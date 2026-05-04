@@ -14,8 +14,62 @@ datasource db {
   extensions = [citext]
 }
 
-// Modelle werden in Tasks 9–12 ergänzt.
-// Placeholder so prisma generate works before real models are added (Task 9 will replace this).
-model Placeholder {
-  id String @id @default(uuid()) @db.Uuid
+enum UserRole {
+  user
+  admin
+}
+
+enum UserStatus {
+  active
+  disabled
+}
+
+model User {
+  id              String     @id @default(uuid()) @db.Uuid
+  email           String     @unique @db.Citext
+  passwordHash    String
+  role            UserRole   @default(user)
+  status          UserStatus @default(active)
+  createdAt       DateTime   @default(now()) @db.Timestamptz(6)
+  storageQuota    BigInt     @default(21474836480) // 20 GB
+  parallelQuota   Int        @default(3)           @db.SmallInt
+  hourlyQuota     Int        @default(30)          @db.SmallInt
+  invitedById     String?    @db.Uuid
+  invitedBy       User?      @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  invitedUsers    User[]     @relation("InvitedBy")
+
+  invitesIssued   Invite[]   @relation("InviteIssuer")
+  invitesConsumed Invite[]   @relation("InviteConsumer")
+  sessions        Session[]
+
+  @@index([email])
+}
+
+model Invite {
+  id            String    @id @default(uuid()) @db.Uuid
+  token         String    @unique
+  email         String?   @db.Citext
+  createdById   String    @db.Uuid
+  createdBy     User      @relation("InviteIssuer", fields: [createdById], references: [id])
+  expiresAt     DateTime  @db.Timestamptz(6)
+  consumedAt    DateTime? @db.Timestamptz(6)
+  consumedById  String?   @db.Uuid
+  consumedBy    User?     @relation("InviteConsumer", fields: [consumedById], references: [id])
+
+  @@index([expiresAt])
+}
+
+model Session {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String   @unique
+  userAgent   String
+  ip          String   @db.Inet
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  lastUsedAt  DateTime @default(now()) @db.Timestamptz(6)
+  expiresAt   DateTime @db.Timestamptz(6)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
