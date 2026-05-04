@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - mediacompressor-internal
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - mediacompressor-internal
+
+  migrate:
+    image: node:22-bookworm-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: ['sh', '-c', 'apt-get update -y && apt-get install -y openssl && corepack enable && corepack prepare pnpm@9 --activate && pnpm install --frozen-lockfile && pnpm --filter @mediacompressor/db prisma:migrate:deploy']
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+    networks:
+      - mediacompressor-internal
+
+volumes:
+  postgres-data:
+  redis-data:
+
+networks:
+  mediacompressor-internal:
+    driver: bridge
+    # internal: true wird in Plan 9 ergänzt, sobald die Worker-/API-Egress-Trennung
+    # final konfiguriert ist. In Foundation muss migrate noch online installieren.
