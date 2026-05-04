@@ -13,4 +13,10 @@ describe('db package', () => {
     expect(typeof client.session.findFirst).toBe('function');
     void client.$disconnect();
   });
+
+  it('PrismaClient knows about ApiKey model', () => {
+    const client = createPrismaClient();
+    expect(typeof client.apiKey.findFirst).toBe('function');
+    void client.$disconnect();
+  });
 });
