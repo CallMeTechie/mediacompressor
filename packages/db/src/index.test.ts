@@ -19,4 +19,11 @@ describe('db package', () => {
     expect(typeof client.apiKey.findFirst).toBe('function');
     void client.$disconnect();
   });
+
+  it('PrismaClient knows about Job and UsageEvent models', () => {
+    const client = createPrismaClient();
+    expect(typeof client.job.findFirst).toBe('function');
+    expect(typeof client.usageEvent.findFirst).toBe('function');
+    void client.$disconnect();
+  });
 });

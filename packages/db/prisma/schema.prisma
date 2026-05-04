@@ -42,6 +42,7 @@ model User {
   invitesConsumed Invite[]   @relation("InviteConsumer")
   sessions        Session[]
   apiKeys         ApiKey[]
+  jobs            Job[]
 
   @@index([email])
 }
@@ -89,4 +90,74 @@ model ApiKey {
 
   @@index([userId])
   @@index([revokedAt])
+}
+
+enum JobStatus {
+  pending
+  uploading
+  queued
+  processing
+  succeeded
+  failed
+  canceled
+  expired
+}
+
+enum JobKind {
+  image
+  video
+}
+
+enum UsageEventType {
+  job_submitted
+  bytes_in
+  bytes_out
+  job_failed
+}
+
+model Job {
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @db.Uuid
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  uploadId          String    @unique
+  status            JobStatus
+  kind              JobKind
+  profile           String
+  overrides         Json
+  inputFilename     String
+  reservedBytes     BigInt    @default(0)
+  inputBytes        BigInt?
+  inputMime         String?
+  inputStorageKey   String?
+  outputBytes       BigInt?
+  outputMime        String?
+  outputFormat      String?
+  outputStorageKey  String?
+  metadata          Json?
+  errorCode         String?
+  errorMessage      String?
+  progress          Int       @default(0) @db.SmallInt
+  attempts          Int       @default(0) @db.SmallInt
+  createdAt         DateTime  @default(now()) @db.Timestamptz(6)
+  startedAt         DateTime? @db.Timestamptz(6)
+  finishedAt        DateTime? @db.Timestamptz(6)
+  expiresAt         DateTime? @db.Timestamptz(6)
+
+  usageEvents       UsageEvent[]
+
+  @@index([userId, status])
+  @@index([status, expiresAt])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model UsageEvent {
+  id          BigInt        @id @default(autoincrement())
+  userId      String        @db.Uuid
+  jobId       String?       @db.Uuid
+  job         Job?          @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  type        UsageEventType
+  value       BigInt
+  occurredAt  DateTime      @default(now()) @db.Timestamptz(6)
+
+  @@index([userId, occurredAt(sort: Desc)])
 }
