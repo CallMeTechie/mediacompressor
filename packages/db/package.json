@@ -12,6 +12,7 @@
     }
   },
   "scripts": {
+    "postinstall": "prisma generate --schema=./prisma/schema.prisma",
     "build": "tsc -b",
     "test": "vitest run",
     "prisma:generate": "prisma generate --schema=./prisma/schema.prisma",
