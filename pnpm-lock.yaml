@@ -45,6 +45,12 @@ importers:
         specifier: ^3.23.8
         version: 3.25.76
 
+  packages/storage:
+    dependencies:
+      '@mediacompressor/shared':
+        specifier: workspace:*
+        version: link:../shared
+
 packages:
 
   '@ampproject/remapping@2.3.0':
