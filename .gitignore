@@ -1,0 +1,35 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build output
+dist
+build
+*.tsbuildinfo
+
+# Test artifacts
+coverage
+.vitest
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Compose volumes (lokal)
+postgres-data/
+redis-data/
+media-data/
+
+# Prisma generated
+**/prisma/generated
