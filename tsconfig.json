@@ -4,6 +4,7 @@
     { "path": "./packages/shared" },
     { "path": "./packages/storage" },
     { "path": "./packages/compression" },
-    { "path": "./packages/db" }
+    { "path": "./packages/db" },
+    { "path": "./packages/eslint-plugin-mediacompressor" }
   ]
 }

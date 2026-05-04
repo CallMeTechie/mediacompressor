@@ -2,6 +2,7 @@ import tseslint from '@typescript-eslint/eslint-plugin';
 import tsparser from '@typescript-eslint/parser';
 import security from 'eslint-plugin-security';
 import globals from 'globals';
+import mediacompressor from '@mediacompressor/eslint-plugin-mediacompressor';
 
 export default [
   {
@@ -20,6 +21,7 @@ export default [
     plugins: {
       '@typescript-eslint': tseslint,
       security,
+      '@mediacompressor': mediacompressor,
     },
     rules: {
       ...tseslint.configs.recommended.rules,
@@ -32,6 +34,7 @@ export default [
       'no-eval': 'error',
       'no-implied-eval': 'error',
       'no-new-func': 'error',
+      '@mediacompressor/no-direct-ffmpeg-spawn': 'error',
     },
   },
 ];

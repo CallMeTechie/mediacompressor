@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@mediacompressor/eslint-plugin-mediacompressor':
+        specifier: workspace:^
+        version: link:packages/eslint-plugin-mediacompressor
       '@types/node':
         specifier: ~22.7.0
         version: 22.7.9
@@ -54,6 +57,19 @@ importers:
       prisma:
         specifier: ^5.22.0
         version: 5.22.0
+
+  packages/eslint-plugin-mediacompressor:
+    dependencies:
+      eslint:
+        specifier: '>=9'
+        version: 9.13.0
+    devDependencies:
+      '@types/eslint':
+        specifier: ^9.6.1
+        version: 9.6.1
+      '@typescript-eslint/utils':
+        specifier: ^8.12.0
+        version: 8.59.2(eslint@9.13.0)(typescript@5.6.3)
 
   packages/shared:
     dependencies:
@@ -466,6 +482,9 @@ packages:
     resolution: {integrity: sha512-hPt/bgL5cE+Qp+/TPHBqptcAgPzgj46mPcg/16zNUmbQk0j+mOEQV/+Lqu8QRtDV3Ek95Q6FeFITpuhl6OTsAA==}
     cpu: [x64]
     os: [win32]
+
+  '@types/eslint@9.6.1':
+    resolution: {integrity: sha512-FXx2pKgId/WyYo2jXw63kk7/+TY7u7AziEJxJAnSFzHlqTAS3Ync6SvgYAN/k4/PQpnnVuzoMuVnByKK2qp0ag==}
 
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
@@ -1496,6 +1515,11 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.60.3':
     optional: true
+
+  '@types/eslint@9.6.1':
+    dependencies:
+      '@types/estree': 1.0.8
+      '@types/json-schema': 7.0.15
 
   '@types/estree@1.0.8': {}
 
