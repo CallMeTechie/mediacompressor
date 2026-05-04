@@ -26,4 +26,10 @@ describe('db package', () => {
     expect(typeof client.usageEvent.findFirst).toBe('function');
     void client.$disconnect();
   });
+
+  it('PrismaClient knows about PepperCanary model', () => {
+    const client = createPrismaClient();
+    expect(typeof client.pepperCanary.findFirst).toBe('function');
+    void client.$disconnect();
+  });
 });
