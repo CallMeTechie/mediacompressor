@@ -33,7 +33,12 @@ services:
     working_dir: /app
     volumes:
       - .:/app
-    command: ['sh', '-c', 'apt-get update -y && apt-get install -y openssl && corepack enable && corepack prepare pnpm@9 --activate && pnpm install --frozen-lockfile && pnpm --filter @mediacompressor/db prisma:migrate:deploy']
+    command:
+      [
+        'sh',
+        '-c',
+        'apt-get update -y && apt-get install -y openssl && corepack enable && corepack prepare pnpm@9 --activate && pnpm install --frozen-lockfile && pnpm --filter @mediacompressor/db prisma:migrate:deploy',
+      ]
     environment:
       DATABASE_URL: ${DATABASE_URL}
     depends_on:

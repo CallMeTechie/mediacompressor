@@ -29,7 +29,8 @@ export const rule = createRule({
         if (callee.type !== 'Identifier') return;
 
         const name = callee.name;
-        if (name !== 'spawn' && name !== 'exec' && name !== 'execFile' && name !== 'spawnSync') return;
+        if (name !== 'spawn' && name !== 'exec' && name !== 'execFile' && name !== 'spawnSync')
+          return;
 
         const firstArg = node.arguments[0];
         if (!firstArg) return;
