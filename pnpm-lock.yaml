@@ -39,6 +39,12 @@ importers:
         specifier: ~2.1.4
         version: 2.1.9(@types/node@22.7.9)
 
+  packages/compression:
+    dependencies:
+      '@mediacompressor/shared':
+        specifier: workspace:*
+        version: link:../shared
+
   packages/shared:
     dependencies:
       zod:

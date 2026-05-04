@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/shared" },
-    { "path": "./packages/storage" }
+    { "path": "./packages/storage" },
+    { "path": "./packages/compression" }
   ]
 }
