@@ -63,7 +63,8 @@ export class Argon2Semaphore {
     if (!next) return;
     if (next.timer) clearTimeout(next.timer);
     this.active++;
-    next.task()
+    next
+      .task()
       .then((v) => next.resolve(v))
       .catch((e) => next.reject(e))
       .finally(() => this.release());

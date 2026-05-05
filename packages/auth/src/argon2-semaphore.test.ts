@@ -32,16 +32,20 @@ describe('Argon2Semaphore', () => {
 
   it('releases the slot even when the task throws', async () => {
     const sem = new Argon2Semaphore(1);
-    await sem.run(async () => { throw new Error('x'); }).catch(() => {});
+    await sem
+      .run(async () => {
+        throw new Error('x');
+      })
+      .catch(() => {});
     await expect(sem.run(async () => 42)).resolves.toBe(42);
   });
 
   it('rejects with SemaphoreTimeoutError when wait exceeds timeoutMs (C2-Rev1)', async () => {
     const sem = new Argon2Semaphore(1);
     const slow = sem.run(() => new Promise((r) => setTimeout(r, 200)));
-    await expect(
-      sem.run(() => Promise.resolve('x'), { timeoutMs: 30 }),
-    ).rejects.toBeInstanceOf(SemaphoreTimeoutError);
+    await expect(sem.run(() => Promise.resolve('x'), { timeoutMs: 30 })).rejects.toBeInstanceOf(
+      SemaphoreTimeoutError,
+    );
     await slow;
   });
 
@@ -49,9 +53,7 @@ describe('Argon2Semaphore', () => {
     const sem = new Argon2Semaphore(1);
     const slow = sem.run(() => new Promise((r) => setTimeout(r, 600)));
     const start = Date.now();
-    await expect(sem.run(() => Promise.resolve('x'))).rejects.toBeInstanceOf(
-      SemaphoreTimeoutError,
-    );
+    await expect(sem.run(() => Promise.resolve('x'))).rejects.toBeInstanceOf(SemaphoreTimeoutError);
     const elapsed = Date.now() - start;
     expect(elapsed).toBeGreaterThanOrEqual(450);
     expect(elapsed).toBeLessThan(700);

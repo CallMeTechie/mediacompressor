@@ -5,4 +5,13 @@ export { generateApiKey, hashApiKey, verifyApiKey, parseApiKey } from './api-key
 export { generateSessionToken, hashSessionToken, verifySessionToken } from './sessions.js';
 export { generateInviteToken, hashInviteToken, verifyInviteToken } from './invites.js';
 export { assertPepperCanary, PepperCanaryMismatchError } from './pepper-canary.js';
-export { Argon2Semaphore, SemaphoreTimeoutError, type SemaphoreRunOptions } from './argon2-semaphore.js';
+export {
+  Argon2Semaphore,
+  SemaphoreTimeoutError,
+  type SemaphoreRunOptions,
+} from './argon2-semaphore.js';
+export {
+  checkAndIncrementRateLimit,
+  defineRateLimitCommand,
+  type RateLimitResult,
+} from './rate-limit.js';

@@ -5,7 +5,10 @@ import { assertPepper } from './timing.js';
 const CANARY_INPUT = 'mediacompressor-canary-v1';
 
 export class PepperCanaryMismatchError extends Error {
-  constructor(public readonly expected: string, public readonly actual: string) {
+  constructor(
+    public readonly expected: string,
+    public readonly actual: string,
+  ) {
     super(
       `API_KEY_PEPPER mismatch.\n` +
         `Expected HMAC: ${expected}\n` +
@@ -38,10 +41,7 @@ export async function assertPepperCanary(prisma: PrismaClient, pepper: Buffer): 
   }
   const expectedBuf = Buffer.from(row.expectedHmac, 'hex');
   const actualBuf = Buffer.from(actual, 'hex');
-  if (
-    expectedBuf.length !== actualBuf.length ||
-    !timingSafeEqual(expectedBuf, actualBuf)
-  ) {
+  if (expectedBuf.length !== actualBuf.length || !timingSafeEqual(expectedBuf, actualBuf)) {
     throw new PepperCanaryMismatchError(row.expectedHmac, actual);
   }
 }
