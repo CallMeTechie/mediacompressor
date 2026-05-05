@@ -9,6 +9,17 @@ export const VIDEO_OUTPUT_CODECS = {
   webm: 'libvpx-vp9',
 } as const satisfies Record<'mp4' | 'webm', string>;
 
+export interface EngineLimits {
+  maxFileSize?: number;
+  maxDuration?: number;
+}
+
+export const PROFILE_LIMITS: Record<Profile, EngineLimits> = {
+  'web-optimized': { maxFileSize: 2_000_000_000, maxDuration: 14_400 },
+  'mobile-low': { maxFileSize: 500_000_000, maxDuration: 14_400 },
+  'archive-medium': { maxFileSize: 4_000_000_000, maxDuration: 14_400 },
+};
+
 export const IMAGE_INPUT_MIMES = new Set([
   'image/jpeg',
   'image/png',

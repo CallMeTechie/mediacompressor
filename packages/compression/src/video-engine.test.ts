@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { compressVideo } from './video-engine.js';
+import { compressVideo, compressVideoWithLimits } from './video-engine.js';
 
 const FIXTURES = join(import.meta.dirname, '..', 'test-fixtures');
 let outDir: string;
@@ -91,5 +91,39 @@ describe('compressVideo', () => {
         signal: new AbortController().signal,
       }),
     ).rejects.toThrow(/UNSUPPORTED_OUTPUT_FORMAT/);
+  });
+
+  it('reports ENGINE_INPUT_CORRUPT when -fs cap truncates output (uses internal API, C5)', async () => {
+    const out = join(outDir, 'truncated.webm');
+    await expect(
+      compressVideoWithLimits(
+        {
+          inputPath: join(FIXTURES, 'tiny.mp4'),
+          outputPath: out,
+          profile: 'web-optimized',
+          overrides: { targetFormat: 'webm' },
+          signal: new AbortController().signal,
+        },
+        { maxFileSize: 1024 },
+      ),
+    ).rejects.toThrow(/ENGINE_INPUT_CORRUPT/);
+  });
+
+  it('ignores maxFileSize sent in overrides (C5: not a user-API parameter)', async () => {
+    const out = join(outDir, 'override-ignored.webm');
+    await expect(
+      compressVideo({
+        inputPath: join(FIXTURES, 'tiny.mp4'),
+        outputPath: out,
+        profile: 'web-optimized',
+        // @ts-expect-error  intentional: maxFileSize is not in CompressionOverrides
+        overrides: { targetFormat: 'webm', maxFileSize: 100 },
+        signal: new AbortController().signal,
+      }),
+    ).resolves.toMatchObject({ outputFormat: 'webm' });
+
+    const { statSync, existsSync } = await import('node:fs');
+    expect(existsSync(out)).toBe(true);
+    expect(statSync(out).size).toBeGreaterThan(500);
   });
 });

@@ -1,10 +1,12 @@
 import { spawn } from 'node:child_process';
 import { rm, stat } from 'node:fs/promises';
 import {
+  PROFILE_LIMITS,
   VIDEO_OUTPUT_CODECS,
   VIDEO_OUTPUT_FORMATS,
   type CompressionRequest,
   type CompressionResult,
+  type EngineLimits,
   type VideoOutputFormat,
 } from './types.js';
 import { buildFfmpegArgs } from './ffmpeg-args.js';
@@ -18,6 +20,14 @@ const CRF_BY_PROFILE: Record<string, number> = {
 };
 
 export async function compressVideo(req: CompressionRequest): Promise<CompressionResult> {
+  return compressVideoWithLimits(req, PROFILE_LIMITS[req.profile]);
+}
+
+/** @internal — exported for testing only (Task 12 C5 tests) */
+export async function compressVideoWithLimits(
+  req: CompressionRequest,
+  limits: EngineLimits,
+): Promise<CompressionResult> {
   const start = Date.now();
   const inputBytes = (await stat(req.inputPath)).size;
 
@@ -44,9 +54,11 @@ export async function compressVideo(req: CompressionRequest): Promise<Compressio
     videoCodec: codec,
     crf,
     preset: codec === 'libx264' ? 'medium' : undefined,
+    maxFileSize: limits.maxFileSize,
+    maxDuration: limits.maxDuration,
   });
 
-  await runFfmpeg(args, probe.duration, req.signal, req.onProgress, req.outputPath, undefined);
+  await runFfmpeg(args, probe.duration, req.signal, req.onProgress, req.outputPath, limits.maxFileSize);
 
   const outputBytes = (await stat(req.outputPath)).size;
 
