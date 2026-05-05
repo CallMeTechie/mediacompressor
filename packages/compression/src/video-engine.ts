@@ -9,7 +9,7 @@ import {
   type EngineLimits,
   type VideoOutputFormat,
 } from './types.js';
-import { buildFfmpegArgs } from './ffmpeg-args.js';
+import { buildFfmpegArgs, type BuildFfmpegArgsOptions } from './ffmpeg-args.js';
 import { parseProgressChunk } from './ffmpeg-progress.js';
 import { probeVideo, VideoProbeError } from './video-probe.js';
 
@@ -48,15 +48,16 @@ export async function compressVideoWithLimits(
     throw err;
   }
 
-  const args = buildFfmpegArgs({
+  const ffmpegOpts: BuildFfmpegArgsOptions = {
     inputs: [{ path: req.inputPath }],
     output: req.outputPath,
     videoCodec: codec,
     crf,
-    preset: codec === 'libx264' ? 'medium' : undefined,
-    maxFileSize: limits.maxFileSize,
-    maxDuration: limits.maxDuration,
-  });
+  };
+  if (codec === 'libx264') ffmpegOpts.preset = 'medium';
+  if (limits.maxFileSize !== undefined) ffmpegOpts.maxFileSize = limits.maxFileSize;
+  if (limits.maxDuration !== undefined) ffmpegOpts.maxDuration = limits.maxDuration;
+  const args = buildFfmpegArgs(ffmpegOpts);
 
   await runFfmpeg(args, probe.duration, req.signal, req.onProgress, req.outputPath, limits.maxFileSize);
 

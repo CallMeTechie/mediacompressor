@@ -15,3 +15,4 @@ export type {
   VideoOutputFormat,
 } from './types.js';
 export { buildFfmpegArgs, type FfmpegInput, type BuildFfmpegArgsOptions } from './ffmpeg-args.js';
+export { compress } from './compress.js';

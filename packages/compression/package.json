@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@mediacompressor/shared": "workspace:*",
+    "@mediacompressor/storage": "workspace:^",
     "sharp": "~0.33.5"
   },
   "devDependencies": {

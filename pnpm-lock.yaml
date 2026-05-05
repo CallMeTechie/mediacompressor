@@ -47,6 +47,9 @@ importers:
       '@mediacompressor/shared':
         specifier: workspace:*
         version: link:../shared
+      '@mediacompressor/storage':
+        specifier: workspace:^
+        version: link:../storage
       sharp:
         specifier: ~0.33.5
         version: 0.33.5
