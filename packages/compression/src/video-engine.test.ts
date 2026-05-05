@@ -7,8 +7,12 @@ import { compressVideo, compressVideoWithLimits } from './video-engine.js';
 const FIXTURES = join(import.meta.dirname, '..', 'test-fixtures');
 let outDir: string;
 
-beforeAll(() => { outDir = mkdtempSync(join(tmpdir(), 'mc-vid-test-')); });
-afterAll(() => { rmSync(outDir, { recursive: true, force: true }); });
+beforeAll(() => {
+  outDir = mkdtempSync(join(tmpdir(), 'mc-vid-test-'));
+});
+afterAll(() => {
+  rmSync(outDir, { recursive: true, force: true });
+});
 
 describe('compressVideo', () => {
   it('MP4 input produces valid WebM (VP9) output', async () => {

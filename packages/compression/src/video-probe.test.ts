@@ -18,6 +18,8 @@ describe('probeVideo', () => {
   });
 
   it('throws on non-existent file', async () => {
-    await expect(probeVideo(join(FIXTURES, 'does-not-exist.mp4'))).rejects.toBeInstanceOf(VideoProbeError);
+    await expect(probeVideo(join(FIXTURES, 'does-not-exist.mp4'))).rejects.toBeInstanceOf(
+      VideoProbeError,
+    );
   });
 });

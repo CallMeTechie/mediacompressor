@@ -1,7 +1,10 @@
 import { spawn } from 'node:child_process';
 
 export class VideoProbeError extends Error {
-  constructor(public readonly inputPath: string, cause: string) {
+  constructor(
+    public readonly inputPath: string,
+    cause: string,
+  ) {
     super(`ffprobe failed for ${inputPath}: ${cause}`);
     this.name = 'VideoProbeError';
   }
@@ -25,11 +28,16 @@ export interface VideoProbeResult {
 export async function probeVideo(inputPath: string): Promise<VideoProbeResult> {
   return new Promise((resolveProbe, rejectProbe) => {
     const args = [
-      '-v', 'error',
-      '-show_entries', 'stream=width,height,duration,codec_name',
-      '-select_streams', 'v:0',
-      '-of', 'json',
-      '-protocol_whitelist', 'file',
+      '-v',
+      'error',
+      '-show_entries',
+      'stream=width,height,duration,codec_name',
+      '-select_streams',
+      'v:0',
+      '-of',
+      'json',
+      '-protocol_whitelist',
+      'file',
       inputPath,
     ];
     const proc = spawn('ffprobe', args, { stdio: ['ignore', 'pipe', 'pipe'] });

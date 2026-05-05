@@ -59,7 +59,14 @@ export async function compressVideoWithLimits(
   if (limits.maxDuration !== undefined) ffmpegOpts.maxDuration = limits.maxDuration;
   const args = buildFfmpegArgs(ffmpegOpts);
 
-  await runFfmpeg(args, probe.duration, req.signal, req.onProgress, req.outputPath, limits.maxFileSize);
+  await runFfmpeg(
+    args,
+    probe.duration,
+    req.signal,
+    req.onProgress,
+    req.outputPath,
+    limits.maxFileSize,
+  );
 
   const outputBytes = (await stat(req.outputPath)).size;
 

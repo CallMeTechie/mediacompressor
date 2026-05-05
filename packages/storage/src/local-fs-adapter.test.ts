@@ -42,9 +42,7 @@ describe('LocalFsAdapter', () => {
     await expect(adapter.put('../escape.bin', Buffer.from('x'))).rejects.toBeInstanceOf(
       PathTraversalError,
     );
-    await expect(adapter.get('user-1/../../etc/passwd')).rejects.toBeInstanceOf(
-      PathTraversalError,
-    );
+    await expect(adapter.get('user-1/../../etc/passwd')).rejects.toBeInstanceOf(PathTraversalError);
   });
 
   it('rejects absolute keys', async () => {

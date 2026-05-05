@@ -33,9 +33,7 @@ describe('magic-number', () => {
 
   it('verifyClaimedMime throws when file format is unrecognisable', async () => {
     const garbage = Buffer.from('not a real file');
-    await expect(verifyClaimedMime(garbage, 'image/png')).rejects.toBeInstanceOf(
-      MimeMismatchError,
-    );
+    await expect(verifyClaimedMime(garbage, 'image/png')).rejects.toBeInstanceOf(MimeMismatchError);
   });
 
   it('detectMimeFromFile reads only the head of the file (no full-file load)', async () => {

@@ -7,8 +7,12 @@ import { compress } from './compress.js';
 const FIXTURES = join(import.meta.dirname, '..', 'test-fixtures');
 let outDir: string;
 
-beforeAll(() => { outDir = mkdtempSync(join(tmpdir(), 'mc-compress-test-')); });
-afterAll(() => { rmSync(outDir, { recursive: true, force: true }); });
+beforeAll(() => {
+  outDir = mkdtempSync(join(tmpdir(), 'mc-compress-test-'));
+});
+afterAll(() => {
+  rmSync(outDir, { recursive: true, force: true });
+});
 
 describe('compress (façade)', () => {
   it('dispatches image input to image-engine', async () => {
