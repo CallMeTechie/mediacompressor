@@ -4,24 +4,28 @@ const createRule = ESLintUtils.RuleCreator(
   (name) => `https://example.com/eslint-plugin-mediacompressor/${name}`,
 );
 
+const RESTRICTED_PROGRAMS = new Set(['ffmpeg', 'ffprobe']);
+
+const ALLOWED_FILES = ['ffmpeg-args.ts', 'video-engine.ts', 'video-probe.ts'];
+
 export const rule = createRule({
   name: 'no-direct-ffmpeg-spawn',
   meta: {
     type: 'problem',
     docs: {
       description:
-        'Verbiete direkte spawn/exec-Aufrufe von ffmpeg ausserhalb des zentralen Argument-Builders. Spec C2.',
+        'Verbiete direkte spawn/exec-Aufrufe von ffmpeg/ffprobe ausserhalb der zentralen Wrapper. Spec C2.',
     },
     schema: [],
     messages: {
       noDirectSpawn:
-        'Direkter ffmpeg-Aufruf verboten. Nutze buildFfmpegArgs() in packages/compression/src/ffmpeg-args.ts.',
+        'Direkter ffmpeg/ffprobe-Aufruf verboten. Nutze buildFfmpegArgs() in ffmpeg-args.ts oder probeVideo() in video-probe.ts.',
     },
   },
   defaultOptions: [],
   create(context) {
     const filename = context.filename;
-    if (filename.endsWith('ffmpeg-args.ts')) return {};
+    if (ALLOWED_FILES.some((f) => filename.endsWith(f))) return {};
 
     return {
       CallExpression(node: TSESTree.CallExpression) {
@@ -35,15 +39,18 @@ export const rule = createRule({
         const firstArg = node.arguments[0];
         if (!firstArg) return;
 
-        const isFfmpegStringArg =
+        const isRestrictedProgramArg =
           firstArg.type === 'Literal' &&
           typeof firstArg.value === 'string' &&
-          (firstArg.value === 'ffmpeg' ||
-            firstArg.value.startsWith('ffmpeg ') ||
-            firstArg.value.includes(' ffmpeg ') ||
-            firstArg.value.startsWith('ffmpeg -'));
+          [...RESTRICTED_PROGRAMS].some(
+            (p) =>
+              firstArg.value === p ||
+              (firstArg.value as string).startsWith(`${p} `) ||
+              (firstArg.value as string).includes(` ${p} `) ||
+              (firstArg.value as string).startsWith(`${p} -`),
+          );
 
-        if (!isFfmpegStringArg) return;
+        if (!isRestrictedProgramArg) return;
 
         const secondArg = node.arguments[1];
         if (
