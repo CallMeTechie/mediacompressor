@@ -82,6 +82,10 @@ importers:
       '@mediacompressor/shared':
         specifier: workspace:*
         version: link:../shared
+    devDependencies:
+      '@types/node':
+        specifier: ~22.7.0
+        version: 22.7.9
 
 packages:
 
