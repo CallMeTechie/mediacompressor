@@ -58,7 +58,8 @@ jobs:
           # compression" fehl und HEIC-Tests sind rot.
           sudo apt-get install -y --no-install-recommends \
               libheif-plugin-libde265 libheif-plugin-x265 \
-            || echo "warning: libheif-plugin-x265 not available — HEIC encoding will fail"
+              libheif-plugin-aomenc \
+            || echo "warning: libheif plugins not available — HEIC/AVIF encoding may fail"
           # Verifikation
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
