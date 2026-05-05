@@ -36,6 +36,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install system dependencies (ffmpeg, libvips, libheif)
+        run: |
+          sudo apt-get update -y
+          # Diagnose: zeige verfügbare libheif-Pakete (für CI-Log-Lesbarkeit)
+          apt-cache search libheif | head -20 || true
+          # Pflicht-Pakete (auf allen ubuntu-latest-Generationen verfügbar)
+          sudo apt-get install -y --no-install-recommends \
+            ffmpeg \
+            libvips42 \
+            libheif1
+          # Plugin-Pakete optional — auf Ubuntu 22.04 sind die Decoder bereits in
+          # libheif1 integriert; auf 24.04 sind sie als separate Pakete verfügbar.
+          # Wir installieren best-effort und brechen NICHT bei Fehlschlag ab (C3-Rev2-Fix).
+          sudo apt-get install -y --no-install-recommends \
+              libheif-plugin-libde265 libheif-plugin-x265 \
+            || echo "info: libheif-plugin-* not separate on this Ubuntu; integrated in libheif1"
+          # Verifikation
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+          vips --version
+          ldconfig -p | grep -i heif || echo "warning: libheif not linked"
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
