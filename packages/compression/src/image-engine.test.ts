@@ -113,3 +113,60 @@ describe('compressImage — resize', () => {
     expect(meta.width).toBe(256);
   });
 });
+
+describe('compressImage — security regressions', () => {
+  it('rejects pixel-bomb PNG with limitInputPixels-specific error (C4-Fix)', async () => {
+    // bomb.png is a VALID PNG of 16001x16001 (256_032_001 pixels) — it exceeds
+    // the 256_000_000 limitInputPixels cap and must be rejected by sharp's
+    // limit, not by malformed-PNG detection.
+    const out = join(outDir, 'bomb.webp');
+    await expect(
+      compressImage({
+        inputPath: join(FIXTURES, 'bomb.png'),
+        outputPath: out,
+        profile: 'web-optimized',
+        overrides: { targetFormat: 'webp' },
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toThrow(/pixel limit|input image exceeds|limitInputPixels/i);
+  });
+
+  it('rejects path-traversal targetFormat (allowlist), not interpolating into pipeline', async () => {
+    const out = join(outDir, 'evil.bin');
+    await expect(
+      compressImage({
+        inputPath: join(FIXTURES, 'tiny.png'),
+        outputPath: out,
+        profile: 'web-optimized',
+        overrides: { targetFormat: '../../../etc/passwd' },
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toThrow(/UNSUPPORTED_OUTPUT_FORMAT/);
+  });
+});
+
+describe('compressImage — HEIC and AVIF input', () => {
+  it('reads HEIC and converts to WebP', async () => {
+    const out = join(outDir, 'heic.webp');
+    const result = await compressImage({
+      inputPath: join(FIXTURES, 'tiny.heic'),
+      outputPath: out,
+      profile: 'web-optimized',
+      overrides: { targetFormat: 'webp' },
+      signal: new AbortController().signal,
+    });
+    expect(result.outputFormat).toBe('webp');
+  });
+
+  it('reads AVIF and converts to JPEG', async () => {
+    const out = join(outDir, 'avif.jpg');
+    const result = await compressImage({
+      inputPath: join(FIXTURES, 'tiny.avif'),
+      outputPath: out,
+      profile: 'web-optimized',
+      overrides: { targetFormat: 'jpeg' },
+      signal: new AbortController().signal,
+    });
+    expect(result.outputFormat).toBe('jpeg');
+  });
+});
