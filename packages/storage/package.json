@@ -16,7 +16,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@mediacompressor/shared": "workspace:*"
+    "@mediacompressor/shared": "workspace:*",
+    "file-type": "~19.6.0"
   },
   "devDependencies": {
     "@types/node": "~22.7.0"

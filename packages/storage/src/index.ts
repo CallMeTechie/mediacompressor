@@ -4,3 +4,9 @@ export {
   PathTraversalError,
   type LocalFsAdapterOptions,
 } from './local-fs-adapter.js';
+export {
+  detectMime,
+  detectMimeFromFile,
+  verifyClaimedMime,
+  MimeMismatchError,
+} from './magic-number.js';
