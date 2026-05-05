@@ -1,10 +1,23 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/shared" },
-    { "path": "./packages/storage" },
-    { "path": "./packages/compression" },
-    { "path": "./packages/db" },
-    { "path": "./packages/eslint-plugin-mediacompressor" }
+    {
+      "path": "./packages/shared"
+    },
+    {
+      "path": "./packages/storage"
+    },
+    {
+      "path": "./packages/compression"
+    },
+    {
+      "path": "./packages/db"
+    },
+    {
+      "path": "./packages/eslint-plugin-mediacompressor"
+    },
+    {
+      "path": "./packages/auth"
+    }
   ]
 }
