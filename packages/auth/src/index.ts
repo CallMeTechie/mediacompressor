@@ -1,2 +1,2 @@
 // Plan 3 Tasks 2–9 fügen hier Re-Exports ein.
-export {};
+export { equalsConstantTime, dummyCompare, assertPepper } from './timing.js';
