@@ -71,3 +71,45 @@ describe('compressImage — format conversion', () => {
     ).rejects.toThrow(/UNSUPPORTED_OUTPUT_FORMAT/);
   });
 });
+
+describe('compressImage — resize', () => {
+  it('respects maxWidth (preserving aspect ratio)', async () => {
+    const out = join(outDir, 'resize-w.webp');
+    await compressImage({
+      inputPath: join(FIXTURES, 'tiny.png'), // 256x256
+      outputPath: out,
+      profile: 'web-optimized',
+      overrides: { targetFormat: 'webp', maxWidth: 100 },
+      signal: new AbortController().signal,
+    });
+    const meta = await sharp(out).metadata();
+    expect(meta.width).toBe(100);
+    expect(meta.height).toBe(100); // 1:1 ratio preserved
+  });
+
+  it('respects maxHeight when stricter than maxWidth', async () => {
+    const out = join(outDir, 'resize-h.webp');
+    await compressImage({
+      inputPath: join(FIXTURES, 'tiny.png'),
+      outputPath: out,
+      profile: 'web-optimized',
+      overrides: { targetFormat: 'webp', maxWidth: 200, maxHeight: 50 },
+      signal: new AbortController().signal,
+    });
+    const meta = await sharp(out).metadata();
+    expect(meta.height).toBeLessThanOrEqual(50);
+  });
+
+  it('does NOT upscale when image is already smaller', async () => {
+    const out = join(outDir, 'no-upscale.webp');
+    await compressImage({
+      inputPath: join(FIXTURES, 'tiny.png'), // 256x256
+      outputPath: out,
+      profile: 'web-optimized',
+      overrides: { targetFormat: 'webp', maxWidth: 1000 },
+      signal: new AbortController().signal,
+    });
+    const meta = await sharp(out).metadata();
+    expect(meta.width).toBe(256);
+  });
+});

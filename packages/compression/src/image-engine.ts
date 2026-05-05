@@ -21,10 +21,21 @@ export async function compressImage(req: CompressionRequest): Promise<Compressio
   const quality = clampQuality(req.overrides?.quality, PROFILE_QUALITY[req.profile] ?? 80);
 
   sharp.cache(false);
-  const pipeline = sharp(req.inputPath, {
+  let pipeline = sharp(req.inputPath, {
     failOn: 'truncated',
     limitInputPixels: MAX_PIXELS,
   });
+
+  const maxWidth = clampDimension(req.overrides?.maxWidth);
+  const maxHeight = clampDimension(req.overrides?.maxHeight);
+  if (maxWidth || maxHeight) {
+    pipeline = pipeline.resize({
+      width: maxWidth,
+      height: maxHeight,
+      fit: 'inside',
+      withoutEnlargement: true,
+    });
+  }
 
   const formatted = applyOutputFormat(pipeline, targetFormat, quality);
   const info = await formatted.toFile(req.outputPath);
@@ -40,6 +51,14 @@ export async function compressImage(req: CompressionRequest): Promise<Compressio
       height: info.height,
     },
   };
+}
+
+function clampDimension(v: number | undefined): number | undefined {
+  if (v === undefined) return undefined;
+  if (!Number.isInteger(v) || v < 1 || v > 16384) {
+    throw new Error(`VALIDATION_FAILED: dimension out of range`);
+  }
+  return v;
 }
 
 function clampQuality(override: number | undefined, fallback: number): number {
