@@ -20,6 +20,8 @@
     "sharp": "~0.33.5"
   },
   "devDependencies": {
-    "@types/node": "~22.7.0"
+    "@types/node": "~22.7.0",
+    "node-addon-api": "^8.7.0",
+    "node-gyp": "^12.3.0"
   }
 }
