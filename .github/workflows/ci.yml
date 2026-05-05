@@ -36,27 +36,42 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system dependencies (ffmpeg, libvips, libheif)
+      - name: Install system dependencies (ffmpeg, libvips, libheif + build deps for sharp HEIC)
         run: |
           sudo apt-get update -y
           # Diagnose: zeige verfügbare libheif-Pakete (für CI-Log-Lesbarkeit)
           apt-cache search libheif | head -20 || true
-          # Pflicht-Pakete (auf allen ubuntu-latest-Generationen verfügbar)
+          # Runtime-Pflicht-Pakete + Build-Toolchain für sharp from-source (Plan 2 Task 4-bis):
+          # libvips-dev, libheif-dev, build-essential, python3 sind nötig, damit sharp
+          # gegen system-libvips linkt (statt prebuild ohne HEVC-Encoder).
           sudo apt-get install -y --no-install-recommends \
             ffmpeg \
             libvips42 \
-            libheif1
-          # Plugin-Pakete optional — auf Ubuntu 22.04 sind die Decoder bereits in
-          # libheif1 integriert; auf 24.04 sind sie als separate Pakete verfügbar.
-          # Wir installieren best-effort und brechen NICHT bei Fehlschlag ab (C3-Rev2-Fix).
+            libvips-dev \
+            libheif1 \
+            libheif-dev \
+            build-essential \
+            python3
+          # x265-Plugin Pflicht (Plan 2 Task 4-bis): sharp baut from-source gegen
+          # system-libvips, das libheif-plugin-x265 zur Laufzeit lädt. Ohne dieses
+          # Plugin schlägt sharp.heif({ compression: 'hevc' }) mit "Unsupported
+          # compression" fehl und HEIC-Tests sind rot.
           sudo apt-get install -y --no-install-recommends \
               libheif-plugin-libde265 libheif-plugin-x265 \
-            || echo "info: libheif-plugin-* not separate on this Ubuntu; integrated in libheif1"
+            || echo "warning: libheif-plugin-x265 not available — HEIC encoding will fail"
           # Verifikation
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
           vips --version
+          ls -la /usr/lib/x86_64-linux-gnu/libheif/plugins/ || true
           ldconfig -p | grep -i heif || echo "warning: libheif not linked"
+
+      - name: Configure sharp build-from-source for HEIC support
+        # SHARP_FORCE_GLOBAL_LIBVIPS=true is also in .npmrc; we set it in $GITHUB_ENV
+        # as well so all subsequent steps see the variable and pnpm install builds
+        # sharp from source against system libvips (with HEVC encoder).
+        run: |
+          echo "SHARP_FORCE_GLOBAL_LIBVIPS=true" >> $GITHUB_ENV
 
       - uses: actions/setup-node@v4
         with:
