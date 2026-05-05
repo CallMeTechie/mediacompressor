@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  generateApiKey,
-  hashApiKey,
-  verifyApiKey,
-  parseApiKey,
-} from './api-keys.js';
+import { generateApiKey, hashApiKey, verifyApiKey, parseApiKey } from './api-keys.js';
 
 const PEPPER = Buffer.from('a'.repeat(32));
 
@@ -82,6 +77,8 @@ describe('api-keys', () => {
   it('rejects pepper shorter than 32 bytes (C4-Rev1 defense-in-depth)', () => {
     const { key } = generateApiKey();
     expect(() => hashApiKey(key, Buffer.from('short'))).toThrow(/Pepper too short/);
-    expect(() => verifyApiKey(key, '0'.repeat(64), Buffer.from('short'))).toThrow(/Pepper too short/);
+    expect(() => verifyApiKey(key, '0'.repeat(64), Buffer.from('short'))).toThrow(
+      /Pepper too short/,
+    );
   });
 });
