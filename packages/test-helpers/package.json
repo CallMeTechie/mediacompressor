@@ -9,8 +9,8 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@mediacompressor/auth": "workspace:*",
     "@mediacompressor/db": "workspace:*",
+    "argon2": "~0.41.1",
     "ioredis": "~5.4.1"
   },
   "devDependencies": {

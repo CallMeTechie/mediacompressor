@@ -1,9 +1,10 @@
 import { describe, expect, it, beforeAll, afterAll, beforeEach } from 'vitest';
 import IORedis from 'ioredis';
+import { testRedisUrl } from '@mediacompressor/test-helpers';
 import { checkAndIncrementRateLimit, defineRateLimitCommand } from './rate-limit.js';
 
 let redis: IORedis;
-const REDIS_URL = process.env.REDIS_URL ?? 'redis://127.0.0.1:6379';
+const REDIS_URL = testRedisUrl();
 
 beforeAll(() => {
   redis = new IORedis(REDIS_URL);
