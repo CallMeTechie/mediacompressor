@@ -1,12 +1,22 @@
 import { z } from 'zod';
 import type { FastifyPluginAsync } from 'fastify';
 import { PROFILES } from '@mediacompressor/compression/types';
+import type { Prisma } from '@mediacompressor/db';
 import { createCompressionQueue, type CompressJobData } from '../queue.js';
 
 // C3-Rev1: Strikte Format-Pflicht für inputStorageKey — verhindert Path-Traversal
 // in den Worker. Plan 5 ersetzt das durch tusd-Pre-Create-Hook, aber Plan 4 (Stub)
 // muss schon defense-in-depth haben.
 const STORAGE_KEY_RE = /^uploads\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/source\.bin$/;
+
+const ListQuery = z.object({
+  status: z.enum(['queued', 'processing', 'succeeded', 'failed', 'canceled', 'expired']).optional(),
+  kind: z.enum(['image', 'video']).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  cursor: z.string().optional(),
+});
+
+const JobIdParams = z.object({ id: z.string().uuid() });
 
 const PostJobBody = z.object({
   inputStorageKey: z.string().regex(STORAGE_KEY_RE, {
@@ -98,5 +108,85 @@ export const jobsRoutes: FastifyPluginAsync = async (app) => {
         events: `/api/v1/jobs/${job.id}/events`,
       },
     });
+  });
+
+  // Public job projection for read-endpoints. Excludes storage keys, raw
+  // overrides, errorMessage, etc. — only the safe view-model fields.
+  const PUBLIC_JOB_SELECT = {
+    id: true,
+    userId: true,
+    status: true,
+    kind: true,
+    profile: true,
+    inputFilename: true,
+    inputBytes: true,
+    outputBytes: true,
+    progress: true,
+    createdAt: true,
+    finishedAt: true,
+  } as const satisfies Prisma.JobSelect;
+
+  // BigInt is not JSON-serializable. Convert nullable BigInt fields to string
+  // so callers can safely consume the JSON response. Strings keep precision for
+  // bytes > 2^53 (large-file safety) at minimal client cost.
+  type RawJob = {
+    inputBytes: bigint | null;
+    outputBytes: bigint | null;
+  } & Record<string, unknown>;
+  function toPublicJob(j: RawJob): Record<string, unknown> {
+    return {
+      ...j,
+      inputBytes: j.inputBytes === null ? null : j.inputBytes.toString(),
+      outputBytes: j.outputBytes === null ? null : j.outputBytes.toString(),
+    };
+  }
+
+  // GET /api/v1/jobs — cursor-paginated list of the authenticated user's jobs.
+  // Cursor format `iso|id` keyed on (createdAt DESC, id DESC). UUIDs cannot
+  // contain `|`, so the delimiter is unambiguous.
+  app.get('/api/v1/jobs', { schema: { querystring: ListQuery } }, async (req, reply) => {
+    const userId = await app.requireAuth(req, reply);
+    if (!userId) return;
+    const { status, kind, limit, cursor } = req.query as z.infer<typeof ListQuery>;
+
+    let cursorWhere: Prisma.JobWhereInput = {};
+    if (cursor) {
+      const [iso, id] = cursor.split('|');
+      if (iso && id) {
+        cursorWhere = {
+          OR: [
+            { createdAt: { lt: new Date(iso) } },
+            { AND: [{ createdAt: new Date(iso) }, { id: { lt: id } }] },
+          ],
+        };
+      }
+    }
+
+    const items = await prisma.job.findMany({
+      where: { userId, ...(status && { status }), ...(kind && { kind }), ...cursorWhere },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+      select: PUBLIC_JOB_SELECT,
+    });
+    const hasMore = items.length > limit;
+    const slice = items.slice(0, limit);
+    const last = slice[slice.length - 1];
+    const nextCursor = hasMore && last ? `${last.createdAt.toISOString()}|${last.id}` : null;
+    return { items: slice.map(toPublicJob), nextCursor };
+  });
+
+  // GET /api/v1/jobs/:id — detail for a single job owned by the caller.
+  // Foreign jobs return 404 (NOT 403) to avoid leaking the existence of
+  // other users' job IDs.
+  app.get('/api/v1/jobs/:id', { schema: { params: JobIdParams } }, async (req, reply) => {
+    const userId = await app.requireAuth(req, reply);
+    if (!userId) return;
+    const { id } = req.params as z.infer<typeof JobIdParams>;
+    const job = await prisma.job.findFirst({
+      where: { id, userId },
+      select: PUBLIC_JOB_SELECT,
+    });
+    if (!job) return reply.code(404).send({ error: { code: 'NOT_FOUND' } });
+    return toPublicJob(job);
   });
 };
