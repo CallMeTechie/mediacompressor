@@ -53,7 +53,10 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      # UC14-Fix: connection_limit=20 prevents Prisma-pool-exhaustion under
+      # Pre-Create-Hook bursts (advisory-lock + 4 quota-queries per call,
+      # default pool of 10 saturates at ~3 concurrent uploads per replica).
+      DATABASE_URL: ${DATABASE_URL}&connection_limit=20
       REDIS_URL: redis://redis:6379
       SESSION_SECRET: ${SESSION_SECRET}
       CSRF_SECRET: ${CSRF_SECRET}
@@ -86,7 +89,10 @@ services:
       context: .
       dockerfile: apps/worker/Dockerfile
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      # UC14-Fix: same connection_limit reasoning as api. Worker reads job-state
+      # + writes progress throttled, but burst-load (queue drains after a long
+      # stall) can hit pool-saturation otherwise.
+      DATABASE_URL: ${DATABASE_URL}&connection_limit=20
       REDIS_URL: redis://redis:6379
       # API_KEY_PEPPER: worker config schema (apps/worker/src/config.ts) requires
       # this for symmetry with apps/api (HMAC-SHA-256 keyed lookups). Plan-2-Fix.
