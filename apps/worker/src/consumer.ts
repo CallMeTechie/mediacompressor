@@ -1,8 +1,22 @@
 import { Worker } from 'bullmq';
 import IORedis, { type Redis } from 'ioredis';
 import { createPrismaClient, type PrismaClient } from '@mediacompressor/db';
-import { compress } from '@mediacompressor/compression';
+import type { compress as CompressFn } from '@mediacompressor/compression';
 import type { CompressionOverrides, Profile } from '@mediacompressor/compression/types';
+
+// F1-Fix: Lazy-load `compress` so the heavy `@mediacompressor/compression`
+// root export (which transitively initializes sharp's native addon) is NOT
+// evaluated at module-load time. Tests inject `deps.compress` directly and
+// never trigger this path → Sharp's worker_threads-incompatible native init
+// stays out of the test process, eliminating tinypool teardown crashes.
+let cachedCompress: typeof CompressFn | undefined;
+async function loadCompress(): Promise<typeof CompressFn> {
+  if (!cachedCompress) {
+    const mod = await import('@mediacompressor/compression');
+    cachedCompress = mod.compress;
+  }
+  return cachedCompress;
+}
 
 export interface CompressJobData {
   jobId: string;
@@ -17,8 +31,9 @@ export interface ProcessJobDeps {
   redis: Redis;
   pub: Redis;
   prisma: PrismaClient;
-  // Injected so tests can stub the heavy compression engine.
-  compress?: typeof compress;
+  // Injected so tests can stub the heavy compression engine. When not set,
+  // `compress` is lazy-loaded from `@mediacompressor/compression` on first use.
+  compress?: typeof CompressFn;
 }
 
 // Terminal states: jobs in einem dieser Status werden vom Worker NICHT mehr modifiziert
@@ -54,7 +69,8 @@ function asProfile(p: string): Profile {
  */
 export async function processJob(deps: ProcessJobDeps, data: CompressJobData): Promise<void> {
   const { redis, pub, prisma } = deps;
-  const compressFn = deps.compress ?? compress;
+  // F1-Fix: only load the real `compress` (and Sharp) if no test stub is provided.
+  const compressFn = deps.compress ?? (await loadCompress());
   const { jobId, inputPath, outputPath, profile, overrides } = data;
 
   const ctrl = new AbortController();
