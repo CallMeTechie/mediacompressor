@@ -2,18 +2,32 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import IORedis from 'ioredis';
 import { Queue } from 'bullmq';
 import { createPrismaClient, type PrismaClient } from '@mediacompressor/db';
-import { generateApiKey, hashApiKey, hashPassword } from '@mediacompressor/auth';
+import { generateApiKey, hashApiKey } from '@mediacompressor/auth';
+import {
+  TEST_API_KEY_PEPPER,
+  TEST_SESSION_SECRET,
+  TEST_CSRF_SECRET,
+  testDatabaseUrl,
+  testRedisUrl,
+  createTestUser,
+  cleanupTestUsers,
+} from '@mediacompressor/test-helpers';
 import { buildServer } from '../server.js';
 import type { Config } from '../config.js';
 
+// Per-describe scoped emails for parallel-test isolation. The union of these
+// is the set of users this file may seed/cleanup; each describe's beforeAll/
+// afterAll touches only its own slice (HC1-Fix from Devil's-Advocate).
+const TEST_EMAILS_TASK6 = ['jobs@b.com'];
+const TEST_EMAILS_TASK7 = ['jobs7@b.com', 'jobs7-foreign@b.com'];
+const TEST_EMAILS_TASK8 = ['jobs8@b.com', 'jobs8-foreign@b.com'];
+
 const config: Config = {
-  DATABASE_URL:
-    process.env.DATABASE_URL ??
-    'postgresql://mediacompressor:changeme-dev@172.18.0.2:5432/mediacompressor?schema=public',
-  REDIS_URL: process.env.REDIS_URL ?? 'redis://172.18.0.3:6379',
-  SESSION_SECRET: 'a'.repeat(32),
-  CSRF_SECRET: 'b'.repeat(32),
-  API_KEY_PEPPER: 'c'.repeat(32),
+  DATABASE_URL: testDatabaseUrl(),
+  REDIS_URL: testRedisUrl(),
+  SESSION_SECRET: TEST_SESSION_SECRET,
+  CSRF_SECRET: TEST_CSRF_SECRET,
+  API_KEY_PEPPER: TEST_API_KEY_PEPPER,
   CORS_ALLOWED_ORIGINS: 'http://localhost:5173',
   PORT: 0,
   NODE_ENV: 'test',
@@ -32,18 +46,10 @@ describe('jobs routes — POST /api/v1/jobs (Plan 4 Task 6 stub)', () => {
   beforeAll(async () => {
     prisma = createPrismaClient({ databaseUrl: config.DATABASE_URL });
     redis = new IORedis(config.REDIS_URL);
-    // Cleanup leftovers from prior runs.
-    await prisma.session.deleteMany();
-    await prisma.apiKey.deleteMany();
-    await prisma.job.deleteMany();
-    await prisma.user.deleteMany({ where: { email: 'jobs@b.com' } });
+    // Cleanup leftovers from prior runs (scoped — does not nuke other suites).
+    await cleanupTestUsers(prisma, TEST_EMAILS_TASK6);
 
-    const u = await prisma.user.create({
-      data: {
-        email: 'jobs@b.com',
-        passwordHash: await hashPassword('hunter22hunter22'),
-      },
-    });
+    const u = await createTestUser(prisma, { email: 'jobs@b.com' });
     userId = u.id;
 
     const seeded = generateApiKey();
@@ -71,10 +77,7 @@ describe('jobs routes — POST /api/v1/jobs (Plan 4 Task 6 stub)', () => {
   });
 
   afterAll(async () => {
-    await prisma.job.deleteMany({ where: { userId } });
-    await prisma.session.deleteMany({ where: { userId } });
-    await prisma.apiKey.deleteMany({ where: { userId } });
-    await prisma.user.deleteMany({ where: { id: userId } });
+    await cleanupTestUsers(prisma, TEST_EMAILS_TASK6);
     const keys = await redis.keys('bull:compression:*');
     if (keys.length > 0) await redis.del(...keys);
     await prisma.$disconnect();
@@ -215,25 +218,13 @@ describe('jobs routes — GET /api/v1/jobs + GET /api/v1/jobs/:id (Plan 4 Task 7
   beforeAll(async () => {
     prisma = createPrismaClient({ databaseUrl: config.DATABASE_URL });
     redis = new IORedis(config.REDIS_URL);
-    // Cleanup leftovers from prior runs (use distinct emails for parallel-test isolation).
-    await prisma.user.deleteMany({
-      where: { email: { in: ['jobs7@b.com', 'jobs7-foreign@b.com'] } },
-    });
+    // Cleanup leftovers from prior runs (scoped — does not nuke other suites).
+    await cleanupTestUsers(prisma, TEST_EMAILS_TASK7);
 
-    const u = await prisma.user.create({
-      data: {
-        email: 'jobs7@b.com',
-        passwordHash: await hashPassword('hunter22hunter22'),
-      },
-    });
+    const u = await createTestUser(prisma, { email: 'jobs7@b.com' });
     userId = u.id;
 
-    const foreign = await prisma.user.create({
-      data: {
-        email: 'jobs7-foreign@b.com',
-        passwordHash: await hashPassword('hunter22hunter22'),
-      },
-    });
+    const foreign = await createTestUser(prisma, { email: 'jobs7-foreign@b.com' });
     foreignUserId = foreign.id;
 
     const seeded = generateApiKey();
@@ -254,10 +245,7 @@ describe('jobs routes — GET /api/v1/jobs + GET /api/v1/jobs/:id (Plan 4 Task 7
   });
 
   afterAll(async () => {
-    await prisma.job.deleteMany({ where: { userId: { in: [userId, foreignUserId] } } });
-    await prisma.session.deleteMany({ where: { userId: { in: [userId, foreignUserId] } } });
-    await prisma.apiKey.deleteMany({ where: { userId: { in: [userId, foreignUserId] } } });
-    await prisma.user.deleteMany({ where: { id: { in: [userId, foreignUserId] } } });
+    await cleanupTestUsers(prisma, TEST_EMAILS_TASK7);
     await prisma.$disconnect();
     await redis.quit();
   });
@@ -410,25 +398,13 @@ describe('jobs routes — DELETE /api/v1/jobs/:id (Plan 4 Task 8)', () => {
   beforeAll(async () => {
     prisma = createPrismaClient({ databaseUrl: config.DATABASE_URL });
     redis = new IORedis(config.REDIS_URL);
-    // Cleanup leftovers from prior runs (use distinct emails for parallel-test isolation).
-    await prisma.user.deleteMany({
-      where: { email: { in: ['jobs8@b.com', 'jobs8-foreign@b.com'] } },
-    });
+    // Cleanup leftovers from prior runs (scoped — does not nuke other suites).
+    await cleanupTestUsers(prisma, TEST_EMAILS_TASK8);
 
-    const u = await prisma.user.create({
-      data: {
-        email: 'jobs8@b.com',
-        passwordHash: await hashPassword('hunter22hunter22'),
-      },
-    });
+    const u = await createTestUser(prisma, { email: 'jobs8@b.com' });
     userId = u.id;
 
-    const foreign = await prisma.user.create({
-      data: {
-        email: 'jobs8-foreign@b.com',
-        passwordHash: await hashPassword('hunter22hunter22'),
-      },
-    });
+    const foreign = await createTestUser(prisma, { email: 'jobs8-foreign@b.com' });
     foreignUserId = foreign.id;
 
     const seeded = generateApiKey();
@@ -455,10 +431,7 @@ describe('jobs routes — DELETE /api/v1/jobs/:id (Plan 4 Task 8)', () => {
   });
 
   afterAll(async () => {
-    await prisma.job.deleteMany({ where: { userId: { in: [userId, foreignUserId] } } });
-    await prisma.session.deleteMany({ where: { userId: { in: [userId, foreignUserId] } } });
-    await prisma.apiKey.deleteMany({ where: { userId: { in: [userId, foreignUserId] } } });
-    await prisma.user.deleteMany({ where: { id: { in: [userId, foreignUserId] } } });
+    await cleanupTestUsers(prisma, TEST_EMAILS_TASK8);
     const cancelKeys = await redis.keys('cancel:*');
     if (cancelKeys.length > 0) await redis.del(...cancelKeys);
     await prisma.$disconnect();

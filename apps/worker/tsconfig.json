@@ -10,6 +10,7 @@
     { "path": "../../packages/db" },
     { "path": "../../packages/auth" },
     { "path": "../../packages/compression" },
-    { "path": "../../packages/storage" }
+    { "path": "../../packages/storage" },
+    { "path": "../../packages/test-helpers" }
   ]
 }

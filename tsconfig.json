@@ -20,6 +20,9 @@
       "path": "./packages/auth"
     },
     {
+      "path": "./packages/test-helpers"
+    },
+    {
       "path": "./apps/api"
     },
     {
