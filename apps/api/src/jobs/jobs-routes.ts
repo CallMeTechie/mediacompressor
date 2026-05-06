@@ -2,12 +2,19 @@ import { z } from 'zod';
 import type { FastifyPluginAsync } from 'fastify';
 import { PROFILES } from '@mediacompressor/compression/types';
 import type { Prisma } from '@mediacompressor/db';
+import { isValidUploadPath, parseUploadPath } from '@mediacompressor/storage';
 import { createCompressionQueue, type CompressJobData } from '../queue.js';
 
-// C3-Rev1: Strikte Format-Pflicht für inputStorageKey — verhindert Path-Traversal
-// in den Worker. Plan 5 ersetzt das durch tusd-Pre-Create-Hook, aber Plan 4 (Stub)
-// muss schon defense-in-depth haben.
-const STORAGE_KEY_RE = /^uploads\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/source\.bin$/;
+// @deprecated since Plan 5: The canonical job-creation flow is via tusd
+// (POST /uploads/ → pre-create-hook → post-finish-hook). This Plan-4-Stub
+// remains as an internal/testing-only Bearer-API-Key endpoint and may be
+// removed in v1.0. Production deployments should disable it via a feature
+// flag (Plan 7 polish work).
+//
+// UC13-Fix: Plan-4-Stub originally used a weak `[0-9a-f-]{36}` regex. We now
+// delegate to `isValidUploadPath` / `parseUploadPath` from
+// @mediacompressor/storage (strict UUIDv4 8-4-4-4-12 layout). Defense-in-Depth:
+// rejects 36×'a' and dash-misaligned strings that the old regex accepted.
 
 const ListQuery = z.object({
   status: z.enum(['queued', 'processing', 'succeeded', 'failed', 'canceled', 'expired']).optional(),
@@ -19,7 +26,7 @@ const ListQuery = z.object({
 const JobIdParams = z.object({ id: z.string().uuid() });
 
 const PostJobBody = z.object({
-  inputStorageKey: z.string().regex(STORAGE_KEY_RE, {
+  inputStorageKey: z.string().refine(isValidUploadPath, {
     message: 'inputStorageKey must be uploads/{userUuid}/{jobUuid}/source.bin',
   }),
   kind: z.enum(['image', 'video']),
@@ -51,9 +58,10 @@ export const jobsRoutes: FastifyPluginAsync = async (app) => {
 
     const { inputStorageKey, kind, profile, overrides } = req.body as z.infer<typeof PostJobBody>;
 
-    // C3-Rev1: Server-Side-Check — userUuid im Pfad muss mit auth.userId übereinstimmen.
-    const match = inputStorageKey.match(/^uploads\/([0-9a-f-]{36})\//);
-    if (!match || match[1] !== userId) {
+    // C3-Rev1 + UC13: Server-Side-Check — userUuid im Pfad muss mit auth.userId
+    // übereinstimmen. parseUploadPath enforced strikte UUIDv4-Layout (Defense-in-Depth).
+    const parsed = parseUploadPath(inputStorageKey);
+    if (!parsed || parsed.userId !== userId) {
       return reply.code(403).send({
         error: {
           code: 'AUTH_INVALID',
