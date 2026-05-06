@@ -10,3 +10,8 @@ export {
   verifyClaimedMime,
   MimeMismatchError,
 } from './magic-number.js';
+export {
+  uploadSourcePath,
+  parseUploadPath,
+  isValidUploadPath,
+} from './upload-paths.js';
