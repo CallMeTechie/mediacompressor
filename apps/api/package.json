@@ -16,6 +16,7 @@
     "@fastify/csrf-protection": "~7.0.0",
     "@fastify/helmet": "~13.0.0",
     "@mediacompressor/auth": "workspace:*",
+    "@mediacompressor/cleanup": "workspace:*",
     "@mediacompressor/compression": "workspace:*",
     "@mediacompressor/db": "workspace:*",
     "@mediacompressor/shared": "workspace:*",

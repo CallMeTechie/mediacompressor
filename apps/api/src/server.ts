@@ -17,6 +17,7 @@ import { registerAuthMiddleware } from './auth/auth-middleware.js';
 import { apiKeyRoutes } from './auth/api-key-routes.js';
 import { jobsRoutes } from './jobs/jobs-routes.js';
 import { jobsEventsRoute } from './jobs/jobs-events-route.js';
+import { downloadRoute } from './jobs/download-route.js';
 import { preCreateHook } from './uploads/pre-create-hook.js';
 import { postFinishHook } from './uploads/post-finish-hook.js';
 import { tusdHooksDispatcher } from './uploads/hooks-dispatcher.js';
@@ -120,6 +121,11 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
 
   // Plan 4 Task 9: GET /jobs/:id/events (SSE) — snapshot + Pub/Sub forwarding.
   await app.register(jobsEventsRoute);
+
+  // Plan 6 Task 4: GET /jobs/:id/download — streams compressed output while
+  // holding a download-handler in `downloads:<jobId>`. Cleanup-worker cannot
+  // delete files under active downloads (C5 + C2-Rev4 + DC4).
+  await app.register(downloadRoute);
 
   // Plan 5 Task 5: tusd Pre-Create-Hook
   // (POST /api/v1/internal/uploads/hooks/pre-create). Shared-secret +

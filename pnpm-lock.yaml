@@ -62,6 +62,9 @@ importers:
       '@mediacompressor/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@mediacompressor/cleanup':
+        specifier: workspace:*
+        version: link:../../packages/cleanup
       '@mediacompressor/compression':
         specifier: workspace:*
         version: link:../../packages/compression
