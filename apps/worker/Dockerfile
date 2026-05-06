@@ -47,3 +47,15 @@ RUN ffmpeg -version | head -n 1 \
  && echo "Worker base image ready"
 
 # Plan 4 ergänzt von hier ab: WORKDIR, COPY, pnpm install, CMD
+WORKDIR /app
+COPY --chown=node:node package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY --chown=node:node tsconfig.base.json tsconfig.json ./
+COPY --chown=node:node packages ./packages
+COPY --chown=node:node apps/worker ./apps/worker
+RUN corepack enable && corepack prepare pnpm@9 --activate \
+ && chown -R node:node /app \
+ && su node -c "pnpm install --frozen-lockfile \
+    && pnpm --filter @mediacompressor/db prisma:generate \
+    && pnpm --filter @mediacompressor/worker build"
+USER node
+CMD ["node", "apps/worker/dist/index.js"]

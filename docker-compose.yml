@@ -48,6 +48,40 @@ services:
     networks:
       - mediacompressor-internal
 
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379
+      SESSION_SECRET: ${SESSION_SECRET}
+      CSRF_SECRET: ${CSRF_SECRET}
+      API_KEY_PEPPER: ${API_KEY_PEPPER}
+      PORT: 3000
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    ports: ['3000:3000']
+    networks: [mediacompressor-internal]
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379
+      # C12-Rev2: per-Container-Concurrency. Default 2 → 1 Video + 1 Image parallel.
+      # Skalierung per `docker compose up -d --scale worker=N`.
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    networks: [mediacompressor-internal]
+
 volumes:
   postgres-data:
   redis-data:
