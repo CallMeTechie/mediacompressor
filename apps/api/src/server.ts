@@ -17,6 +17,7 @@ import { registerAuthMiddleware } from './auth/auth-middleware.js';
 import { apiKeyRoutes } from './auth/api-key-routes.js';
 import { jobsRoutes } from './jobs/jobs-routes.js';
 import { jobsEventsRoute } from './jobs/jobs-events-route.js';
+import { preCreateHook } from './uploads/pre-create-hook.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -117,6 +118,11 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
 
   // Plan 4 Task 9: GET /jobs/:id/events (SSE) — snapshot + Pub/Sub forwarding.
   await app.register(jobsEventsRoute);
+
+  // Plan 5 Task 5: tusd Pre-Create-Hook
+  // (POST /api/v1/internal/uploads/hooks/pre-create). Shared-secret +
+  // Bearer-API-Key + UC7 MIME-allowlist + atomic quota reservation.
+  await app.register(preCreateHook);
 
   return app;
 }

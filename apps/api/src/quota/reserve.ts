@@ -26,6 +26,13 @@ export interface ReserveQuotaInput {
   inputFilename?: string;
   // UC12: deterministischer Key für Hook-Retry-Idempotency.
   precreateIdempotencyKey?: string;
+  /**
+   * Plan 5 Task 5: Pre-Create-Hook needs Job.id == Job.uploadId so tusd's
+   * upload-id matches the DB row. Caller may pre-generate a UUID and pass it
+   * here to override Prisma's @default(uuid()) for `id`. Optional —
+   * existing callers (Plan 4 jobs-routes) keep getting auto-generated IDs.
+   */
+  id?: string;
 }
 
 const IN_FLIGHT_STATUSES = ['uploading', 'queued', 'processing'] as const;
@@ -130,6 +137,10 @@ export async function reserveQuota(
 
     const job = await tx.job.create({
       data: {
+        // Plan 5 Task 5: Pre-Create-Hook supplies a pre-generated UUID so
+        // that Job.id === Job.uploadId === tusd-upload-id. If omitted, Prisma
+        // falls back to @default(uuid()).
+        ...(input.id !== undefined ? { id: input.id } : {}),
         userId: input.userId,
         status: 'uploading',
         kind: input.kind,
