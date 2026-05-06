@@ -11,6 +11,7 @@ import {
 import { createPrismaClient, type PrismaClient } from '@mediacompressor/db';
 import IORedis, { type Redis } from 'ioredis';
 import type { Config } from './config.js';
+import { runPepperCanaryOnBoot } from './pepper-canary-hook.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -68,7 +69,35 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
     await redis.quit();
   });
 
-  // Tasks 2–9 register hooks/routes here.
+  // Plan 4 Task 2: Pepper-Canary Boot-Self-Check
+  await runPepperCanaryOnBoot(prisma, Buffer.from(config.API_KEY_PEPPER));
+
+  app.get('/api/v1/health', async () => ({ status: 'ok' }));
+
+  app.get('/api/v1/ready', async () => {
+    let db = false;
+    let redisOk = false;
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      db = true;
+    } catch {
+      /* keep false */
+    }
+    try {
+      const pong = await Promise.race([
+        redis.ping(),
+        new Promise<string>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 2000),
+        ),
+      ]);
+      if (pong === 'PONG') redisOk = true;
+    } catch {
+      /* keep false */
+    }
+    return { status: db && redisOk ? 'ok' : 'degraded', db, redis: redisOk };
+  });
+
+  // Tasks 3–9 register hooks/routes here.
 
   return app;
 }
