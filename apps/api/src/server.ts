@@ -16,6 +16,7 @@ import { loginRoutes } from './auth/login-routes.js';
 import { registerAuthMiddleware } from './auth/auth-middleware.js';
 import { apiKeyRoutes } from './auth/api-key-routes.js';
 import { jobsRoutes } from './jobs/jobs-routes.js';
+import { jobsEventsRoute } from './jobs/jobs-events-route.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -113,6 +114,9 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
 
   // Plan 4 Task 6: POST /jobs stub + BullMQ producer (Outbox-Pattern).
   await app.register(jobsRoutes);
+
+  // Plan 4 Task 9: GET /jobs/:id/events (SSE) — snapshot + Pub/Sub forwarding.
+  await app.register(jobsEventsRoute);
 
   return app;
 }
