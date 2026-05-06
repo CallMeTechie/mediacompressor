@@ -189,4 +189,38 @@ export const jobsRoutes: FastifyPluginAsync = async (app) => {
     if (!job) return reply.code(404).send({ error: { code: 'NOT_FOUND' } });
     return toPublicJob(job);
   });
+
+  // DELETE /api/v1/jobs/:id — cancel an in-flight job. Idempotent for terminal
+  // states (returns 204 without side-effects). Foreign jobs return 404 to avoid
+  // existence-leak (mirrors GET /jobs/:id).
+  // C1-Rev1: state-changing → CSRF-Pflicht (Bearer-API-Key bypassed via skipCsrf).
+  app.delete('/api/v1/jobs/:id', { schema: { params: JobIdParams } }, async (req, reply) => {
+    const userId = await app.requireAuthCsrf(req, reply);
+    if (!userId) return;
+    const { id } = req.params as z.infer<typeof JobIdParams>;
+    const job = await prisma.job.findFirst({ where: { id, userId } });
+    if (!job) return reply.code(404).send({ error: { code: 'NOT_FOUND' } });
+
+    if (job.status === 'queued' || job.status === 'processing') {
+      // Worker polls `cancel:{jobId}` to abort in-flight work. 600s TTL prevents
+      // indefinite key buildup if the worker never picks the job up.
+      await redis.set(`cancel:${job.id}`, '1', 'EX', 600);
+
+      // C10-Rev2: updateMany statt update mit Idempotenz-Guard. Worker setzt
+      // ggf. parallel status='canceled'; updateMany mit `notIn: terminalStates`
+      // verhindert Doppel-Schreibe / finishedAt-Race.
+      await prisma.job.updateMany({
+        where: {
+          id: job.id,
+          status: { notIn: ['canceled', 'succeeded', 'failed', 'expired'] as const },
+        },
+        data: { status: 'canceled', finishedAt: new Date() },
+      });
+
+      // C10-Rev2: SOFORT publizieren — SSE-Subscriber sieht Cancel ohne Worker-Poll-Latenz.
+      await redis.publish(`job:status:${job.id}`, JSON.stringify({ status: 'canceled' }));
+    }
+
+    return reply.code(204).send();
+  });
 };

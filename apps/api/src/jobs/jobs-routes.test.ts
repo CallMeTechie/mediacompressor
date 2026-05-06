@@ -399,3 +399,239 @@ describe('jobs routes — GET /api/v1/jobs + GET /api/v1/jobs/:id (Plan 4 Task 7
     }
   });
 });
+
+describe('jobs routes — DELETE /api/v1/jobs/:id (Plan 4 Task 8)', () => {
+  let prisma: PrismaClient;
+  let redis: IORedis;
+  let userId: string;
+  let foreignUserId: string;
+  let apiKey: string;
+
+  beforeAll(async () => {
+    prisma = createPrismaClient({ databaseUrl: config.DATABASE_URL });
+    redis = new IORedis(config.REDIS_URL);
+    // Cleanup leftovers from prior runs (use distinct emails for parallel-test isolation).
+    await prisma.user.deleteMany({
+      where: { email: { in: ['jobs8@b.com', 'jobs8-foreign@b.com'] } },
+    });
+
+    const u = await prisma.user.create({
+      data: {
+        email: 'jobs8@b.com',
+        passwordHash: await hashPassword('hunter22hunter22'),
+      },
+    });
+    userId = u.id;
+
+    const foreign = await prisma.user.create({
+      data: {
+        email: 'jobs8-foreign@b.com',
+        passwordHash: await hashPassword('hunter22hunter22'),
+      },
+    });
+    foreignUserId = foreign.id;
+
+    const seeded = generateApiKey();
+    apiKey = seeded.key;
+    await prisma.apiKey.create({
+      data: {
+        userId,
+        name: 'jobs8-test',
+        keyHash: hashApiKey(seeded.key, apiKeyPepper),
+        keyPrefix: seeded.prefix,
+        scopes: ['jobs:write', 'jobs:read'],
+      },
+    });
+
+    // Drain leftover cancel keys to prevent flakes.
+    const cancelKeys = await redis.keys('cancel:*');
+    if (cancelKeys.length > 0) await redis.del(...cancelKeys);
+  });
+
+  beforeEach(async () => {
+    await prisma.job.deleteMany({ where: { userId: { in: [userId, foreignUserId] } } });
+    const cancelKeys = await redis.keys('cancel:*');
+    if (cancelKeys.length > 0) await redis.del(...cancelKeys);
+  });
+
+  afterAll(async () => {
+    await prisma.job.deleteMany({ where: { userId: { in: [userId, foreignUserId] } } });
+    await prisma.session.deleteMany({ where: { userId: { in: [userId, foreignUserId] } } });
+    await prisma.apiKey.deleteMany({ where: { userId: { in: [userId, foreignUserId] } } });
+    await prisma.user.deleteMany({ where: { id: { in: [userId, foreignUserId] } } });
+    const cancelKeys = await redis.keys('cancel:*');
+    if (cancelKeys.length > 0) await redis.del(...cancelKeys);
+    await prisma.$disconnect();
+    await redis.quit();
+  });
+
+  async function seedJob(opts: {
+    ownerId: string;
+    status?: 'queued' | 'processing' | 'succeeded' | 'failed' | 'canceled' | 'expired';
+    kind?: 'image' | 'video';
+    profile?: string;
+    inputFilename?: string;
+    finishedAt?: Date | null;
+  }) {
+    return prisma.job.create({
+      data: {
+        userId: opts.ownerId,
+        status: opts.status ?? 'queued',
+        kind: opts.kind ?? 'image',
+        profile: opts.profile ?? 'web-optimized',
+        overrides: {},
+        inputFilename: opts.inputFilename ?? 'in.bin',
+        uploadId: `task8-${Math.random().toString(36).slice(2)}-${Date.now()}`,
+        ...(opts.finishedAt !== undefined ? { finishedAt: opts.finishedAt } : {}),
+      },
+    });
+  }
+
+  it('DELETE without auth → 401', async () => {
+    const app = await buildServer(config);
+    try {
+      const job = await seedJob({ ownerId: userId, status: 'queued' });
+      const res = await app.inject({
+        method: 'DELETE',
+        url: `/api/v1/jobs/${job.id}`,
+      });
+      expect(res.statusCode).toBe(401);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("DELETE foreign user's job → 404 NOT_FOUND (no existence-leak)", async () => {
+    const app = await buildServer(config);
+    try {
+      const foreignJob = await seedJob({ ownerId: foreignUserId, status: 'queued' });
+      const res = await app.inject({
+        method: 'DELETE',
+        url: `/api/v1/jobs/${foreignJob.id}`,
+        headers: { authorization: `Bearer ${apiKey}` },
+      });
+      expect(res.statusCode).toBe(404);
+      expect(res.json()).toMatchObject({ error: { code: 'NOT_FOUND' } });
+      // Job state must be unchanged.
+      const after = await prisma.job.findUnique({ where: { id: foreignJob.id } });
+      expect(after?.status).toBe('queued');
+      // No cancel-key written for foreign job.
+      const cancelVal = await redis.get(`cancel:${foreignJob.id}`);
+      expect(cancelVal).toBeNull();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('DELETE own queued job → 204, DB=canceled, cancel-key set, pub/sub event seen', async () => {
+    const app = await buildServer(config);
+    const sub = new IORedis(config.REDIS_URL);
+    try {
+      const job = await seedJob({ ownerId: userId, status: 'queued' });
+
+      // Subscribe BEFORE the DELETE to avoid losing the event.
+      await sub.subscribe(`job:status:${job.id}`);
+      const messages: string[] = [];
+      sub.on('message', (_ch, raw) => messages.push(raw));
+
+      const res = await app.inject({
+        method: 'DELETE',
+        url: `/api/v1/jobs/${job.id}`,
+        headers: { authorization: `Bearer ${apiKey}` },
+      });
+      expect(res.statusCode).toBe(204);
+
+      // DB row updated to canceled.
+      const after = await prisma.job.findUnique({ where: { id: job.id } });
+      expect(after?.status).toBe('canceled');
+      expect(after?.finishedAt).not.toBeNull();
+
+      // Redis cancel-key set with a TTL (worker reads this).
+      const cancelVal = await redis.get(`cancel:${job.id}`);
+      expect(cancelVal).toBe('1');
+      const ttl = await redis.ttl(`cancel:${job.id}`);
+      expect(ttl).toBeGreaterThan(0);
+      expect(ttl).toBeLessThanOrEqual(600);
+
+      // Pub/sub event arrived (poll-loop with safety bound).
+      const start = Date.now();
+      while (messages.length === 0 && Date.now() - start < 200) {
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      expect(messages.length).toBeGreaterThan(0);
+      expect(JSON.parse(messages[0]!)).toMatchObject({ status: 'canceled' });
+    } finally {
+      await sub.quit();
+      await app.close();
+    }
+  });
+
+  it('C10-Rev2: DELETE /jobs/:id publiziert canceled-Event innerhalb von 100 ms', async () => {
+    const app = await buildServer(config);
+    const sub = new IORedis(config.REDIS_URL);
+    try {
+      const job = await seedJob({ ownerId: userId, status: 'processing' });
+
+      await sub.subscribe(`job:status:${job.id}`);
+      const messages: string[] = [];
+      sub.on('message', (_ch, raw) => messages.push(raw));
+
+      const t0 = Date.now();
+      const res = await app.inject({
+        method: 'DELETE',
+        url: `/api/v1/jobs/${job.id}`,
+        headers: { authorization: `Bearer ${apiKey}` },
+      });
+      expect(res.statusCode).toBe(204);
+
+      // Spin until the canceled-event arrives or the safety-timeout fires.
+      const start = Date.now();
+      while (messages.length === 0 && Date.now() - start < 200) {
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      const elapsed = Date.now() - t0;
+      expect(messages.length).toBeGreaterThan(0);
+      expect(elapsed).toBeLessThan(100);
+      expect(JSON.parse(messages[0]!)).toMatchObject({ status: 'canceled' });
+    } finally {
+      await sub.quit();
+      await app.close();
+    }
+  });
+
+  it('DELETE already-finished job → 204 (idempotent), status unchanged, NO event', async () => {
+    const app = await buildServer(config);
+    const sub = new IORedis(config.REDIS_URL);
+    try {
+      const finishedAt = new Date(Date.now() - 60_000);
+      const job = await seedJob({ ownerId: userId, status: 'succeeded', finishedAt });
+
+      await sub.subscribe(`job:status:${job.id}`);
+      const messages: string[] = [];
+      sub.on('message', (_ch, raw) => messages.push(raw));
+
+      const res = await app.inject({
+        method: 'DELETE',
+        url: `/api/v1/jobs/${job.id}`,
+        headers: { authorization: `Bearer ${apiKey}` },
+      });
+      expect(res.statusCode).toBe(204);
+
+      // DB row untouched.
+      const after = await prisma.job.findUnique({ where: { id: job.id } });
+      expect(after?.status).toBe('succeeded');
+      expect(after?.finishedAt?.getTime()).toBe(finishedAt.getTime());
+
+      // No cancel-key set.
+      const cancelVal = await redis.get(`cancel:${job.id}`);
+      expect(cancelVal).toBeNull();
+
+      // Wait briefly to ensure no event was published.
+      await new Promise((r) => setTimeout(r, 50));
+      expect(messages).toHaveLength(0);
+    } finally {
+      await sub.quit();
+      await app.close();
+    }
+  });
+});
