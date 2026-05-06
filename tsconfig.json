@@ -23,6 +23,9 @@
       "path": "./packages/test-helpers"
     },
     {
+      "path": "./packages/cleanup"
+    },
+    {
       "path": "./apps/api"
     },
     {

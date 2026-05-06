@@ -6,6 +6,8 @@ const ConfigSchema = z.object({
   API_KEY_PEPPER: z.string().min(32),
   // C12-Rev2: Worker-Concurrency env, default 2.
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).default(2),
+  // Plan 6: cleanup-cron resolves storage keys against this absolute mount.
+  MEDIA_MOUNT_PATH: z.string().default('/media'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   LOG_LEVEL: z
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])

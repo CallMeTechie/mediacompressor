@@ -14,6 +14,7 @@
     "@mediacompressor/shared": "workspace:*",
     "@mediacompressor/db": "workspace:*",
     "@mediacompressor/auth": "workspace:*",
+    "@mediacompressor/cleanup": "workspace:*",
     "@mediacompressor/compression": "workspace:*",
     "@mediacompressor/storage": "workspace:*",
     "bullmq": "~5.34.0",

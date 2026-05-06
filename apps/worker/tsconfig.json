@@ -9,6 +9,7 @@
     { "path": "../../packages/shared" },
     { "path": "../../packages/db" },
     { "path": "../../packages/auth" },
+    { "path": "../../packages/cleanup" },
     { "path": "../../packages/compression" },
     { "path": "../../packages/storage" },
     { "path": "../../packages/test-helpers" }
