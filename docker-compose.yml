@@ -58,12 +58,27 @@ services:
       SESSION_SECRET: ${SESSION_SECRET}
       CSRF_SECRET: ${CSRF_SECRET}
       API_KEY_PEPPER: ${API_KEY_PEPPER}
+      # Plan 5: tusd shared-secret + canonical media paths. The hook routes
+      # require these; defaults in apps/api/src/config.ts already match
+      # /media/tusd-data + /media/uploads, but we set them explicitly so
+      # `compose config` is self-documenting.
+      TUSD_SHARED_SECRET: ${TUSD_SHARED_SECRET}
+      TUSD_DATA_DIR: /media/tusd-data
+      TUSD_FINAL_DIR: /media/uploads
+      MEDIA_MOUNT_PATH: /media
+      MIN_FREE_BYTES_RESERVE: ${MIN_FREE_BYTES_RESERVE:-5368709120}
       PORT: 3000
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }
     ports: ['3000:3000']
+    volumes:
+      # UC4-Fix: api needs read+write on the shared media-data volume so the
+      # post-finish-hook can rename tusd-data/${id}.bin →
+      # uploads/${user}/${id}/source.bin in O(1) (same filesystem ⇒ atomic
+      # rename, no EXDEV).
+      - media-data:/media
     networks: [mediacompressor-internal]
 
   worker:
@@ -83,11 +98,57 @@ services:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }
+    volumes:
+      # Worker reads source.bin from /media/uploads and writes results back
+      # to the same volume.
+      - media-data:/media
     networks: [mediacompressor-internal]
+
+  # Plan 5 Task 8: tusd resumable-upload server. tusd implements the tus
+  # protocol, persists chunked uploads, and POSTs hook events back to the api
+  # service so we can authorize, reserve quota (pre-create), and move the
+  # finished file into the final layout (post-finish).
+  tusd:
+    # UC3-Fix: pin to exact patch version. Hook-body schema is 2.x-specific;
+    # `:latest` would let upstream changes silently break our hooks.
+    image: tusproject/tusd:v2.4.0
+    command:
+      - '-host=0.0.0.0'
+      - '-port=1080'
+      - '-base-path=/uploads/'
+      # UC4-Fix: tusd-data als Subdir von /media (= media-data volume),
+      # damit fs.rename(tusd-data → uploads) atomar O(1) ist.
+      - '-upload-dir=/media/tusd-data'
+      # tusd v2 sends ALL hook events (pre-create, post-finish, …) to this
+      # single URL; the api dispatches by body.Type
+      # (apps/api/src/uploads/hooks-dispatcher.ts).
+      - '-hooks-http=http://api:3000/api/v1/internal/uploads/hooks'
+      # UC5: forward Authorization so the pre-create-hook can authenticate
+      # the user via Bearer-API-Key.
+      - '-hooks-http-forward-headers=Authorization,X-CSRF-Token'
+      # 2 GiB hard cap per upload; pre-create-hook + worker enforce
+      # per-user / per-profile limits on top.
+      - '-max-size=2147483648'
+    environment:
+      # tusd's HTTP-hook client passes this header on every hook call; the
+      # verifyTusdSharedSecret middleware checks it (constant-time compare).
+      TUSD_HOOKS_HTTP_HEADER_X_TUSD_SHARED_SECRET: ${TUSD_SHARED_SECRET}
+    volumes:
+      - media-data:/media
+    depends_on:
+      api: { condition: service_started }
+    networks: [mediacompressor-internal]
+    # In production (Plan 9 Caddy) port 1080 is NOT exposed; here it's open
+    # so the E2E smoke-script (apps/api/test-e2e/upload-flow.sh) can drive
+    # the tus protocol from the host.
+    ports: ['1080:1080']
 
 volumes:
   postgres-data:
   redis-data:
+  # Shared upload volume mounted by api + worker + tusd. Single mount point
+  # is the precondition for atomic O(1) rename in post-finish-hook (UC4).
+  media-data:
 
 networks:
   mediacompressor-internal:
