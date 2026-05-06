@@ -169,8 +169,8 @@ PSQL "DELETE FROM \"ApiKey\" WHERE \"userId\" IN (SELECT id FROM \"User\" WHERE 
 PSQL "DELETE FROM \"Session\" WHERE \"userId\" IN (SELECT id FROM \"User\" WHERE email = '${TEST_EMAIL}');" >/dev/null
 PSQL "DELETE FROM \"User\" WHERE email = '${TEST_EMAIL}';" >/dev/null
 
-PSQL "INSERT INTO \"User\" (id, email, \"passwordHash\", status, \"storageQuota\", \"parallelQuota\", \"hourlyQuota\", \"createdAt\", \"updatedAt\")
-      VALUES ('${TEST_USER_ID}', '${TEST_EMAIL}', '${DUMMY_PWHASH}', 'active', 1000000000, 100, 1000, NOW(), NOW());" >/dev/null
+PSQL "INSERT INTO \"User\" (id, email, \"passwordHash\", status, \"storageQuota\", \"parallelQuota\", \"hourlyQuota\", \"createdAt\")
+      VALUES ('${TEST_USER_ID}', '${TEST_EMAIL}', '${DUMMY_PWHASH}', 'active', 1000000000, 100, 1000, NOW());" >/dev/null
 
 PSQL "INSERT INTO \"ApiKey\" (id, \"userId\", name, \"keyHash\", \"keyPrefix\", scopes, \"createdAt\")
       VALUES (gen_random_uuid(), '${TEST_USER_ID}', 'e2e-smoke', '${KEY_HASH}', '${KEY_PREFIX}', ARRAY['jobs:write','jobs:read'], NOW());" >/dev/null

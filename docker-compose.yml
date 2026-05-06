@@ -75,6 +75,7 @@ services:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }
+      init-media: { condition: service_completed_successfully }
     ports: ['3000:3000']
     volumes:
       # UC4-Fix: api needs read+write on the shared media-data volume so the
@@ -104,11 +105,30 @@ services:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }
+      init-media: { condition: service_completed_successfully }
     volumes:
       # Worker reads source.bin from /media/uploads and writes results back
       # to the same volume.
       - media-data:/media
     networks: [mediacompressor-internal]
+
+  # Plan 5 Task 8 follow-up: media-data volume is created root-owned by
+  # docker; tusd, api, and worker all run as uid 1000 (`node`/`tusd` user).
+  # Without this init container, tusd fails at boot with
+  # "mkdir /media/tusd-data: permission denied". We create the canonical
+  # subdirs and chown them once, then exit successfully.
+  init-media:
+    image: alpine:3.20
+    command:
+      [
+        'sh',
+        '-c',
+        'mkdir -p /media/tusd-data /media/uploads && chown -R 1000:1000 /media && chmod -R 0755 /media',
+      ]
+    user: '0:0'
+    volumes:
+      - media-data:/media
+    restart: 'no'
 
   # Plan 5 Task 8: tusd resumable-upload server. tusd implements the tus
   # protocol, persists chunked uploads, and POSTs hook events back to the api
@@ -135,14 +155,19 @@ services:
       # 2 GiB hard cap per upload; pre-create-hook + worker enforce
       # per-user / per-profile limits on top.
       - '-max-size=2147483648'
-    environment:
-      # tusd's HTTP-hook client passes this header on every hook call; the
-      # verifyTusdSharedSecret middleware checks it (constant-time compare).
-      TUSD_HOOKS_HTTP_HEADER_X_TUSD_SHARED_SECRET: ${TUSD_SHARED_SECRET}
+      # NOTE: tusd v2.4.0 has NO CLI flag to inject a static header on hook
+      # calls (`-hooks-http-header` does not exist; only
+      # `-hooks-http-forward-headers` for client-supplied headers). Plan 9
+      # will front tusd with Caddy that injects X-Tusd-Shared-Secret. Until
+      # then, network trust is enforced via the docker-internal network and
+      # `TUSD_REQUIRE_SHARED_SECRET=false` on the api side. The api still
+      # rejects forged headers, so a future Caddy enabling won't change
+      # the accept-criteria semantics.
     volumes:
       - media-data:/media
     depends_on:
       api: { condition: service_started }
+      init-media: { condition: service_completed_successfully }
     networks: [mediacompressor-internal]
     # In production (Plan 9 Caddy) port 1080 is NOT exposed; here it's open
     # so the E2E smoke-script (apps/api/test-e2e/upload-flow.sh) can drive

@@ -12,6 +12,15 @@ const ConfigSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   ARGON2_MAX_CONCURRENCY: z.coerce.number().int().min(1).default(8),
   TUSD_SHARED_SECRET: z.string().min(32),
+  // Plan-5-Followup: tusd v2.4.0 has no `-hooks-http-header` flag, so we cannot
+  // make tusd inject a static auth header on hook calls. Plan 9 will front
+  // tusd with Caddy that injects X-Tusd-Shared-Secret. Until then, Compose
+  // deployments rely on the internal docker network for trust (default false).
+  // Set to true once Caddy is in place so the api enforces the header.
+  TUSD_REQUIRE_SHARED_SECRET: z
+    .union([z.boolean(), z.string()])
+    .default(false)
+    .transform((v) => v === true || v === 'true' || v === '1'),
   TUSD_DATA_DIR: z.string().default('/media/tusd-data'),
   TUSD_FINAL_DIR: z.string().default('/media/uploads'),
   MEDIA_MOUNT_PATH: z.string().default('/media'),
