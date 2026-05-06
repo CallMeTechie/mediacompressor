@@ -12,6 +12,7 @@ import { createPrismaClient, type PrismaClient } from '@mediacompressor/db';
 import IORedis, { type Redis } from 'ioredis';
 import type { Config } from './config.js';
 import { runPepperCanaryOnBoot } from './pepper-canary-hook.js';
+import { loginRoutes } from './auth/login-routes.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -98,6 +99,7 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   });
 
   // Tasks 3–9 register hooks/routes here.
+  await app.register(loginRoutes);
 
   return app;
 }
