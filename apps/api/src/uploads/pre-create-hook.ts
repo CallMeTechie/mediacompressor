@@ -57,7 +57,10 @@ const TusdHookBody = z.object({
  */
 export const preCreateHook: FastifyPluginAsync = async (app) => {
   const { prisma, config } = app.deps;
-  const verifySecret = verifyTusdSharedSecret(config.TUSD_SHARED_SECRET);
+  const verifySecret = verifyTusdSharedSecret(
+    config.TUSD_SHARED_SECRET,
+    config.TUSD_REQUIRE_SHARED_SECRET,
+  );
 
   app.post(
     '/api/v1/internal/uploads/hooks/pre-create',

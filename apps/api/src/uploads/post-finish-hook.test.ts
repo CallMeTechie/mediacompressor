@@ -40,6 +40,7 @@ function makeConfig(): Config {
     CSRF_SECRET: TEST_CSRF_SECRET,
     API_KEY_PEPPER: TEST_API_KEY_PEPPER,
     TUSD_SHARED_SECRET: SHARED_SECRET,
+  TUSD_REQUIRE_SHARED_SECRET: true,
     TUSD_DATA_DIR: tusdDataDir,
     TUSD_FINAL_DIR: tusdFinalDir,
     MEDIA_MOUNT_PATH: '/tmp',
@@ -282,8 +283,11 @@ describe('post-finish-hook — POST /api/v1/internal/uploads/hooks/post-finish',
         expect(jobInQueue?.data).toMatchObject({
           jobId: job.id,
           userId,
-          inputPath: `uploads/${userId}/${job.id}/source.bin`,
-          outputPath: `results/${userId}/${job.id}/output`,
+          // Plan-5-Followup: queue-payload paths are absolute (rooted at
+          // MEDIA_MOUNT_PATH) so the worker's compress() can fs.statSync directly.
+          // Test config hardcodes MEDIA_MOUNT_PATH='/tmp' (see buildConfig).
+          inputPath: `/tmp/uploads/${userId}/${job.id}/source.bin`,
+          outputPath: `/tmp/results/${userId}/${job.id}/output`,
           profile: 'web-optimized',
         });
       } finally {

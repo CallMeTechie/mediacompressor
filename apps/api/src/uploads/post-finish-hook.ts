@@ -67,7 +67,10 @@ const TusdHookBody = z.object({
  */
 export const postFinishHook: FastifyPluginAsync = async (app) => {
   const { prisma, redis, config } = app.deps;
-  const verifySecret = verifyTusdSharedSecret(config.TUSD_SHARED_SECRET);
+  const verifySecret = verifyTusdSharedSecret(
+    config.TUSD_SHARED_SECRET,
+    config.TUSD_REQUIRE_SHARED_SECRET,
+  );
   const queue: Queue<CompressJobData> = createCompressionQueue(redis);
   app.addHook('onClose', async () => {
     await queue.close();
@@ -169,13 +172,29 @@ export const postFinishHook: FastifyPluginAsync = async (app) => {
       // BullMQ's own jobId-dedup is a second line of defense, but skipping
       // here avoids enqueuing duplicates altogether on hook-retry.
       if (updated.count > 0) {
+        // Worker calls fs.statSync/readFile directly via @mediacompressor/compression,
+        // so inputPath / outputPath MUST be absolute. inputStorageKey stays relative
+        // for storage-key-validation (UC13 / Plan-4 stub regex), the absolute path is
+        // only the queue-payload concern.
+        const inputPathAbs = join(config.MEDIA_MOUNT_PATH, inputStorageKey);
+        const outputPathAbs = join(
+          config.MEDIA_MOUNT_PATH,
+          'results',
+          job.userId,
+          job.id,
+          'output',
+        );
+        // Pre-create the output directory so the worker's compress() finds it
+        // when sharp/ffmpeg open the target. The compression-engine doesn't
+        // mkdir -p itself; doing it here keeps the worker simple.
+        await fsp.mkdir(dirname(outputPathAbs), { recursive: true });
         await queue.add(
           'compress',
           {
             jobId: job.id,
             userId: job.userId,
-            inputPath: inputStorageKey,
-            outputPath: `results/${job.userId}/${job.id}/output`,
+            inputPath: inputPathAbs,
+            outputPath: outputPathAbs,
             profile: job.profile,
             overrides: (job.overrides ?? {}) as Record<string, unknown>,
           },

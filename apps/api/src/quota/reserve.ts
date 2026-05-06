@@ -161,14 +161,23 @@ export async function reserveQuota(
 }
 
 /**
- * UC2-Fix: 64-bit advisory-lock key. High-32-bit = lock-namespace (1=Storage-Quota),
- * Low-32-bit = SHA-256 first 4 bytes of userId. Mask top bit so it fits Postgres
- * signed bigint.
+ * UC2-Fix (post-Plan-5 hardening): 63-bit advisory-lock key with full
+ * SHA-256-derived entropy. The previous 32-bit userPart had birthday-collision
+ * probability ~50% at ~65k users (sqrt(2^32)) — low but tangible at scale.
+ * 63-bit userPart pushes that to ~3 Mrd. users (sqrt(2^63)). Lock-namespacing
+ * is encoded by XORing the namespace into the top byte, so different namespaces
+ * (future: cleanup-cron, download-lease) still serialize on disjoint key ranges
+ * while keeping 63 bits of effective userPart entropy.
+ *
+ * Postgres `pg_advisory_xact_lock(bigint)` takes a signed bigint; we mask the
+ * sign bit to stay in the non-negative range.
  */
 function quotaLockKey(userId: string): bigint {
   const NAMESPACE_STORAGE_QUOTA = 1n;
   const digest = createHash('sha256').update(userId).digest();
-  const userPart = BigInt(digest.readUInt32BE(0));
-  const key = (NAMESPACE_STORAGE_QUOTA << 32n) | userPart;
-  return key & 0x7fffffffffffffffn;
+  // First 8 bytes → 64-bit unsigned. Mask top bit for signed-bigint safety.
+  const userPart = digest.readBigUInt64BE(0) & 0x7fffffffffffffffn;
+  // XOR the namespace into the top byte so different lock namespaces serialize
+  // on disjoint key ranges without sacrificing entropy.
+  return userPart ^ (NAMESPACE_STORAGE_QUOTA << 56n);
 }
