@@ -143,6 +143,14 @@ model Job {
   finishedAt        DateTime? @db.Timestamptz(6)
   expiresAt         DateTime? @db.Timestamptz(6)
 
+  // UC1-Fix: Orphan-Schutz bei tusd-Crash zwischen Pre-Create und Post-Finish.
+  uploadExpiresAt          DateTime? @db.Timestamptz(6)
+
+  // UC12-Fix: Pre-Create-Hook-Retry-Idempotency. Deterministischer SHA-256-Key
+  // aus (authUserId || metadata || size). Unique-Index sorgt für DB-seitige
+  // Doppelreservation-Defense (race-safe).
+  precreateIdempotencyKey  String?   @unique
+
   usageEvents       UsageEvent[]
 
   @@index([userId, status])
