@@ -14,5 +14,5 @@ export function createPrismaClient(options: CreatePrismaClientOptions = {}): Pri
   });
 }
 
-export type { PrismaClient } from '../prisma/generated/client/index.js';
+export type { PrismaClient, Job } from '../prisma/generated/client/index.js';
 export { Prisma } from '../prisma/generated/client/index.js';

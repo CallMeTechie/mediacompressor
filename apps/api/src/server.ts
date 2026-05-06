@@ -17,6 +17,9 @@ import { registerAuthMiddleware } from './auth/auth-middleware.js';
 import { apiKeyRoutes } from './auth/api-key-routes.js';
 import { jobsRoutes } from './jobs/jobs-routes.js';
 import { jobsEventsRoute } from './jobs/jobs-events-route.js';
+import { preCreateHook } from './uploads/pre-create-hook.js';
+import { postFinishHook } from './uploads/post-finish-hook.js';
+import { tusdHooksDispatcher } from './uploads/hooks-dispatcher.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -117,6 +120,23 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
 
   // Plan 4 Task 9: GET /jobs/:id/events (SSE) — snapshot + Pub/Sub forwarding.
   await app.register(jobsEventsRoute);
+
+  // Plan 5 Task 5: tusd Pre-Create-Hook
+  // (POST /api/v1/internal/uploads/hooks/pre-create). Shared-secret +
+  // Bearer-API-Key + UC7 MIME-allowlist + atomic quota reservation.
+  await app.register(preCreateHook);
+
+  // Plan 5 Task 6: tusd Post-Finish-Hook
+  // (POST /api/v1/internal/uploads/hooks/post-finish). Shared-secret +
+  // file-move (rename, EXDEV-fallback) + magic-number-check + atomic
+  // status-transition uploading→queued + BullMQ-Enqueue (UC4/UC6).
+  await app.register(postFinishHook);
+
+  // Plan 5 Task 8: tusd HTTP-Hook dispatcher (POST /api/v1/internal/uploads/hooks).
+  // tusd posts ALL events to a single URL; this thin route fans out by
+  // body.Type to the per-Type routes registered above. Must run AFTER both
+  // per-Type plugins so the in-process app.inject() sees them.
+  await app.register(tusdHooksDispatcher);
 
   return app;
 }

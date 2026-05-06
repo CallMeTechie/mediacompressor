@@ -27,6 +27,11 @@ const config: Config = {
   NODE_ENV: 'test',
   LOG_LEVEL: 'error',
   ARGON2_MAX_CONCURRENCY: 8,
+  TUSD_SHARED_SECRET: 'a'.repeat(64),
+  TUSD_DATA_DIR: '/media/tusd-data',
+  TUSD_FINAL_DIR: '/media/uploads',
+  MEDIA_MOUNT_PATH: '/media',
+  MIN_FREE_BYTES_RESERVE: 1n,
 };
 
 const apiKeyPepper = Buffer.from(config.API_KEY_PEPPER);

@@ -33,6 +33,11 @@ const config: Config = {
   NODE_ENV: 'test',
   LOG_LEVEL: 'error',
   ARGON2_MAX_CONCURRENCY: 8,
+  TUSD_SHARED_SECRET: 'a'.repeat(64),
+  TUSD_DATA_DIR: '/media/tusd-data',
+  TUSD_FINAL_DIR: '/media/uploads',
+  MEDIA_MOUNT_PATH: '/media',
+  MIN_FREE_BYTES_RESERVE: 1n,
 };
 
 const apiKeyPepper = Buffer.from(config.API_KEY_PEPPER);
@@ -204,6 +209,26 @@ describe('jobs routes — POST /api/v1/jobs (Plan 4 Task 6 stub)', () => {
     expect(jobsInDb).toHaveLength(0);
 
     queueAddSpy.mockRestore();
+    await app.close();
+  });
+
+  // UC13 PFLICHT-REGRESSIONSTEST — strict UUID-Layout-Regex
+  it('UC13: rejects 36×hex-without-proper-UUID-dashes (Plan-4 weak-regex defense)', async () => {
+    // Annahme widerlegen: alte STORAGE_KEY_RE = `[0-9a-f-]{36}` akzeptierte
+    // `aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`. UC13-Fix: isValidUploadPath aus
+    // @mediacompressor/storage erzwingt strikte UUIDv4-Layout (8-4-4-4-12).
+    const app = await buildServer(config);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/jobs',
+      headers: { authorization: `Bearer ${apiKey}` },
+      payload: {
+        inputStorageKey: `uploads/${'a'.repeat(36)}/${'a'.repeat(36)}/source.bin`,
+        kind: 'image',
+        profile: 'web-optimized',
+      },
+    });
+    expect(res.statusCode).toBe(400); // Zod-validation fails
     await app.close();
   });
 });
