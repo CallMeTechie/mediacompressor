@@ -1,0 +1,19 @@
+{
+  "name": "@mediacompressor/test-helpers",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@mediacompressor/auth": "workspace:*",
+    "@mediacompressor/db": "workspace:*",
+    "ioredis": "~5.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "~22.7.0"
+  }
+}

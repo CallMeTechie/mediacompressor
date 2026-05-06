@@ -214,6 +214,22 @@ importers:
         specifier: ~22.7.0
         version: 22.7.9
 
+  packages/test-helpers:
+    dependencies:
+      '@mediacompressor/auth':
+        specifier: workspace:*
+        version: link:../auth
+      '@mediacompressor/db':
+        specifier: workspace:*
+        version: link:../db
+      ioredis:
+        specifier: ~5.4.1
+        version: 5.4.2
+    devDependencies:
+      '@types/node':
+        specifier: ~22.7.0
+        version: 22.7.9
+
 packages:
 
   '@ampproject/remapping@2.3.0':
