@@ -1,18 +1,34 @@
 import pino from 'pino';
 import { loadConfig } from './config.js';
-// startWorker will be added in Task 11
-// import { startWorker } from './consumer.js';
+import { startWorker } from './consumer.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
   const log = pino({ level: config.LOG_LEVEL });
   log.info(
     { concurrency: config.WORKER_CONCURRENCY },
-    'worker boot — Task 10 stub, consumer added in Task 11',
+    'worker boot — compression consumer running',
   );
-  // const worker = startWorker(config.REDIS_URL, config.DATABASE_URL);
-  // process.on('SIGTERM', async () => { await worker.close(); process.exit(0); });
-  await new Promise<void>((resolve) => process.on('SIGTERM', resolve));
+
+  const handle = startWorker(config.REDIS_URL, config.DATABASE_URL);
+
+  handle.worker.on('error', (err) => log.error({ err }, 'worker error'));
+  handle.worker.on('failed', (job, err) =>
+    log.warn({ jobId: job?.id, err: err.message }, 'job failed'),
+  );
+
+  const shutdown = async (signal: string): Promise<void> => {
+    log.info({ signal }, 'shutting down worker');
+    try {
+      await handle.close();
+    } catch (err) {
+      log.error({ err }, 'error during worker shutdown');
+    }
+    process.exit(0);
+  };
+
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
 }
 
 main().catch((err: unknown) => {
