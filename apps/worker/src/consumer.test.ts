@@ -6,12 +6,17 @@ import IORedis from 'ioredis';
 import { createPrismaClient, type PrismaClient } from '@mediacompressor/db';
 import type { CompressionRequest, CompressionResult } from '@mediacompressor/compression/types';
 import type { compress } from '@mediacompressor/compression';
+import {
+  testDatabaseUrl,
+  testRedisUrl,
+  createTestUser,
+  cleanupTestUsers,
+} from '@mediacompressor/test-helpers';
 import { processJob, type CompressJobData } from './consumer.js';
 
-const DATABASE_URL =
-  process.env.DATABASE_URL ??
-  'postgresql://mediacompressor:changeme-dev@172.18.0.2:5432/mediacompressor?schema=public';
-const REDIS_URL = process.env.REDIS_URL ?? 'redis://172.18.0.3:6379';
+const TEST_EMAILS = ['worker11@b.com'];
+const DATABASE_URL = testDatabaseUrl();
+const REDIS_URL = testRedisUrl();
 
 const FIXTURES = join(
   import.meta.dirname,
@@ -71,10 +76,8 @@ describe('worker consumer — processJob (Plan 4 Task 11)', () => {
     pub = new IORedis(REDIS_URL);
 
     // Cleanup leftovers from prior test runs of this suite.
-    await prisma.user.deleteMany({ where: { email: 'worker11@b.com' } });
-    const u = await prisma.user.create({
-      data: { email: 'worker11@b.com', passwordHash: 'x'.repeat(60) },
-    });
+    await cleanupTestUsers(prisma, TEST_EMAILS);
+    const u = await createTestUser(prisma, { email: 'worker11@b.com' });
     userId = u.id;
     outDir = mkdtempSync(join(tmpdir(), 'mc-worker-test-'));
   });
@@ -86,9 +89,7 @@ describe('worker consumer — processJob (Plan 4 Task 11)', () => {
   });
 
   afterAll(async () => {
-    await prisma.job.deleteMany({ where: { userId } });
-    await prisma.session.deleteMany({ where: { userId } });
-    await prisma.user.deleteMany({ where: { id: userId } });
+    await cleanupTestUsers(prisma, TEST_EMAILS);
     rmSync(outDir, { recursive: true, force: true });
     await prisma.$disconnect();
     await redis.quit();

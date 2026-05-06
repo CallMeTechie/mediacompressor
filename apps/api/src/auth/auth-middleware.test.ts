@@ -7,20 +7,29 @@ import {
   generateApiKey,
   generateSessionToken,
   hashApiKey,
-  hashPassword,
   hashSessionToken,
 } from '@mediacompressor/auth';
+import {
+  TEST_API_KEY_PEPPER,
+  TEST_SESSION_SECRET,
+  TEST_CSRF_SECRET,
+  testDatabaseUrl,
+  testRedisUrl,
+  createTestUser,
+  cleanupTestUsers,
+} from '@mediacompressor/test-helpers';
 import { buildServer } from '../server.js';
 import type { Config } from '../config.js';
 
+const TEST_EMAILS_REQ_AUTH = ['mw@test.invalid'];
+const TEST_EMAILS_REQ_AUTH_CSRF = ['csrf@test.invalid'];
+
 const config: Config = {
-  DATABASE_URL:
-    process.env.DATABASE_URL ??
-    'postgresql://mediacompressor:changeme-dev@172.18.0.2:5432/mediacompressor?schema=public',
-  REDIS_URL: process.env.REDIS_URL ?? 'redis://172.18.0.3:6379',
-  SESSION_SECRET: 'a'.repeat(32),
-  CSRF_SECRET: 'b'.repeat(32),
-  API_KEY_PEPPER: 'c'.repeat(32),
+  DATABASE_URL: testDatabaseUrl(),
+  REDIS_URL: testRedisUrl(),
+  SESSION_SECRET: TEST_SESSION_SECRET,
+  CSRF_SECRET: TEST_CSRF_SECRET,
+  API_KEY_PEPPER: TEST_API_KEY_PEPPER,
   CORS_ALLOWED_ORIGINS: 'http://localhost:5173',
   PORT: 0,
   NODE_ENV: 'test',
@@ -41,16 +50,9 @@ describe('auth middleware: requireAuth', () => {
   beforeAll(async () => {
     prisma = createPrismaClient({ databaseUrl: config.DATABASE_URL });
     await prisma.pepperCanary.deleteMany();
-    await prisma.session.deleteMany();
-    await prisma.apiKey.deleteMany();
-    await prisma.user.deleteMany({ where: { email: 'mw@test.invalid' } });
+    await cleanupTestUsers(prisma, TEST_EMAILS_REQ_AUTH);
 
-    const u = await prisma.user.create({
-      data: {
-        email: 'mw@test.invalid',
-        passwordHash: await hashPassword('hunter22hunter22'),
-      },
-    });
+    const u = await createTestUser(prisma, { email: 'mw@test.invalid' });
     userId = u.id;
 
     // Active key.
@@ -94,9 +96,7 @@ describe('auth middleware: requireAuth', () => {
   });
 
   afterAll(async () => {
-    await prisma.session.deleteMany({ where: { userId } });
-    await prisma.apiKey.deleteMany({ where: { userId } });
-    await prisma.user.deleteMany({ where: { id: userId } });
+    await cleanupTestUsers(prisma, TEST_EMAILS_REQ_AUTH);
     await prisma.$disconnect();
   });
 
@@ -204,16 +204,9 @@ describe('auth middleware: requireAuthCsrf (C9-Rev2)', () => {
   beforeAll(async () => {
     prisma = createPrismaClient({ databaseUrl: config.DATABASE_URL });
     await prisma.pepperCanary.deleteMany();
-    await prisma.session.deleteMany();
-    await prisma.apiKey.deleteMany();
-    await prisma.user.deleteMany({ where: { email: 'csrf@test.invalid' } });
+    await cleanupTestUsers(prisma, TEST_EMAILS_REQ_AUTH_CSRF);
 
-    const u = await prisma.user.create({
-      data: {
-        email: 'csrf@test.invalid',
-        passwordHash: await hashPassword('hunter22hunter22'),
-      },
-    });
+    const u = await createTestUser(prisma, { email: 'csrf@test.invalid' });
     userId = u.id;
 
     const active = generateApiKey();
@@ -241,9 +234,7 @@ describe('auth middleware: requireAuthCsrf (C9-Rev2)', () => {
   });
 
   afterAll(async () => {
-    await prisma.session.deleteMany({ where: { userId } });
-    await prisma.apiKey.deleteMany({ where: { userId } });
-    await prisma.user.deleteMany({ where: { id: userId } });
+    await cleanupTestUsers(prisma, TEST_EMAILS_REQ_AUTH_CSRF);
     await prisma.$disconnect();
   });
 

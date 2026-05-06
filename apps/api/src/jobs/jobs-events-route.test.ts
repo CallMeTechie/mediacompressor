@@ -3,18 +3,27 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import IORedis from 'ioredis';
 import type { FastifyInstance } from 'fastify';
 import { createPrismaClient, type PrismaClient } from '@mediacompressor/db';
-import { generateApiKey, hashApiKey, hashPassword } from '@mediacompressor/auth';
+import { generateApiKey, hashApiKey } from '@mediacompressor/auth';
+import {
+  TEST_API_KEY_PEPPER,
+  TEST_SESSION_SECRET,
+  TEST_CSRF_SECRET,
+  testDatabaseUrl,
+  testRedisUrl,
+  createTestUser,
+  cleanupTestUsers,
+} from '@mediacompressor/test-helpers';
 import { buildServer } from '../server.js';
 import type { Config } from '../config.js';
 
+const TEST_EMAILS = ['jobs9@b.com', 'jobs9-foreign@b.com'];
+
 const config: Config = {
-  DATABASE_URL:
-    process.env.DATABASE_URL ??
-    'postgresql://mediacompressor:changeme-dev@172.18.0.2:5432/mediacompressor?schema=public',
-  REDIS_URL: process.env.REDIS_URL ?? 'redis://172.18.0.3:6379',
-  SESSION_SECRET: 'a'.repeat(32),
-  CSRF_SECRET: 'b'.repeat(32),
-  API_KEY_PEPPER: 'c'.repeat(32),
+  DATABASE_URL: testDatabaseUrl(),
+  REDIS_URL: testRedisUrl(),
+  SESSION_SECRET: TEST_SESSION_SECRET,
+  CSRF_SECRET: TEST_CSRF_SECRET,
+  API_KEY_PEPPER: TEST_API_KEY_PEPPER,
   CORS_ALLOWED_ORIGINS: 'http://localhost:5173',
   PORT: 0,
   NODE_ENV: 'test',
@@ -62,21 +71,12 @@ describe('jobs-events route — GET /api/v1/jobs/:id/events (Plan 4 Task 9)', ()
   beforeAll(async () => {
     prisma = createPrismaClient({ databaseUrl: config.DATABASE_URL });
     redis = new IORedis(config.REDIS_URL);
-    await prisma.user.deleteMany({
-      where: { email: { in: ['jobs9@b.com', 'jobs9-foreign@b.com'] } },
-    });
+    await cleanupTestUsers(prisma, TEST_EMAILS);
 
-    const u = await prisma.user.create({
-      data: { email: 'jobs9@b.com', passwordHash: await hashPassword('hunter22hunter22') },
-    });
+    const u = await createTestUser(prisma, { email: 'jobs9@b.com' });
     userId = u.id;
 
-    const f = await prisma.user.create({
-      data: {
-        email: 'jobs9-foreign@b.com',
-        passwordHash: await hashPassword('hunter22hunter22'),
-      },
-    });
+    const f = await createTestUser(prisma, { email: 'jobs9-foreign@b.com' });
     foreignUserId = f.id;
 
     const seeded = generateApiKey();
@@ -109,10 +109,7 @@ describe('jobs-events route — GET /api/v1/jobs/:id/events (Plan 4 Task 9)', ()
   });
 
   afterAll(async () => {
-    await prisma.job.deleteMany({ where: { userId: { in: [userId, foreignUserId] } } });
-    await prisma.session.deleteMany({ where: { userId: { in: [userId, foreignUserId] } } });
-    await prisma.apiKey.deleteMany({ where: { userId: { in: [userId, foreignUserId] } } });
-    await prisma.user.deleteMany({ where: { id: { in: [userId, foreignUserId] } } });
+    await cleanupTestUsers(prisma, TEST_EMAILS);
     await prisma.$disconnect();
     await redis.quit();
   });
