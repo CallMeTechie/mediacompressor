@@ -18,6 +18,7 @@ import { apiKeyRoutes } from './auth/api-key-routes.js';
 import { jobsRoutes } from './jobs/jobs-routes.js';
 import { jobsEventsRoute } from './jobs/jobs-events-route.js';
 import { preCreateHook } from './uploads/pre-create-hook.js';
+import { postFinishHook } from './uploads/post-finish-hook.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -123,6 +124,12 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // (POST /api/v1/internal/uploads/hooks/pre-create). Shared-secret +
   // Bearer-API-Key + UC7 MIME-allowlist + atomic quota reservation.
   await app.register(preCreateHook);
+
+  // Plan 5 Task 6: tusd Post-Finish-Hook
+  // (POST /api/v1/internal/uploads/hooks/post-finish). Shared-secret +
+  // file-move (rename, EXDEV-fallback) + magic-number-check + atomic
+  // status-transition uploading→queued + BullMQ-Enqueue (UC4/UC6).
+  await app.register(postFinishHook);
 
   return app;
 }
