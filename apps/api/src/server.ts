@@ -15,6 +15,7 @@ import { runPepperCanaryOnBoot } from './pepper-canary-hook.js';
 import { loginRoutes } from './auth/login-routes.js';
 import { registerAuthMiddleware } from './auth/auth-middleware.js';
 import { apiKeyRoutes } from './auth/api-key-routes.js';
+import { jobsRoutes } from './jobs/jobs-routes.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -89,9 +90,7 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
     try {
       const pong = await Promise.race([
         redis.ping(),
-        new Promise<string>((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 2000),
-        ),
+        new Promise<string>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)),
       ]);
       if (pong === 'PONG') redisOk = true;
     } catch {
@@ -111,6 +110,9 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // Registered AFTER registerAuthMiddleware because it relies on
   // app.requireAuth / app.requireAuthCsrf decorators.
   await app.register(apiKeyRoutes);
+
+  // Plan 4 Task 6: POST /jobs stub + BullMQ producer (Outbox-Pattern).
+  await app.register(jobsRoutes);
 
   return app;
 }
