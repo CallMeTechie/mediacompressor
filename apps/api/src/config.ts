@@ -11,6 +11,11 @@ const ConfigSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   ARGON2_MAX_CONCURRENCY: z.coerce.number().int().min(1).default(8),
+  TUSD_SHARED_SECRET: z.string().min(32),
+  TUSD_DATA_DIR: z.string().default('/media/tusd-data'),
+  TUSD_FINAL_DIR: z.string().default('/media/uploads'),
+  MEDIA_MOUNT_PATH: z.string().default('/media'),
+  MIN_FREE_BYTES_RESERVE: z.coerce.bigint().default(5n * 1024n * 1024n * 1024n), // 5 GB
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
