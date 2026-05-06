@@ -94,6 +94,43 @@ importers:
         specifier: ~4.19.2
         version: 4.19.4
 
+  apps/worker:
+    dependencies:
+      '@mediacompressor/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@mediacompressor/compression':
+        specifier: workspace:*
+        version: link:../../packages/compression
+      '@mediacompressor/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@mediacompressor/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@mediacompressor/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
+      bullmq:
+        specifier: ~5.34.0
+        version: 5.34.10
+      ioredis:
+        specifier: ~5.4.1
+        version: 5.4.2
+      pino:
+        specifier: ~9.5.0
+        version: 9.5.0
+      zod:
+        specifier: ~3.23.8
+        version: 3.23.8
+    devDependencies:
+      '@types/node':
+        specifier: ~22.7.0
+        version: 22.7.9
+      tsx:
+        specifier: ~4.19.2
+        version: 4.19.4
+
   packages/auth:
     dependencies:
       '@mediacompressor/db':
@@ -1308,6 +1345,10 @@ packages:
   fast-querystring@1.1.2:
     resolution: {integrity: sha512-g6KuKWmFXc0fID8WWH0jit4g0AGBoJhCkJMb1RmbsSEUNvQ+ZC8D6CUZ+GtF8nMzSPXnhiePyyqqipzNNEnHjg==}
 
+  fast-redact@3.5.0:
+    resolution: {integrity: sha512-dwsoQlS7h9hMeYUq1W++23NDcBLV4KqONnITDV9DjfS3q1SgDGVrBdvvTLUotWtPSD7asWDV9/CmsZPy8Hf70A==}
+    engines: {node: '>=6'}
+
   fast-uri@3.1.2:
     resolution: {integrity: sha512-rVjf7ArG3LTk+FS6Yw81V1DLuZl1bRbNrev6Tmd/9RaroeeRRJhAt7jg/6YFxbvAQXUCavSoZhPPj6oOx+5KjQ==}
 
@@ -1672,6 +1713,10 @@ packages:
 
   pino@9.14.0:
     resolution: {integrity: sha512-8OEwKp5juEvb/MjpIc4hjqfgCNysrS94RIOMXYvpYCdm/jglrKEiAYmiumbmGhCvs+IcInsphYDFwqrjr7398w==}
+    hasBin: true
+
+  pino@9.5.0:
+    resolution: {integrity: sha512-xSEmD4pLnV54t0NOUN16yCl7RIB1c5UUOse5HSyEXtBp+FgFQyPeDutc+Q2ZO7/22vImV7VfEjH/1zV2QuqvYw==}
     hasBin: true
 
   postcss@8.5.14:
@@ -3035,6 +3080,8 @@ snapshots:
     dependencies:
       fast-decode-uri-component: 1.0.1
 
+  fast-redact@3.5.0: {}
+
   fast-uri@3.1.2: {}
 
   fastify-plugin@5.1.0: {}
@@ -3410,6 +3457,20 @@ snapshots:
       pino-abstract-transport: 2.0.0
       pino-std-serializers: 7.1.0
       process-warning: 5.0.0
+      quick-format-unescaped: 4.0.4
+      real-require: 0.2.0
+      safe-stable-stringify: 2.5.0
+      sonic-boom: 4.2.1
+      thread-stream: 3.1.0
+
+  pino@9.5.0:
+    dependencies:
+      atomic-sleep: 1.0.0
+      fast-redact: 3.5.0
+      on-exit-leak-free: 2.1.2
+      pino-abstract-transport: 2.0.0
+      pino-std-serializers: 7.1.0
+      process-warning: 4.0.1
       quick-format-unescaped: 4.0.4
       real-require: 0.2.0
       safe-stable-stringify: 2.5.0
