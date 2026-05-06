@@ -1,9 +1,9 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { createPrismaClient, type PrismaClient } from '@mediacompressor/db';
+import { TEST_API_KEY_PEPPER, testDatabaseUrl } from '@mediacompressor/test-helpers';
 import { runPepperCanaryOnBoot } from './pepper-canary-hook.js';
 
-const DATABASE_URL =
-  process.env.DATABASE_URL ?? 'postgresql://mc:mc@127.0.0.1:5432/mc?schema=public';
+const DATABASE_URL = testDatabaseUrl();
 
 let prisma: PrismaClient;
 
@@ -18,7 +18,7 @@ afterAll(async () => {
 describe('runPepperCanaryOnBoot', () => {
   it('passes on consistent pepper', async () => {
     await prisma.pepperCanary.deleteMany();
-    const pepper = Buffer.alloc(32, 7);
+    const pepper = Buffer.from(TEST_API_KEY_PEPPER);
     await expect(runPepperCanaryOnBoot(prisma, pepper)).resolves.toBeUndefined();
     await expect(runPepperCanaryOnBoot(prisma, pepper)).resolves.toBeUndefined();
   });
@@ -29,5 +29,7 @@ describe('runPepperCanaryOnBoot', () => {
     await expect(runPepperCanaryOnBoot(prisma, Buffer.alloc(32, 9))).rejects.toThrow(
       /API_KEY_PEPPER mismatch/,
     );
+    // H1-Fix: clean up local mismatch peppers so other tests/files see an empty canary.
+    await prisma.pepperCanary.deleteMany();
   });
 });

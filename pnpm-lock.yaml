@@ -87,6 +87,9 @@ importers:
         specifier: ~3.23.8
         version: 3.23.8
     devDependencies:
+      '@mediacompressor/test-helpers':
+        specifier: workspace:*
+        version: link:../../packages/test-helpers
       '@types/node':
         specifier: ~22.7.0
         version: 22.7.9
@@ -143,6 +146,9 @@ importers:
         specifier: ~0.41.1
         version: 0.41.1
     devDependencies:
+      '@mediacompressor/test-helpers':
+        specifier: workspace:*
+        version: link:../test-helpers
       '@types/node':
         specifier: ~22.7.0
         version: 22.7.9

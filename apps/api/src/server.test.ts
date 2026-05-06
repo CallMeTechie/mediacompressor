@@ -1,14 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { createPrismaClient } from '@mediacompressor/db';
+import {
+  TEST_API_KEY_PEPPER,
+  TEST_CSRF_SECRET,
+  TEST_SESSION_SECRET,
+  testDatabaseUrl,
+  testRedisUrl,
+} from '@mediacompressor/test-helpers';
 import { buildServer } from './server.js';
 import type { Config } from './config.js';
 
 const config: Config = {
-  DATABASE_URL: process.env.DATABASE_URL ?? 'postgresql://mc:mc@127.0.0.1:5432/mc?schema=public',
-  REDIS_URL: process.env.REDIS_URL ?? 'redis://127.0.0.1:6379',
-  SESSION_SECRET: 'a'.repeat(32),
-  CSRF_SECRET: 'b'.repeat(32),
-  API_KEY_PEPPER: 'c'.repeat(32),
+  DATABASE_URL: testDatabaseUrl(),
+  REDIS_URL: testRedisUrl(),
+  SESSION_SECRET: TEST_SESSION_SECRET,
+  CSRF_SECRET: TEST_CSRF_SECRET,
+  API_KEY_PEPPER: TEST_API_KEY_PEPPER,
   CORS_ALLOWED_ORIGINS: 'http://localhost:5173',
   PORT: 0,
   NODE_ENV: 'test',

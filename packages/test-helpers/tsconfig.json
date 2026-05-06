@@ -6,8 +6,5 @@
     "composite": true
   },
   "include": ["src/**/*"],
-  "references": [
-    { "path": "../auth" },
-    { "path": "../db" }
-  ]
+  "references": [{ "path": "../db" }]
 }

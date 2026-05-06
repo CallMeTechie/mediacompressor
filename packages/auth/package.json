@@ -21,6 +21,7 @@
     "argon2": "~0.41.1"
   },
   "devDependencies": {
+    "@mediacompressor/test-helpers": "workspace:*",
     "@types/node": "~22.7.0",
     "ioredis": "~5.4.1"
   }

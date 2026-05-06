@@ -5,5 +5,5 @@
     "rootDir": "./src"
   },
   "include": ["src/**/*"],
-  "references": [{ "path": "../shared" }, { "path": "../db" }]
+  "references": [{ "path": "../shared" }, { "path": "../db" }, { "path": "../test-helpers" }]
 }
