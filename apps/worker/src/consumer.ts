@@ -174,6 +174,10 @@ export async function processJob(deps: ProcessJobDeps, data: CompressJobData): P
 
 export interface StartWorkerHandle {
   worker: Worker<CompressJobData>;
+  // Exposed so co-deployed workloads (e.g. cleanup-cron) can piggy-back on
+  // the same connections instead of doubling the Redis/Postgres pool.
+  redis: Redis;
+  prisma: PrismaClient;
   close: () => Promise<void>;
 }
 
@@ -207,6 +211,8 @@ export function startWorker(redisUrl: string, databaseUrl: string): StartWorkerH
 
   return {
     worker,
+    redis,
+    prisma,
     close: async () => {
       await worker.close();
       await prisma.$disconnect();
