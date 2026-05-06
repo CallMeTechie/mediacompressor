@@ -73,6 +73,9 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://redis:6379
+      # API_KEY_PEPPER: worker config schema (apps/worker/src/config.ts) requires
+      # this for symmetry with apps/api (HMAC-SHA-256 keyed lookups). Plan-2-Fix.
+      API_KEY_PEPPER: ${API_KEY_PEPPER}
       # C12-Rev2: per-Container-Concurrency. Default 2 → 1 Video + 1 Image parallel.
       # Skalierung per `docker compose up -d --scale worker=N`.
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
