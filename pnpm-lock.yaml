@@ -225,12 +225,12 @@ importers:
 
   packages/test-helpers:
     dependencies:
-      '@mediacompressor/auth':
-        specifier: workspace:*
-        version: link:../auth
       '@mediacompressor/db':
         specifier: workspace:*
         version: link:../db
+      argon2:
+        specifier: ~0.41.1
+        version: 0.41.1
       ioredis:
         specifier: ~5.4.1
         version: 5.4.2
