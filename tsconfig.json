@@ -18,6 +18,12 @@
     },
     {
       "path": "./packages/auth"
+    },
+    {
+      "path": "./apps/api"
+    },
+    {
+      "path": "./apps/worker"
     }
   ]
 }
