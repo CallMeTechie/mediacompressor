@@ -14,6 +14,7 @@ import type { Config } from './config.js';
 import { runPepperCanaryOnBoot } from './pepper-canary-hook.js';
 import { loginRoutes } from './auth/login-routes.js';
 import { registerAuthMiddleware } from './auth/auth-middleware.js';
+import { apiKeyRoutes } from './auth/api-key-routes.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -105,6 +106,11 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // Plan 4 Task 5: Auth-Middleware (Session ODER API-Key). Must be registered
   // BEFORE Task-4 routes (API-Key-Routes) since they call app.requireAuth.
   registerAuthMiddleware(app);
+
+  // Plan 4 Task 4: API-Key-Routes (CRUD for the authenticated user's keys).
+  // Registered AFTER registerAuthMiddleware because it relies on
+  // app.requireAuth / app.requireAuthCsrf decorators.
+  await app.register(apiKeyRoutes);
 
   return app;
 }
