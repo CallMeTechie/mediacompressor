@@ -5,3 +5,8 @@ export {
   type CleanupLockResult,
   type AcquireOptions,
 } from './lock.js';
+export {
+  startDownloadHandler,
+  type DownloadHandle,
+  type StartDownloadOptions,
+} from './download-set.js';
