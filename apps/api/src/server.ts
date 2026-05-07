@@ -15,6 +15,7 @@ import { runPepperCanaryOnBoot } from './pepper-canary-hook.js';
 import { loginRoutes } from './auth/login-routes.js';
 import { registerAuthMiddleware } from './auth/auth-middleware.js';
 import { registerAdminGuard } from './admin/role-guard.js';
+import { adminUsersRoutes } from './admin/users-routes.js';
 import { apiKeyRoutes } from './auth/api-key-routes.js';
 import { capabilitiesRoute } from './capabilities/capabilities-route.js';
 import { jobsRoutes } from './jobs/jobs-routes.js';
@@ -117,6 +118,11 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // registerAuthMiddleware because requireAdmin/requireAdminCsrf delegate to
   // app.requireAuth and read req.auth.role/status (populated by resolveAuth).
   registerAdminGuard(app);
+
+  // Plan 7 Task 3: Admin user-management routes. Registered AFTER
+  // registerAdminGuard because the routes use app.requireAdmin /
+  // app.requireAdminCsrf decorators.
+  await app.register(adminUsersRoutes);
 
   // Plan 4 Task 4: API-Key-Routes (CRUD for the authenticated user's keys).
   // Registered AFTER registerAuthMiddleware because it relies on
