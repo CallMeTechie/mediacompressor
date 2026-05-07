@@ -144,6 +144,15 @@
         }
       }
     },
+    "/logout": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
     "/api/v1/admin/users": {
       "get": {
         "parameters": [

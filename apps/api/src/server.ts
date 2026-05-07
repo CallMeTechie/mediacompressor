@@ -30,6 +30,7 @@ import { openapiSpecPlugin, openapiUiPlugin } from './openapi/plugin.js';
 import { webViewPlugin } from './web/view-plugin.js';
 import { loginPagePlugin } from './web/login-page.js';
 import { inviteRedeemPagePlugin } from './web/invite-redeem-page.js';
+import { logoutRoutePlugin } from './web/logout-route.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -163,6 +164,11 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // CSRF rotation (WC4) + revert-on-failure logging (C3-Rev2). Reads
   // invite tokens hashed with SESSION_SECRET (HMAC-SHA-256).
   await app.register(inviteRedeemPagePlugin);
+
+  // Plan 8a Task 5: POST /logout HTML route (BFF). Clears mc_session +
+  // mc_csrf cookies and the corresponding DB row, then 303 → /login.
+  // Idempotent: missing session cookie still returns 303. CSRF-protected.
+  await app.register(logoutRoutePlugin);
 
   // Plan 4 Task 5: Auth-Middleware (Session ODER API-Key). Must be registered
   // BEFORE Task-4 routes (API-Key-Routes) since they call app.requireAuth.
