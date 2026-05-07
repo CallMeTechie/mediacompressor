@@ -43,3 +43,21 @@ const ERROR_CODE_SET = new Set<string>(ERROR_CODES);
 export function isErrorCode(value: unknown): value is ErrorCode {
   return typeof value === 'string' && ERROR_CODE_SET.has(value);
 }
+
+/**
+ * C9-LI: Single-source-of-truth allowlist of user-facing error codes that
+ * Plan-2 worker may emit AND Plan-8b BFF may render. Worker imports this same
+ * map and TypeScript-keyof-validates that emitted codes are members of the
+ * `KnownErrorCode` union; BFF (apps/api/src/web/error-redact.ts) imports it to
+ * map Job.errorMessage prefixes to user-safe text. Add new codes here as the
+ * worker emits them so neither side can drift.
+ */
+export const KNOWN_ERROR_MESSAGES = {
+  INPUT_CORRUPT: 'The input file appears to be corrupted.',
+  INPUT_UNSUPPORTED: 'The input format is not supported.',
+  TIMEOUT: 'The job timed out and could not finish.',
+  OUTPUT_TOO_LARGE: 'The output exceeds the configured size limit.',
+  WORKER_CRASHED: 'The worker terminated unexpectedly.',
+} as const;
+
+export type KnownErrorCode = keyof typeof KNOWN_ERROR_MESSAGES;

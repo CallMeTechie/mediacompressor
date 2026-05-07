@@ -1,0 +1,35 @@
+<header class="page-header">
+  <h1>{{job.inputFilename}}</h1>
+  <nav class="page-nav">
+    <a href="/jobs">All jobs</a>
+    <a href="/">Dashboard</a>
+  </nav>
+</header>
+
+<section class="job-detail">
+  {{> flash}}
+  <div id="job-detail-sse-target"
+       data-sse-target
+       data-sse-url="/api/v1/jobs/{{job.id}}/events"
+       data-fragment-url="/jobs/{{job.id}}?fragment=1"
+       hx-ext="sse"
+       sse-connect="/api/v1/jobs/{{job.id}}/events"
+       sse-swap="progress,status,snapshot">
+    {{> job-detail-status job}}
+  </div>
+  <p>Kind: {{job.kind}} &middot; Profile: {{job.profile}}</p>
+  {{#if job.inputBytes}}<p>Input: {{job.inputBytes}} bytes (claimed)</p>{{/if}}
+
+  {{#if canCancel}}
+  <form method="POST" action="/jobs/{{job.id}}/cancel">
+    {{{_csrfField}}}
+    <button type="submit" class="btn">Cancel</button>
+  </form>
+  {{/if}}
+
+  {{#if canDownload}}
+  <a class="btn" href="/api/v1/jobs/{{job.id}}/download">Download</a>
+  {{/if}}
+</section>
+
+<script src="/static/js/job-detail-watchdog.js" defer></script>

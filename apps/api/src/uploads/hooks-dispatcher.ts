@@ -34,7 +34,16 @@ const ROUTE_BY_TYPE: Record<string, string> = {
   'post-finish': '/api/v1/internal/uploads/hooks/post-finish',
 };
 
-const PASSTHROUGH_HEADERS = ['x-tusd-shared-secret', 'authorization', 'x-csrf-token'] as const;
+// Plan-8b Task 6: `cookie` is forwarded so browser-side tus uploads (Upload-
+// Wizard at /upload) can authenticate via the same `mc_session` cookie used
+// elsewhere in the BFF. Symmetric with docker-compose.yml's tusd
+// `-hooks-http-forward-headers=Authorization,X-CSRF-Token,Cookie` flag.
+const PASSTHROUGH_HEADERS = [
+  'x-tusd-shared-secret',
+  'authorization',
+  'x-csrf-token',
+  'cookie',
+] as const;
 
 export const tusdHooksDispatcher: FastifyPluginAsync = async (app) => {
   app.post('/api/v1/internal/uploads/hooks', async (req, reply) => {
@@ -89,6 +98,9 @@ export const tusdHooksDispatcher: FastifyPluginAsync = async (app) => {
  *  - authorization: forwarded by tusd via -hooks-http-forward-headers
  *  - x-csrf-token: forwarded — currently unused but kept symmetric with the
  *    -hooks-http-forward-headers config in docker-compose.yml.
+ *  - cookie: Plan-8b Task 6, lets browser-uploads (Upload-Wizard) authenticate
+ *    via mc_session instead of requiring an API-key. requireAuth already
+ *    consults req.cookies.mc_session as the second-priority lookup path.
  *  - content-type: must be application/json so the inner Fastify route
  *    parses the JSON body, not opaque text.
  */

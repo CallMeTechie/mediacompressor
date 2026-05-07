@@ -3,6 +3,7 @@ import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import csrf from '@fastify/csrf-protection';
 import helmet from '@fastify/helmet';
+import httpProxy from '@fastify/http-proxy';
 import {
   serializerCompiler,
   validatorCompiler,
@@ -32,6 +33,12 @@ import { loginPagePlugin } from './web/login-page.js';
 import { inviteRedeemPagePlugin } from './web/invite-redeem-page.js';
 import { logoutRoutePlugin } from './web/logout-route.js';
 import { errorPagesPlugin } from './web/error-pages.js';
+import { requireSessionPlugin } from './web/require-session.js';
+import { dashboardPagePlugin } from './web/dashboard-page.js';
+import { jobListPagePlugin } from './web/job-list-page.js';
+import { jobDetailPagePlugin } from './web/job-detail-page.js';
+import { jobCancelRoutePlugin } from './web/job-cancel-route.js';
+import { uploadWizardPagePlugin } from './web/upload-wizard-page.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -103,6 +110,58 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
     },
   });
 
+  // Plan 8b Task 6: dev-side reverse proxy for tus-js-client browser uploads.
+  // The Upload-Wizard's <script>/static/js/upload-wizard.js POSTs to a
+  // *relative* /uploads/ endpoint (so the browser stays same-origin, cookies
+  // and CSRF behave). tusd runs on a separate container (`tusd:1080` in
+  // docker-compose.yml, base-path `/uploads/`); from the host or another
+  // origin, the browser cannot reach it directly. We forward /uploads/* 1:1
+  // to TUSD_UPSTREAM here.
+  //
+  // Plan 9 (Caddy) will front tusd on the public host and serve the same
+  // `/uploads/*` path; this proxy is removable then. Kept here as a plain
+  // env-var (NOT in config.ts) so test configs do not have to set it.
+  //
+  // Path-rewriting: docker-compose.yml's tusd command sets
+  // `-base-path=/uploads/`, so the rewrite is the identity (`/uploads/*` →
+  // upstream `/uploads/*`). Adjust `rewritePrefix` if that ever changes.
+  const TUSD_UPSTREAM = process.env.TUSD_UPSTREAM ?? 'http://tusd:1080';
+  await app.register(httpProxy, {
+    upstream: TUSD_UPSTREAM,
+    prefix: '/uploads',
+    rewritePrefix: '/uploads',
+    http2: false,
+    // tus PATCHes carry `application/offset+octet-stream`. We need
+    // @fastify/http-proxy's catch-all content-type parser registered (the
+    // default when `proxyPayloads` is unset/true) so Fastify doesn't 415
+    // on the chunk uploads. The catch-all parser is registered iff
+    // `opts.proxyPayloads !== false` (see @fastify/http-proxy/index.js
+    // ~line 253), so we leave it at the default.
+    replyOptions: {
+      // tusd's POST /uploads/ response has Location:
+      // `http://tusd:1080/uploads/<id>` — that hostname is unreachable from
+      // the browser. Rewrite it to a same-origin relative path so the
+      // subsequent tus-js-client PATCH chunks come back through this proxy.
+      // @fastify/http-proxy's built-in `internalRewriteLocationHeader` only
+      // touches *relative* Location values; tusd builds absolute URLs, so we
+      // override here.
+      rewriteHeaders: (headers) => {
+        const loc = headers.location;
+        if (typeof loc === 'string') {
+          try {
+            const u = new URL(loc);
+            if (u.pathname.startsWith('/uploads/')) {
+              headers.location = u.pathname + u.search;
+            }
+          } catch {
+            // not a URL; leave it.
+          }
+        }
+        return headers;
+      },
+    },
+  });
+
   const prisma = createPrismaClient({ databaseUrl: config.DATABASE_URL });
   const redis = new IORedis(config.REDIS_URL, { maxRetriesPerRequest: null });
 
@@ -121,6 +180,12 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // route plugins so partials and reply.view are available to all later
   // route registrations.
   await app.register(webViewPlugin);
+
+  // Plan 8b Task 1: requireSession decorator (HTML-aware session check that
+  // 303s to /login on miss/expired/disabled). MUST be registered BEFORE any
+  // plugin that reads `app.requireSession` — fp-wrapped (Rev. 2.3 rule) so
+  // the decorator bubbles up to the parent FastifyInstance.
+  await app.register(requireSessionPlugin);
 
   // Plan 7 Task 6: register @fastify/swagger BEFORE all documented routes —
   // its `onRoute` hook only collects metadata for routes registered after it.
@@ -240,11 +305,43 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // line is now in the spec. Exposes /api/v1/openapi.json + /api/v1/docs.
   await app.register(openapiUiPlugin);
 
-  // Plan 8a Task 6: Accept-aware 404/500 + GET / root-redirect (BFF). MUST be
-  // registered LAST so the catch-all setNotFoundHandler doesn't shadow real
-  // routes registered above. wantsHtml(req) excludes /api/* and /static/*
-  // prefixes so existing JSON-API 404 tests (and asset 404s) keep returning
-  // JSON instead of HTML.
+  // Plan 8b Task 1: dashboard page (GET /). Registered BEFORE errorPagesPlugin
+  // so the dashboard's `/` route is matched before the catch-all 404. Uses
+  // app.requireSession internally (manual invocation, not a preHandler) so
+  // the non-HTML JSON branch can return {status:'ok'} without auth.
+  await app.register(dashboardPagePlugin);
+
+  // Plan 8b Task 2: GET /jobs HTML list page with HTMX polling. Registered
+  // AFTER dashboardPagePlugin (which owns `/`) and BEFORE errorPagesPlugin
+  // (which is the catch-all 404). Uses `app.requireSession` as a preHandler
+  // so unauthenticated requests 303 to /login.
+  await app.register(jobListPagePlugin);
+
+  // Plan 8b Task 3: GET /jobs/:id HTML detail page (status, profile, cancel
+  // form, download link) + view-time errorMessage redaction (C1-LI).
+  // Cancel-form posts to /jobs/:id/cancel below.
+  await app.register(jobDetailPagePlugin);
+
+  // Plan 8b Task 3: POST /jobs/:id/cancel — form-target that delegates to
+  // DELETE /api/v1/jobs/:id via app.inject(). Differentiates inner 401 (true
+  // session-race → /login + clearCookie, C2-LI) from 403 (CSRF stale →
+  // /jobs/:id?cancelflash=csrf-stale, mc_session preserved, C6-LI). Must be
+  // registered AFTER jobsRoutes (which owns DELETE /api/v1/jobs/:id) so the
+  // in-process app.inject() finds it.
+  await app.register(jobCancelRoutePlugin);
+
+  // Plan 8b Task 5: GET /upload — resumable-upload wizard. Renders a
+  // Handlebars form whose submit is hijacked client-side by tus-js-client
+  // (vendored at /static/vendor/tus.min.js) to upload to /uploads/ (tusd).
+  // <noscript>+<style>#upload-form{display:none} hides the form when JS is
+  // disabled (C7-LI), pointing the user at the JSON API docs instead.
+  await app.register(uploadWizardPagePlugin);
+
+  // Plan 8a Task 6: Accept-aware 404/500 (BFF). MUST be registered LAST so
+  // the catch-all setNotFoundHandler doesn't shadow real routes registered
+  // above. wantsHtml(req) excludes /api/* and /static/* prefixes so existing
+  // JSON-API 404 tests (and asset 404s) keep returning JSON instead of HTML.
+  // Plan 8b Task 1: GET / no longer registered here — owned by dashboardPagePlugin.
   await app.register(errorPagesPlugin);
 
   return app;

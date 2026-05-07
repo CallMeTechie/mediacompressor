@@ -41,7 +41,13 @@ test.beforeAll(async () => {
   const prisma = createPrismaClient({ databaseUrl: testDatabaseUrl() });
   const admin = await createTestUser(prisma, { email: ADMIN_EMAIL });
   const token = generateInviteToken();
-  const tokenHash = hashInviteToken(token, Buffer.from(TEST_SESSION_SECRET));
+  // Plan-8b Task 6: the running api container hashes invite tokens with the
+  // SESSION_SECRET it was booted with. When playwright runs against the
+  // docker-compose stack, that's the value loaded from .env (see
+  // playwright.config.ts process.loadEnvFile). Fall back to TEST_SESSION_SECRET
+  // for in-process / CI runs that haven't seeded an env file.
+  const sessionSecret = process.env.SESSION_SECRET ?? TEST_SESSION_SECRET;
+  const tokenHash = hashInviteToken(token, Buffer.from(sessionSecret));
   await prisma.invite.create({
     data: {
       token: tokenHash,
@@ -67,5 +73,7 @@ test('user can redeem an invite and reach the home placeholder', async ({ page }
     page.waitForURL('**/'),
     page.click('button[type="submit"]'),
   ]);
-  await expect(page.locator('h1')).toContainText(/MediaCompressor/);
+  // Plan-8b Task 1 changed `/`'s h1 from "MediaCompressor" → "Dashboard"
+  // (invite-redeem 303s to `/` on success, which is now the Dashboard view).
+  await expect(page.locator('h1')).toContainText(/MediaCompressor|Dashboard/);
 });

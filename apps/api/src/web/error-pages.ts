@@ -1,16 +1,6 @@
-import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
+import type { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
-
-function wantsHtml(req: FastifyRequest): boolean {
-  // Browsers send `accept: text/html,...`. API clients usually send
-  // `accept: application/json` or `*/*`. Only `text/html` opts into HTML.
-  // We also exclude /api/* and /static/* prefixes so JSON APIs and assets
-  // are unaffected by the accept-sniff.
-  if (req.url.startsWith('/api/')) return false;
-  if (req.url.startsWith('/static/')) return false;
-  const accept = (req.headers.accept ?? '').toLowerCase();
-  return accept.includes('text/html');
-}
+import { wantsHtml } from './accept.js';
 
 const errorPagesPluginImpl: FastifyPluginAsync = async (app) => {
   app.setNotFoundHandler((req, reply) => {
@@ -28,19 +18,10 @@ const errorPagesPluginImpl: FastifyPluginAsync = async (app) => {
     return reply.code(500).send({ error: { code: 'INTERNAL', message: err.message } });
   });
 
-  // Root: HTML clients without session → /login; with session → home placeholder.
-  // Non-HTML clients → existing JSON {status:ok} so health-check tooling keeps working.
-  app.get('/', async (req, reply) => {
-    if (wantsHtml(req)) {
-      const session = req.cookies.mc_session;
-      if (!session) return reply.code(303).header('location', '/login').send();
-      // C5-Rev2: post-login HTML renders user-bound data (Plan 8b will surface
-      // job-counts, recent activity, etc.) — must not be browser/proxy cached.
-      reply.header('cache-control', 'no-store, max-age=0');
-      return reply.view('home-placeholder', { title: 'MediaCompressor' });
-    }
-    return reply.send({ status: 'ok' });
-  });
+  // Plan 8b Task 1: GET / is now owned by dashboardPagePlugin (registered
+  // BEFORE this plugin in server.ts). The Plan-8a inline `/` route was
+  // removed because the dashboard renders the real welcome page (recent
+  // jobs + quota) and preserves the non-HTML JSON {status:'ok'} branch.
 };
 
 // Wrap with fastify-plugin so setNotFoundHandler / setErrorHandler bubble up

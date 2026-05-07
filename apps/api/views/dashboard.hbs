@@ -1,0 +1,33 @@
+<header class="page-header">
+  <h1>Dashboard</h1>
+  <nav class="page-nav">
+    <a href="/jobs">All jobs</a>
+    <a href="/upload">Upload</a>
+    <form method="POST" action="/logout" class="inline-form">
+      {{> csrf}}
+      <button type="submit" class="btn-link">Sign out</button>
+    </form>
+  </nav>
+</header>
+
+<section class="dashboard-summary">
+  <p>Welcome back, <strong>{{user.email}}</strong></p>
+  <p class="muted">{{inFlightCount}} job(s) in flight. <a href="/jobs">View all</a>.</p>
+</section>
+
+<section class="recent-jobs">
+  <h2>Recent jobs</h2>
+  {{#if recentJobs.length}}
+  <ul class="job-list">
+    {{#each recentJobs}}
+      <li>
+        <a href="/jobs/{{id}}">{{inputFilename}}</a>
+        {{> job-status-badge}}
+        <span class="muted">{{kind}} · {{profile}}</span>
+      </li>
+    {{/each}}
+  </ul>
+  {{else}}
+  <p class="muted">No jobs yet. <a href="/upload">Upload your first file</a>.</p>
+  {{/if}}
+</section>

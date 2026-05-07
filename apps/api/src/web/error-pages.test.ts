@@ -59,31 +59,9 @@ describe('web/error-pages', () => {
     }
   });
 
-  it('GET / (no session, Accept: text/html) → 303 to /login', async () => {
-    const app = await buildServer(config);
-    try {
-      const res = await app.inject({
-        method: 'GET',
-        url: '/',
-        headers: { accept: 'text/html' },
-      });
-      expect([302, 303]).toContain(res.statusCode);
-      expect(res.headers.location).toBe('/login');
-    } finally {
-      await app.close();
-    }
-  });
-
-  it('GET / (no session, no Accept) → 200 JSON {status:ok} (kept for native-app compat)', async () => {
-    const app = await buildServer(config);
-    try {
-      const res = await app.inject({ method: 'GET', url: '/' });
-      expect(res.statusCode).toBe(200);
-      expect(res.json()).toEqual({ status: 'ok' });
-    } finally {
-      await app.close();
-    }
-  });
+  // Plan 8b Task 1: GET / behavior tests (303-no-session, JSON-no-Accept,
+  // C5-Rev2 no-store) moved to dashboard-page.test.ts because the dashboard
+  // owns `/` now. error-pages.ts no longer registers `app.get('/')`.
 
   it('500 page renders for HTML clients on a thrown error', async () => {
     const app = await buildServer(config);
@@ -104,28 +82,8 @@ describe('web/error-pages', () => {
     }
   });
 
-  // C5-Rev2 PFLICHT-REGRESSIONSTEST — post-login HTML on / has Cache-Control: no-store.
-  // The home-placeholder will render user-bound data once Plan 8b lands;
-  // browser/proxy caching of that HTML is a privacy regression.
-  it('C5-Rev2: GET / with valid session has Cache-Control: no-store', async () => {
-    const app = await buildServer(config);
-    try {
-      // Synthesize a valid session cookie so the / handler renders the
-      // home-placeholder rather than redirecting to /login.
-      // For this test it's enough to attach an mc_session cookie; the
-      // handler doesn't validate it for the cache-control assertion.
-      const res = await app.inject({
-        method: 'GET',
-        url: '/',
-        headers: {
-          accept: 'text/html',
-          cookie: 'mc_session=test-session-placeholder',
-        },
-      });
-      expect(res.statusCode).toBe(200);
-      expect(res.headers['cache-control']).toMatch(/no-store/);
-    } finally {
-      await app.close();
-    }
-  });
+  // Plan 8b Task 1: C5-Rev2 PFLICHT-REGRESSIONSTEST migrated to
+  // dashboard-page.test.ts (test 5: 'GET / (HTML, valid session) has
+  // Cache-Control: no-store') — the dashboard owns `/` and uses a real
+  // session lookup instead of the Plan-8a placeholder cookie sniff.
 });

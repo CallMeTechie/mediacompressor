@@ -1,12 +1,29 @@
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyReply } from 'fastify';
 import fp from 'fastify-plugin';
 import view from '@fastify/view';
 import staticPlugin from '@fastify/static';
 import formbody from '@fastify/formbody';
 import handlebars from 'handlebars';
 import { csrfHelperPlugin } from './csrf-helper.js';
+
+declare module 'fastify' {
+  interface FastifyReply {
+    /**
+     * Render a Handlebars template (relative to `views/`) WITHOUT the global
+     * `layouts/base.hbs` wrapper. Used for HTMX swap-fragments where only the
+     * partial markup is wanted (no `<html>`/`<head>` shell).
+     *
+     * @fastify/view always wraps with the global layout — there is no per-call
+     * disable — so we render the template directly via the same Handlebars
+     * instance that backs reply.view, after registering identical partials so
+     * `{{> job-status-badge}}` etc. resolve.
+     */
+    viewFragment(template: string, data: Record<string, unknown>): Promise<FastifyReply>;
+  }
+}
 
 // __dirname-shim for ESM. The plugin file lives at apps/api/src/web/view-plugin.ts;
 // views/ is at apps/api/views/ and public/ is at apps/api/public/, so we go ../..
@@ -29,6 +46,16 @@ const webViewPluginImpl: FastifyPluginAsync = async (app) => {
       partials: {
         csrf: 'partials/csrf.hbs',
         flash: 'partials/flash.hbs',
+        // Plan 8b Task 1: status badge reused on dashboard / job-list / job-detail.
+        'job-status-badge': 'partials/job-status-badge.hbs',
+        // Plan 8b Task 2: job-list rows partial (HTMX-swap target). Lives at
+        // views/job-list-rows.hbs (not under partials/) because reply.view()
+        // also renders it standalone in fragment-mode.
+        'job-list-rows': 'job-list-rows.hbs',
+        // Plan 8b Task 4: job-detail-status partial (SSE-target inner block).
+        // Rendered standalone via reply.viewFragment for the ?fragment=1 polling
+        // fallback; inlined as `{{> job-detail-status job}}` inside job-detail.hbs.
+        'job-detail-status': 'job-detail-status.hbs',
       },
       useHtmlMinifier: false, // Plan 8b/8c may turn this on.
     },
@@ -67,6 +94,48 @@ const webViewPluginImpl: FastifyPluginAsync = async (app) => {
   // here (inside the fp-wrapped impl) so the decorator bubbles up to the parent
   // app scope alongside reply.view from @fastify/view.
   await app.register(csrfHelperPlugin);
+
+  // Plan 8b Task 2: register the same partials on the standalone Handlebars
+  // instance so reply.viewFragment can resolve `{{> job-status-badge}}` and
+  // friends without going through @fastify/view's layout-wrapped renderer.
+  const VIEWS_ROOT = path.join(APPS_API_ROOT, 'views');
+  const FRAGMENT_PARTIALS: Record<string, string> = {
+    csrf: 'partials/csrf.hbs',
+    flash: 'partials/flash.hbs',
+    'job-status-badge': 'partials/job-status-badge.hbs',
+    'job-list-rows': 'job-list-rows.hbs',
+    // Plan 8b Task 4: keep in sync with @fastify/view partials map above (see
+    // Rev. 2.2 DRY-smell note — Plan-8c will hoist to a shared `const`).
+    'job-detail-status': 'job-detail-status.hbs',
+  };
+  for (const [name, relPath] of Object.entries(FRAGMENT_PARTIALS)) {
+    const src = await fs.readFile(path.join(VIEWS_ROOT, relPath), 'utf8');
+    handlebars.registerPartial(name, src);
+  }
+
+  // Cache compiled fragment templates so repeated polling requests don't re-
+  // read the file from disk.
+  const fragmentCache = new Map<string, Handlebars.TemplateDelegate>();
+  async function getFragmentTemplate(template: string): Promise<Handlebars.TemplateDelegate> {
+    const cached = fragmentCache.get(template);
+    if (cached) return cached;
+    const file = template.endsWith('.hbs') ? template : `${template}.hbs`;
+    const src = await fs.readFile(path.join(VIEWS_ROOT, file), 'utf8');
+    const compiled = handlebars.compile(src);
+    fragmentCache.set(template, compiled);
+    return compiled;
+  }
+
+  app.decorateReply(
+    'viewFragment',
+    async function (this: FastifyReply, template: string, data: Record<string, unknown>) {
+      const compiled = await getFragmentTemplate(template);
+      const html = compiled(data);
+      this.header('content-type', 'text/html; charset=utf-8');
+      this.send(html);
+      return this;
+    },
+  );
 };
 
 // Wrap with fastify-plugin so @fastify/view's reply.view decorator and

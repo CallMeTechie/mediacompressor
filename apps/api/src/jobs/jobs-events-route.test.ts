@@ -172,6 +172,30 @@ describe('jobs-events route — GET /api/v1/jobs/:id/events (Plan 4 Task 9)', ()
     }
   });
 
+  it('snapshot — BigInt outputBytes is serialized as string (regression: JSON.stringify rejects bare BigInt)', async () => {
+    const app = await buildServer(config);
+    const { url } = await startServer(app);
+    try {
+      const job = await seedJob({
+        ownerId: userId,
+        status: 'succeeded',
+        progress: 100,
+        outputBytes: 12345n,
+      });
+      const res = await fetch(`${url}/api/v1/jobs/${job.id}/events`, {
+        headers: { authorization: `Bearer ${apiKey}` },
+      });
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      expect(body).toMatch(/^event: snapshot\ndata: /);
+      const dataLine = body.split('\n').find((l) => l.startsWith('data: '))!;
+      const data = JSON.parse(dataLine.slice(6)) as Record<string, unknown>;
+      expect(data.outputBytes).toBe('12345');
+    } finally {
+      await app.close();
+    }
+  });
+
   it('end-of-stream at terminal status — succeeded job → snapshot, then stream closes', async () => {
     const app = await buildServer(config);
     const { url } = await startServer(app);
