@@ -35,6 +35,8 @@ import { errorPagesPlugin } from './web/error-pages.js';
 import { requireSessionPlugin } from './web/require-session.js';
 import { dashboardPagePlugin } from './web/dashboard-page.js';
 import { jobListPagePlugin } from './web/job-list-page.js';
+import { jobDetailPagePlugin } from './web/job-detail-page.js';
+import { jobCancelRoutePlugin } from './web/job-cancel-route.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -260,6 +262,19 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // (which is the catch-all 404). Uses `app.requireSession` as a preHandler
   // so unauthenticated requests 303 to /login.
   await app.register(jobListPagePlugin);
+
+  // Plan 8b Task 3: GET /jobs/:id HTML detail page (status, profile, cancel
+  // form, download link) + view-time errorMessage redaction (C1-LI).
+  // Cancel-form posts to /jobs/:id/cancel below.
+  await app.register(jobDetailPagePlugin);
+
+  // Plan 8b Task 3: POST /jobs/:id/cancel — form-target that delegates to
+  // DELETE /api/v1/jobs/:id via app.inject(). Differentiates inner 401 (true
+  // session-race → /login + clearCookie, C2-LI) from 403 (CSRF stale →
+  // /jobs/:id?cancelflash=csrf-stale, mc_session preserved, C6-LI). Must be
+  // registered AFTER jobsRoutes (which owns DELETE /api/v1/jobs/:id) so the
+  // in-process app.inject() finds it.
+  await app.register(jobCancelRoutePlugin);
 
   // Plan 8a Task 6: Accept-aware 404/500 (BFF). MUST be registered LAST so
   // the catch-all setNotFoundHandler doesn't shadow real routes registered

@@ -1,0 +1,28 @@
+<header class="page-header">
+  <h1>{{job.inputFilename}}</h1>
+  <nav class="page-nav">
+    <a href="/jobs">All jobs</a>
+    <a href="/">Dashboard</a>
+  </nav>
+</header>
+
+<section class="job-detail">
+  {{> flash}}
+  <p>Status: {{> job-status-badge job}}</p>
+  <p>Kind: {{job.kind}} &middot; Profile: {{job.profile}}</p>
+  {{#if job.inputBytes}}<p>Input: {{job.inputBytes}} bytes (claimed)</p>{{/if}}
+  {{#if job.outputBytes}}<p>Output: {{job.outputBytes}} bytes</p>{{/if}}
+  {{#if job.progress}}<p>Progress: {{job.progress}}%</p>{{/if}}
+  {{#if job.errorMessage}}<p class="flash flash-error">{{job.errorMessage}}</p>{{/if}}
+
+  {{#if canCancel}}
+  <form method="POST" action="/jobs/{{job.id}}/cancel">
+    {{{_csrfField}}}
+    <button type="submit" class="btn">Cancel</button>
+  </form>
+  {{/if}}
+
+  {{#if canDownload}}
+  <a class="btn" href="/api/v1/jobs/{{job.id}}/download">Download</a>
+  {{/if}}
+</section>
