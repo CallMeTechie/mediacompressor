@@ -10,6 +10,9 @@ build
 # Test artifacts
 coverage
 .vitest
+# Playwright run artifacts (apps/api/test-e2e produces these in apps/api/test-results)
+test-results
+playwright-report
 
 # Environment
 .env

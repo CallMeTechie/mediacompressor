@@ -45,6 +45,7 @@ function makeConfig(): Config {
     TUSD_FINAL_DIR: tusdFinalDir,
     MEDIA_MOUNT_PATH: '/tmp',
     MIN_FREE_BYTES_RESERVE: 1n,
+    TRUSTED_PROXY_CIDR: 'loopback',
     CORS_ALLOWED_ORIGINS: 'http://localhost:5173',
     PORT: 0,
     NODE_ENV: 'test',

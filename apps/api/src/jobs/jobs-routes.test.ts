@@ -39,6 +39,7 @@ const config: Config = {
   TUSD_FINAL_DIR: '/media/uploads',
   MEDIA_MOUNT_PATH: '/media',
   MIN_FREE_BYTES_RESERVE: 1n,
+  TRUSTED_PROXY_CIDR: 'loopback',
   // Plan 7 Task 7: the POST /jobs describe-block below tests the deprecated
   // legacy stub explicitly, so the feature flag must be ON. The 4th describe
   // block (flag-OFF regression test) builds its own config with the flag off.

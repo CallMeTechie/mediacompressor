@@ -27,6 +27,11 @@ import { preCreateHook } from './uploads/pre-create-hook.js';
 import { postFinishHook } from './uploads/post-finish-hook.js';
 import { tusdHooksDispatcher } from './uploads/hooks-dispatcher.js';
 import { openapiSpecPlugin, openapiUiPlugin } from './openapi/plugin.js';
+import { webViewPlugin } from './web/view-plugin.js';
+import { loginPagePlugin } from './web/login-page.js';
+import { inviteRedeemPagePlugin } from './web/invite-redeem-page.js';
+import { logoutRoutePlugin } from './web/logout-route.js';
+import { errorPagesPlugin } from './web/error-pages.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -41,9 +46,23 @@ declare module 'fastify' {
 }
 
 export async function buildServer(config: Config): Promise<FastifyInstance> {
+  // WC1 + C1-Rev2: enable trustProxy so app.inject() (used by the BFF login
+  // handler) can spoof x-forwarded-for AND so Plan 9's Caddy can forward the
+  // real client IP. The list/preset passed to Fastify's trustProxy is
+  // parameterised via config so dev (loopback only) and production
+  // (loopback + caddy-subnet) can differ without code changes.
+  // Multiple CIDRs come as a comma-separated string in env; Fastify accepts
+  // either a single string preset, a single CIDR, OR a string[]. Split if
+  // the value contains a comma.
+  const trustProxyConfig: string | string[] = config.TRUSTED_PROXY_CIDR.includes(',')
+    ? config.TRUSTED_PROXY_CIDR.split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : config.TRUSTED_PROXY_CIDR;
   const app = Fastify({
     logger: { level: config.LOG_LEVEL },
     disableRequestLogging: false,
+    trustProxy: trustProxyConfig,
   }).withTypeProvider<ZodTypeProvider>();
 
   app.setValidatorCompiler(validatorCompiler);
@@ -71,7 +90,17 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
       sameSite: 'lax',
       path: '/',
     },
-    getToken: (req) => req.headers['x-csrf-token'] as string | undefined,
+    // Plan 8a Task 1 Pre-Flight: extended for HTML form posts. The web BFF posts
+    // application/x-www-form-urlencoded with a _csrf body field; legacy JSON/API-key
+    // callers still pass the x-csrf-token header. Header takes precedence so existing
+    // CSRF tests are unaffected.
+    getToken: (req) => {
+      const header = req.headers['x-csrf-token'];
+      if (typeof header === 'string') return header;
+      const body = req.body as Record<string, unknown> | undefined;
+      if (body && typeof body._csrf === 'string') return body._csrf;
+      return undefined;
+    },
   });
 
   const prisma = createPrismaClient({ databaseUrl: config.DATABASE_URL });
@@ -86,6 +115,12 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
 
   // Plan 4 Task 2: Pepper-Canary Boot-Self-Check
   await runPepperCanaryOnBoot(prisma, Buffer.from(config.API_KEY_PEPPER));
+
+  // Plan 8a Task 1: register the web BFF view-plugin (Handlebars + static
+  // assets + form-body parser + HTML CSP onSend hook). Mounted before the
+  // route plugins so partials and reply.view are available to all later
+  // route registrations.
+  await app.register(webViewPlugin);
 
   // Plan 7 Task 6: register @fastify/swagger BEFORE all documented routes —
   // its `onRoute` hook only collects metadata for routes registered after it.
@@ -118,6 +153,23 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
 
   // Tasks 3–9 register hooks/routes here.
   await app.register(loginRoutes);
+
+  // Plan 8a Task 3: GET /login + POST /login HTML page (BFF). Internally
+  // delegates to /api/v1/auth/login via app.inject(), so registered AFTER
+  // loginRoutes — although app.inject() is runtime-late-bound, keeping the
+  // dependency-aware order makes the intent obvious.
+  await app.register(loginPagePlugin);
+
+  // Plan 8a Task 4: GET /invites/:token + POST /invites/:token HTML pages
+  // (BFF). Atomic-claim via updateMany (WC3) + Argon2Semaphore (WC2) +
+  // CSRF rotation (WC4) + revert-on-failure logging (C3-Rev2). Reads
+  // invite tokens hashed with SESSION_SECRET (HMAC-SHA-256).
+  await app.register(inviteRedeemPagePlugin);
+
+  // Plan 8a Task 5: POST /logout HTML route (BFF). Clears mc_session +
+  // mc_csrf cookies and the corresponding DB row, then 303 → /login.
+  // Idempotent: missing session cookie still returns 303. CSRF-protected.
+  await app.register(logoutRoutePlugin);
 
   // Plan 4 Task 5: Auth-Middleware (Session ODER API-Key). Must be registered
   // BEFORE Task-4 routes (API-Key-Routes) since they call app.requireAuth.
@@ -187,6 +239,13 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // installed swagger's onRoute hook so every route registered above this
   // line is now in the spec. Exposes /api/v1/openapi.json + /api/v1/docs.
   await app.register(openapiUiPlugin);
+
+  // Plan 8a Task 6: Accept-aware 404/500 + GET / root-redirect (BFF). MUST be
+  // registered LAST so the catch-all setNotFoundHandler doesn't shadow real
+  // routes registered above. wantsHtml(req) excludes /api/* and /static/*
+  // prefixes so existing JSON-API 404 tests (and asset 404s) keep returning
+  // JSON instead of HTML.
+  await app.register(errorPagesPlugin);
 
   return app;
 }

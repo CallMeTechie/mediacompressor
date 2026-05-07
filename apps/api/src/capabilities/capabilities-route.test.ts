@@ -34,6 +34,7 @@ const config: Config = {
   TUSD_FINAL_DIR: '/media/uploads',
   MEDIA_MOUNT_PATH: '/media',
   MIN_FREE_BYTES_RESERVE: 1n,
+  TRUSTED_PROXY_CIDR: 'loopback',
   ENABLE_LEGACY_JOB_STUB: false,
 };
 

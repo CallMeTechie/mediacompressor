@@ -1,0 +1,142 @@
+import { describe, expect, it } from 'vitest';
+import { buildServer } from '../server.js';
+import type { Config } from '../config.js';
+import {
+  TEST_API_KEY_PEPPER,
+  TEST_SESSION_SECRET,
+  TEST_CSRF_SECRET,
+  testDatabaseUrl,
+  testRedisUrl,
+} from '@mediacompressor/test-helpers';
+
+const config: Config = {
+  DATABASE_URL: testDatabaseUrl(),
+  REDIS_URL: testRedisUrl(),
+  SESSION_SECRET: TEST_SESSION_SECRET,
+  CSRF_SECRET: TEST_CSRF_SECRET,
+  API_KEY_PEPPER: TEST_API_KEY_PEPPER,
+  CORS_ALLOWED_ORIGINS: 'http://localhost:5173',
+  PORT: 0,
+  NODE_ENV: 'test',
+  LOG_LEVEL: 'error',
+  ARGON2_MAX_CONCURRENCY: 8,
+  TUSD_SHARED_SECRET: 'a'.repeat(64),
+  TUSD_REQUIRE_SHARED_SECRET: true,
+  TUSD_DATA_DIR: '/media/tusd-data',
+  TUSD_FINAL_DIR: '/media/uploads',
+  MEDIA_MOUNT_PATH: '/media',
+  MIN_FREE_BYTES_RESERVE: 1n,
+  TRUSTED_PROXY_CIDR: 'loopback',
+  ENABLE_LEGACY_JOB_STUB: false,
+};
+
+describe('web/view-plugin', () => {
+  it('serves /static/css/app.css with text/css mime', async () => {
+    const app = await buildServer(config);
+    try {
+      const res = await app.inject({ method: 'GET', url: '/static/css/app.css' });
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['content-type']).toMatch(/text\/css/);
+      expect(res.body).toContain('/* mediacompressor base styles */');
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('serves /static/vendor/htmx.min.js with javascript mime', async () => {
+    const app = await buildServer(config);
+    try {
+      const res = await app.inject({ method: 'GET', url: '/static/vendor/htmx.min.js' });
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['content-type']).toMatch(/javascript/);
+      // Sanity: htmx 2.x file is >40 KB minified.
+      expect(res.body.length).toBeGreaterThan(40_000);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('rejects /static/../config.ts (path traversal)', async () => {
+    const app = await buildServer(config);
+    try {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/static/../src/config.ts',
+      });
+      // @fastify/static must NOT serve files outside the configured root.
+      expect([400, 403, 404]).toContain(res.statusCode);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('app.view("home-placeholder", {title: "Home"}) renders <title>Home</title>', async () => {
+    const app = await buildServer(config);
+    app.get('/__test_view', async (_req, reply) => {
+      return reply.view('home-placeholder', { title: 'Home' });
+    });
+    try {
+      const res = await app.inject({ method: 'GET', url: '/__test_view' });
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['content-type']).toMatch(/text\/html/);
+      expect(res.body).toContain('<title>Home</title>');
+      expect(res.body).toContain('<!doctype html>');
+    } finally {
+      await app.close();
+    }
+  });
+
+  // WC6 PFLICHT-REGRESSIONSTEST — CSP-Header on HTML responses.
+  it('WC6: HTML response carries content-security-policy header', async () => {
+    const app = await buildServer(config);
+    app.get('/__test_csp', async (_req, reply) => {
+      return reply.view('home-placeholder', { title: 'CSP test' });
+    });
+    try {
+      const res = await app.inject({ method: 'GET', url: '/__test_csp' });
+      expect(res.statusCode).toBe(200);
+      const csp = res.headers['content-security-policy'];
+      expect(csp).toBeTruthy();
+      expect(csp).toMatch(/default-src 'self'/);
+      expect(csp).toMatch(/script-src 'self'/);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // WC6 PFLICHT-REGRESSIONSTEST — JSON API responses MUST NOT have CSP.
+  it('WC6: JSON-API response has NO content-security-policy header (regression-watch)', async () => {
+    const app = await buildServer(config);
+    try {
+      const res = await app.inject({ method: 'GET', url: '/api/v1/health' });
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['content-security-policy']).toBeUndefined();
+    } finally {
+      await app.close();
+    }
+  });
+
+  // WC1 PFLICHT-REGRESSIONSTEST — trustProxy honors loopback x-forwarded-for.
+  // Verifies that when an in-process app.inject() spoofs x-forwarded-for, the
+  // inner handler's req.ip reflects the spoofed value. Without trustProxy, the
+  // BFF rate-limit sees 127.0.0.1 for ALL logins and the per-IP budget collapses.
+  it('WC1: req.ip reflects x-forwarded-for from loopback (trustProxy enabled)', async () => {
+    const app = await buildServer(config);
+    let observedIp: string | undefined;
+    app.get('/__test_ip', async (req) => {
+      observedIp = req.ip;
+      return { ip: req.ip };
+    });
+    try {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/__test_ip',
+        headers: { 'x-forwarded-for': '203.0.113.42' },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(observedIp).toBe('203.0.113.42');
+    } finally {
+      await app.close();
+    }
+  });
+});

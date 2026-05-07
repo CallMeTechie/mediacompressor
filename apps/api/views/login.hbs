@@ -1,0 +1,15 @@
+<h1>Sign in to MediaCompressor</h1>
+{{> flash}}
+<form method="POST" action="/login" class="login-form">
+  {{> csrf}}
+  <div class="form-field">
+    <label for="email">Email</label>
+    <input id="email" type="email" name="email" value="{{email}}" required autofocus>
+  </div>
+  <div class="form-field">
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required>
+  </div>
+  <button type="submit" class="btn">Sign in</button>
+</form>
+<p class="muted">Need an account? Use the invite link your admin sent you.</p>

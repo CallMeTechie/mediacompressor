@@ -33,6 +33,7 @@ const config: Config = {
   MEDIA_MOUNT_PATH: '/tmp',
   // 1n effectively disables the disk-free check in tests.
   MIN_FREE_BYTES_RESERVE: 1n,
+  TRUSTED_PROXY_CIDR: 'loopback',
   CORS_ALLOWED_ORIGINS: 'http://localhost:5173',
   PORT: 0,
   NODE_ENV: 'test',

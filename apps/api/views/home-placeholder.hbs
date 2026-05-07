@@ -1,0 +1,6 @@
+<h1>{{title}}</h1>
+<p>You are signed in. The dashboard ships in Plan 8b.</p>
+<form method="POST" action="/logout" style="margin-top: 1rem;">
+  {{> csrf}}
+  <button type="submit" class="btn">Sign out</button>
+</form>

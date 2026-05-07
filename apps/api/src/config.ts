@@ -25,6 +25,14 @@ const ConfigSchema = z.object({
   TUSD_FINAL_DIR: z.string().default('/media/uploads'),
   MEDIA_MOUNT_PATH: z.string().default('/media'),
   MIN_FREE_BYTES_RESERVE: z.coerce.bigint().default(5n * 1024n * 1024n * 1024n), // 5 GB
+  // C1-Rev2: comma-separated CIDR list (or named preset like 'loopback') passed
+  // directly to Fastify's trustProxy option. Default = 'loopback' covers
+  // in-process app.inject() spoofing (BFF login forwards x-forwarded-for from
+  // loopback). Plan 9 deployment with Caddy MUST extend this to include the
+  // caddy-to-api compose subnet, e.g. 'loopback,172.18.0.0/16', otherwise
+  // per-IP rate-limit silently bucketizes ALL production logins under caddy's
+  // container IP.
+  TRUSTED_PROXY_CIDR: z.string().default('loopback'),
   // Plan 7 Task 7: Plan-4 POST /jobs is a deprecated stub. Default OFF — only
   // tests/dev that explicitly need the legacy endpoint should opt in via
   // ENABLE_LEGACY_JOB_STUB=true. Production must keep this disabled so callers
