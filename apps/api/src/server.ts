@@ -14,6 +14,7 @@ import type { Config } from './config.js';
 import { runPepperCanaryOnBoot } from './pepper-canary-hook.js';
 import { loginRoutes } from './auth/login-routes.js';
 import { registerAuthMiddleware } from './auth/auth-middleware.js';
+import { registerAdminGuard } from './admin/role-guard.js';
 import { apiKeyRoutes } from './auth/api-key-routes.js';
 import { capabilitiesRoute } from './capabilities/capabilities-route.js';
 import { jobsRoutes } from './jobs/jobs-routes.js';
@@ -111,6 +112,11 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // Plan 4 Task 5: Auth-Middleware (Session ODER API-Key). Must be registered
   // BEFORE Task-4 routes (API-Key-Routes) since they call app.requireAuth.
   registerAuthMiddleware(app);
+
+  // Plan 7 Task 2 (AP1+AP5): Admin role-guard decorators. Registered AFTER
+  // registerAuthMiddleware because requireAdmin/requireAdminCsrf delegate to
+  // app.requireAuth and read req.auth.role/status (populated by resolveAuth).
+  registerAdminGuard(app);
 
   // Plan 4 Task 4: API-Key-Routes (CRUD for the authenticated user's keys).
   // Registered AFTER registerAuthMiddleware because it relies on
