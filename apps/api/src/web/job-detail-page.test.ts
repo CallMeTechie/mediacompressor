@@ -568,20 +568,24 @@ describe('web/job-detail-page', () => {
     }
   });
 
-  // C3-LI + C10-LI PFLICHT — the committed watchdog script binds the literal
-  // htmx-2.0.x event names. Read via fs and assert via REGEX (NOT toContain)
-  // so tokens in code-comments don't false-positive: the regex enforces that
-  // the strings appear in listener-positions (addEventListener('htmx:...')).
-  // On future htmx-3.0 bumps these patterns shift; the test fails LOUD instead
-  // of silent-broken UX.
-  it('C3-LI + C10-LI: job-detail-watchdog.js binds htmx:sseMessage + cancels swap on session-redirect', () => {
+  // C3-LI PFLICHT — the committed watchdog script binds the literal
+  // htmx-2.0.x event name `htmx:sseMessage` and discovers targets via the
+  // `[data-sse-target]` selector. Read via fs and assert via REGEX (NOT
+  // toContain) so tokens in code-comments don't false-positive: the regex
+  // enforces that the strings appear in listener/selector-positions
+  // (addEventListener('htmx:...'), querySelectorAll('[...]')). On future
+  // htmx-3.0 bumps these patterns shift; the test fails LOUD instead of
+  // silent-broken UX. Note: the C10-LI `shouldSwap=false` regression-test
+  // for the session-redirect handler now lives in view-plugin.test.ts
+  // (htmx-session-redirect.js), since Task 4 moved that logic OUT of the
+  // watchdog.
+  it('C3-LI: job-detail-watchdog.js binds htmx:sseMessage on [data-sse-target]', () => {
     const watchdogPath = path.resolve(
       __dirname,
       '../../public/js/job-detail-watchdog.js',
     );
     const watchdogJs = fs.readFileSync(watchdogPath, 'utf8');
     expect(watchdogJs).toMatch(/addEventListener\(['"]htmx:sseMessage['"]/);
-    expect(watchdogJs).toMatch(/['"]shouldSwap['"]?\s*=\s*false/);
     expect(watchdogJs).toMatch(
       /querySelectorAll\(['"]\[data-sse-target\]['"]\)/,
     );

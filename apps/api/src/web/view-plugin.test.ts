@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildServer } from '../server.js';
 import type { Config } from '../config.js';
 import {
@@ -8,6 +11,10 @@ import {
   testDatabaseUrl,
   testRedisUrl,
 } from '@mediacompressor/test-helpers';
+
+// ESM-Caveat: `__dirname` is not defined in ESM. Compute it from import.meta.url
+// so script-source paths are stable regardless of cwd.
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const config: Config = {
   DATABASE_URL: testDatabaseUrl(),
@@ -137,6 +144,29 @@ describe('web/view-plugin', () => {
     } finally {
       await app.close();
     }
+  });
+
+  // C10-LI PFLICHT-REGRESSIONSTEST — htmx-session-redirect.js binds the literal
+  // htmx-2.0.x event `htmx:beforeSwap` and cancels the swap by setting
+  // `event.detail.shouldSwap = false` when the responseURL points at /login.
+  // Read via fs and assert via REGEX so the test fails LOUD on future
+  // htmx-3.0 bumps (event-name or detail-API shift) instead of silently
+  // breaking session-redirect UX. The `\.shouldSwap` anchor enforces the
+  // assignment lives on a property reference (matches the runtime statement
+  // `ev.detail.shouldSwap = false`), not in a tidy-able comment.
+  it('C10-LI: htmx-session-redirect.js literal-API regex (htmx:beforeSwap + shouldSwap)', () => {
+    const scriptPath = join(
+      __dirname,
+      '..',
+      '..',
+      'public',
+      'js',
+      'htmx-session-redirect.js',
+    );
+    const src = readFileSync(scriptPath, 'utf-8');
+    expect(src).toMatch(/addEventListener\(['"]htmx:beforeSwap['"]/);
+    expect(src).toMatch(/\.shouldSwap\s*=\s*false/);
+    expect(src).toMatch(/responseURL/);
   });
 
   // Task 4: htmx-ext-sse extension is vendored under /static/vendor/.
