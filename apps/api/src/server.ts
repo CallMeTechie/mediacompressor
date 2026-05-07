@@ -31,6 +31,7 @@ import { webViewPlugin } from './web/view-plugin.js';
 import { loginPagePlugin } from './web/login-page.js';
 import { inviteRedeemPagePlugin } from './web/invite-redeem-page.js';
 import { logoutRoutePlugin } from './web/logout-route.js';
+import { errorPagesPlugin } from './web/error-pages.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -238,6 +239,13 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // installed swagger's onRoute hook so every route registered above this
   // line is now in the spec. Exposes /api/v1/openapi.json + /api/v1/docs.
   await app.register(openapiUiPlugin);
+
+  // Plan 8a Task 6: Accept-aware 404/500 + GET / root-redirect (BFF). MUST be
+  // registered LAST so the catch-all setNotFoundHandler doesn't shadow real
+  // routes registered above. wantsHtml(req) excludes /api/* and /static/*
+  // prefixes so existing JSON-API 404 tests (and asset 404s) keep returning
+  // JSON instead of HTML.
+  await app.register(errorPagesPlugin);
 
   return app;
 }
