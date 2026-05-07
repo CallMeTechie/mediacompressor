@@ -1,0 +1,12 @@
+<tbody id="job-list-rows"{{#if hasInFlight}} hx-get="/jobs?fragment=1{{#if statusFilter}}&status={{statusFilter}}{{/if}}" hx-trigger="every 3s" hx-swap="outerHTML"{{/if}}>
+  {{#each jobs}}
+    <tr>
+      <td><a href="/jobs/{{id}}">{{inputFilename}}</a></td>
+      <td>{{> job-status-badge}}</td>
+      <td>{{kind}} &middot; {{profile}}</td>
+      <td><time datetime="{{createdAt}}">{{createdAt}}</time></td>
+    </tr>
+  {{else}}
+    <tr><td colspan="4" class="muted">No jobs yet. <a href="/upload">Upload your first file</a>.</td></tr>
+  {{/each}}
+</tbody>

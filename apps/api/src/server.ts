@@ -34,6 +34,7 @@ import { logoutRoutePlugin } from './web/logout-route.js';
 import { errorPagesPlugin } from './web/error-pages.js';
 import { requireSessionPlugin } from './web/require-session.js';
 import { dashboardPagePlugin } from './web/dashboard-page.js';
+import { jobListPagePlugin } from './web/job-list-page.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -253,6 +254,12 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // app.requireSession internally (manual invocation, not a preHandler) so
   // the non-HTML JSON branch can return {status:'ok'} without auth.
   await app.register(dashboardPagePlugin);
+
+  // Plan 8b Task 2: GET /jobs HTML list page with HTMX polling. Registered
+  // AFTER dashboardPagePlugin (which owns `/`) and BEFORE errorPagesPlugin
+  // (which is the catch-all 404). Uses `app.requireSession` as a preHandler
+  // so unauthenticated requests 303 to /login.
+  await app.register(jobListPagePlugin);
 
   // Plan 8a Task 6: Accept-aware 404/500 (BFF). MUST be registered LAST so
   // the catch-all setNotFoundHandler doesn't shadow real routes registered
