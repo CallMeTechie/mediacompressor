@@ -37,6 +37,7 @@ import { dashboardPagePlugin } from './web/dashboard-page.js';
 import { jobListPagePlugin } from './web/job-list-page.js';
 import { jobDetailPagePlugin } from './web/job-detail-page.js';
 import { jobCancelRoutePlugin } from './web/job-cancel-route.js';
+import { uploadWizardPagePlugin } from './web/upload-wizard-page.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -275,6 +276,13 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // registered AFTER jobsRoutes (which owns DELETE /api/v1/jobs/:id) so the
   // in-process app.inject() finds it.
   await app.register(jobCancelRoutePlugin);
+
+  // Plan 8b Task 5: GET /upload — resumable-upload wizard. Renders a
+  // Handlebars form whose submit is hijacked client-side by tus-js-client
+  // (vendored at /static/vendor/tus.min.js) to upload to /uploads/ (tusd).
+  // <noscript>+<style>#upload-form{display:none} hides the form when JS is
+  // disabled (C7-LI), pointing the user at the JSON API docs instead.
+  await app.register(uploadWizardPagePlugin);
 
   // Plan 8a Task 6: Accept-aware 404/500 (BFF). MUST be registered LAST so
   // the catch-all setNotFoundHandler doesn't shadow real routes registered
