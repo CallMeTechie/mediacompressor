@@ -5,6 +5,7 @@ import {
   hashSessionToken,
   parseApiKey,
 } from '@mediacompressor/auth';
+import { runCsrfHook } from './csrf-stub-reply.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -146,19 +147,8 @@ export function registerAuthMiddleware(app: FastifyInstance): void {
   );
 
   // C1-Rev1 + C9-Rev2: Wrapper für state-changing Routes — erst Auth, dann CSRF (außer Bearer).
-  //
-  // C9-Rev2: Statt blindem Cast `(app as unknown as { csrfProtection })` nutzen
-  // wir die typisierte Fastify-Hook-Signatur `(req, reply, done) => void`. Bei
-  // API-Drift im Plugin wirft der Aufruf laut (kein Silent-Pass = kein
-  // CSRF-Bypass). `app.csrfProtection` wird vom @fastify/csrf-protection-Plugin
-  // decoriert — wir rufen ihn manuell auf einem Stub-Reply, fangen das vom
-  // Plugin gesendete Error-Objekt ab und mappen es auf unser AUTH_INVALID-Envelope.
-  type CsrfHook = (
-    req: FastifyRequest,
-    reply: FastifyReply,
-    done: (err?: Error | null) => void,
-  ) => void;
-
+  // Stub-Reply-Proxy ist nach `csrf-stub-reply.ts` extrahiert (siehe runCsrfHook),
+  // wird auch von requireAdminCsrf in admin/role-guard.ts wiederverwendet.
   app.decorate(
     'requireAuthCsrf',
     async (req: FastifyRequest, reply: FastifyReply): Promise<string | undefined> => {
@@ -166,8 +156,9 @@ export function registerAuthMiddleware(app: FastifyInstance): void {
       if (!userId) return;
       if (req.skipCsrf) return userId; // Bearer-API-Key — CSRF-immun
 
-      const csrfHook = (app as unknown as { csrfProtection?: CsrfHook }).csrfProtection;
-      if (typeof csrfHook !== 'function') {
+      const outcome = await runCsrfHook(app, req, reply);
+      if (outcome.ok) return userId;
+      if (outcome.reason === 'missing-hook') {
         // Fail loud — Plugin-Drift / fehlende Registration. KEIN Silent-Pass.
         app.log.error('csrfProtection hook missing — @fastify/csrf-protection not registered?');
         reply
@@ -175,45 +166,10 @@ export function registerAuthMiddleware(app: FastifyInstance): void {
           .send({ error: { code: 'INTERNAL', message: 'CSRF subsystem unavailable' } });
         return;
       }
-
-      // @fastify/csrf-protection v7 signals failure via `reply.send(error)` and
-      // returns — `next()` is only called on success. We pass a stub reply that
-      // captures the sent error without committing the real response, then map
-      // failure to our own AUTH_INVALID envelope (403).
-      const outcome = await new Promise<{ ok: true } | { ok: false; err: Error }>(
-        (resolve) => {
-          const stubReply = new Proxy(reply, {
-            get(target, prop, receiver) {
-              if (prop === 'send') {
-                return (payload: unknown) => {
-                  resolve({
-                    ok: false,
-                    err:
-                      payload instanceof Error
-                        ? payload
-                        : new Error('CSRF protection rejected'),
-                  });
-                  return stubReply;
-                };
-              }
-              const value = Reflect.get(target, prop, receiver);
-              return typeof value === 'function' ? value.bind(target) : value;
-            },
-          });
-          csrfHook(req, stubReply as FastifyReply, (err) => {
-            if (err) resolve({ ok: false, err });
-            else resolve({ ok: true });
-          });
-        },
-      );
-
-      if (!outcome.ok) {
-        reply
-          .code(403)
-          .send({ error: { code: 'AUTH_INVALID', message: 'CSRF token missing or invalid' } });
-        return;
-      }
-      return userId;
+      reply
+        .code(403)
+        .send({ error: { code: 'AUTH_INVALID', message: 'CSRF token missing or invalid' } });
+      return;
     },
   );
 }

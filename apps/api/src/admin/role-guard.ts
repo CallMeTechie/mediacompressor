@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { runCsrfHook } from '../auth/csrf-stub-reply.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -24,6 +25,10 @@ export function registerAdminGuard(app: FastifyInstance): void {
       const userId = await app.requireAuth(req, reply);
       if (!userId) return;
       if (!req.auth || req.auth.status !== 'active' || req.auth.role !== 'admin') {
+        // 403 vs 401 split is intentional — non-admin (logged in but unprivileged)
+        // gets 403, unauth gets 401 via requireAuth. Small existence-leak for admin
+        // endpoints (a logged-in user can probe whether they have admin role) is
+        // accepted per spec.
         reply
           .code(403)
           .send({ error: { code: 'FORBIDDEN', message: 'admin role required' } });
@@ -40,14 +45,9 @@ export function registerAdminGuard(app: FastifyInstance): void {
       if (!userId) return;
       if (req.skipCsrf) return userId;
 
-      // Reuse the same Promise-wrap pattern as requireAuthCsrf.
-      type CsrfHook = (
-        req: FastifyRequest,
-        reply: FastifyReply,
-        done: (err?: Error | null) => void,
-      ) => void;
-      const csrfHook = (app as unknown as { csrfProtection?: CsrfHook }).csrfProtection;
-      if (typeof csrfHook !== 'function') {
+      const outcome = await runCsrfHook(app, req, reply);
+      if (outcome.ok) return userId;
+      if (outcome.reason === 'missing-hook') {
         app.log.error(
           'csrfProtection hook missing — @fastify/csrf-protection not registered?',
         );
@@ -56,41 +56,10 @@ export function registerAdminGuard(app: FastifyInstance): void {
           .send({ error: { code: 'INTERNAL', message: 'CSRF subsystem unavailable' } });
         return;
       }
-
-      const outcome = await new Promise<{ ok: true } | { ok: false; err: Error }>(
-        (resolve) => {
-          const stubReply = new Proxy(reply, {
-            get(target, prop, receiver) {
-              if (prop === 'send') {
-                return (payload: unknown) => {
-                  resolve({
-                    ok: false,
-                    err:
-                      payload instanceof Error
-                        ? payload
-                        : new Error('CSRF protection rejected'),
-                  });
-                  return stubReply;
-                };
-              }
-              const value = Reflect.get(target, prop, receiver);
-              return typeof value === 'function' ? value.bind(target) : value;
-            },
-          });
-          csrfHook(req, stubReply as FastifyReply, (err) => {
-            if (err) resolve({ ok: false, err });
-            else resolve({ ok: true });
-          });
-        },
-      );
-
-      if (!outcome.ok) {
-        reply
-          .code(403)
-          .send({ error: { code: 'AUTH_INVALID', message: 'CSRF token missing or invalid' } });
-        return;
-      }
-      return userId;
+      reply
+        .code(403)
+        .send({ error: { code: 'AUTH_INVALID', message: 'CSRF token missing or invalid' } });
+      return;
     },
   );
 }
