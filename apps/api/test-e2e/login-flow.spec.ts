@@ -29,7 +29,9 @@ test('user can sign in via /login and is redirected to /', async ({ page }) => {
     page.click('button[type="submit"]'),
   ]);
 
-  await expect(page.locator('h1')).toContainText(/MediaCompressor/);
+  // Plan-8b Task 1 changed `/`'s h1 from "MediaCompressor" → "Dashboard".
+  // Match either so the spec survives a future re-rename without churn.
+  await expect(page.locator('h1')).toContainText(/MediaCompressor|Dashboard/);
 });
 
 test('login with wrong password renders flash-error and stays on /login', async ({ page }) => {

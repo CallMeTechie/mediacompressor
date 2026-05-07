@@ -27,11 +27,13 @@ export const jobsEventsRoute: FastifyPluginAsync = async (app) => {
       reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     };
 
+    // BigInt fields must be coerced to string — JSON.stringify rejects bare BigInt
+    // (mirrors jobs-routes.ts list/get and dashboard-page.ts patterns).
     send('snapshot', {
       jobId: job.id,
       status: job.status,
       progress: job.progress,
-      outputBytes: job.outputBytes ?? null,
+      outputBytes: job.outputBytes === null ? null : job.outputBytes.toString(),
     });
     if (ENDSTATUS.has(job.status)) {
       reply.raw.end();

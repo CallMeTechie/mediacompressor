@@ -3,6 +3,7 @@ import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import csrf from '@fastify/csrf-protection';
 import helmet from '@fastify/helmet';
+import httpProxy from '@fastify/http-proxy';
 import {
   serializerCompiler,
   validatorCompiler,
@@ -106,6 +107,58 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
       const body = req.body as Record<string, unknown> | undefined;
       if (body && typeof body._csrf === 'string') return body._csrf;
       return undefined;
+    },
+  });
+
+  // Plan 8b Task 6: dev-side reverse proxy for tus-js-client browser uploads.
+  // The Upload-Wizard's <script>/static/js/upload-wizard.js POSTs to a
+  // *relative* /uploads/ endpoint (so the browser stays same-origin, cookies
+  // and CSRF behave). tusd runs on a separate container (`tusd:1080` in
+  // docker-compose.yml, base-path `/uploads/`); from the host or another
+  // origin, the browser cannot reach it directly. We forward /uploads/* 1:1
+  // to TUSD_UPSTREAM here.
+  //
+  // Plan 9 (Caddy) will front tusd on the public host and serve the same
+  // `/uploads/*` path; this proxy is removable then. Kept here as a plain
+  // env-var (NOT in config.ts) so test configs do not have to set it.
+  //
+  // Path-rewriting: docker-compose.yml's tusd command sets
+  // `-base-path=/uploads/`, so the rewrite is the identity (`/uploads/*` →
+  // upstream `/uploads/*`). Adjust `rewritePrefix` if that ever changes.
+  const TUSD_UPSTREAM = process.env.TUSD_UPSTREAM ?? 'http://tusd:1080';
+  await app.register(httpProxy, {
+    upstream: TUSD_UPSTREAM,
+    prefix: '/uploads',
+    rewritePrefix: '/uploads',
+    http2: false,
+    // tus PATCHes carry `application/offset+octet-stream`. We need
+    // @fastify/http-proxy's catch-all content-type parser registered (the
+    // default when `proxyPayloads` is unset/true) so Fastify doesn't 415
+    // on the chunk uploads. The catch-all parser is registered iff
+    // `opts.proxyPayloads !== false` (see @fastify/http-proxy/index.js
+    // ~line 253), so we leave it at the default.
+    replyOptions: {
+      // tusd's POST /uploads/ response has Location:
+      // `http://tusd:1080/uploads/<id>` — that hostname is unreachable from
+      // the browser. Rewrite it to a same-origin relative path so the
+      // subsequent tus-js-client PATCH chunks come back through this proxy.
+      // @fastify/http-proxy's built-in `internalRewriteLocationHeader` only
+      // touches *relative* Location values; tusd builds absolute URLs, so we
+      // override here.
+      rewriteHeaders: (headers) => {
+        const loc = headers.location;
+        if (typeof loc === 'string') {
+          try {
+            const u = new URL(loc);
+            if (u.pathname.startsWith('/uploads/')) {
+              headers.location = u.pathname + u.search;
+            }
+          } catch {
+            // not a URL; leave it.
+          }
+        }
+        return headers;
+      },
     },
   });
 

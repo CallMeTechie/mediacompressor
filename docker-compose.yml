@@ -142,6 +142,14 @@ services:
       - '-host=0.0.0.0'
       - '-port=1080'
       - '-base-path=/uploads/'
+      # Plan-8b Task 6: when fronted by api's @fastify/http-proxy (the
+      # /uploads/* dev-side reverse proxy), tusd must build the upload's
+      # Location header from forwarded headers (X-Forwarded-Host /
+      # X-Forwarded-Proto) instead of its internal hostname `tusd:1080`.
+      # Without this flag the browser receives a Location pointing at an
+      # unreachable URL and the subsequent PATCH chunks fail. Plan 9 (Caddy)
+      # will keep this flag enabled.
+      - '-behind-proxy'
       # UC4-Fix: tusd-data als Subdir von /media (= media-data volume),
       # damit fs.rename(tusd-data → uploads) atomar O(1) ist.
       - '-upload-dir=/media/tusd-data'
@@ -150,8 +158,13 @@ services:
       # (apps/api/src/uploads/hooks-dispatcher.ts).
       - '-hooks-http=http://api:3000/api/v1/internal/uploads/hooks'
       # UC5: forward Authorization so the pre-create-hook can authenticate
-      # the user via Bearer-API-Key.
-      - '-hooks-http-forward-headers=Authorization,X-CSRF-Token'
+      # the user via Bearer-API-Key. Plan-8b Task 6: also forward Cookie so
+      # browser-side tus uploads (Upload-Wizard at /upload) can authenticate
+      # via the same `mc_session` cookie they use for the rest of the BFF.
+      # `app.requireAuth` already supports both auth modes (Bearer first, then
+      # session-cookie); without forwarding Cookie tusd's hook-call would
+      # 401-AUTH_REQUIRED on every browser upload.
+      - '-hooks-http-forward-headers=Authorization,X-CSRF-Token,Cookie'
       # 2 GiB hard cap per upload; pre-create-hook + worker enforce
       # per-user / per-profile limits on top.
       - '-max-size=2147483648'
