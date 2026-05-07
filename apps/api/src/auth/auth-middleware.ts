@@ -8,7 +8,14 @@ import {
 
 declare module 'fastify' {
   interface FastifyRequest {
-    auth?: { userId: string; method: 'session' | 'api-key' };
+    auth?: {
+      userId: string;
+      method: 'session' | 'api-key';
+      // AP5: cache role+status on req.auth so requireAdmin can authorize
+      // without an extra DB roundtrip. Populated by resolveAuth.
+      role: 'user' | 'admin';
+      status: 'active' | 'disabled';
+    };
     /** C1-Rev1: marker for csrf-protection plugin to skip Bearer-API-Key requests. */
     skipCsrf?: boolean;
   }
@@ -48,7 +55,12 @@ export function registerAuthMiddleware(app: FastifyInstance): void {
    */
   async function resolveAuth(
     req: FastifyRequest,
-  ): Promise<{ userId: string; method: 'session' | 'api-key' } | null> {
+  ): Promise<{
+    userId: string;
+    method: 'session' | 'api-key';
+    role: 'user' | 'admin';
+    status: 'active' | 'disabled';
+  } | null> {
     // Try API-key first (Bearer header).
     const auth = req.headers.authorization;
     if (auth && auth.startsWith('Bearer ')) {
@@ -58,14 +70,19 @@ export function registerAuthMiddleware(app: FastifyInstance): void {
         const keyHash = hashApiKey(key, apiKeyPepper);
         const row = await prisma.apiKey.findUnique({
           where: { keyHash },
-          include: { user: true },
+          include: { user: { select: { id: true, role: true, status: true } } },
         });
         if (row && !row.revokedAt && row.user.status === 'active') {
           // C4-Rev2: fire-and-forget update of lastUsedAt — not blocking the request path.
           void prisma.apiKey
             .update({ where: { id: row.id }, data: { lastUsedAt: new Date() } })
             .catch(() => {});
-          return { userId: row.userId, method: 'api-key' };
+          return {
+            userId: row.userId,
+            method: 'api-key',
+            role: row.user.role,
+            status: row.user.status,
+          };
         }
       }
       // Bearer-present-but-invalid: caller decides whether to dummyCompare/401 or
@@ -78,9 +95,17 @@ export function registerAuthMiddleware(app: FastifyInstance): void {
     const token = req.cookies.mc_session;
     if (token) {
       const tokenHash = hashSessionToken(token, sessionPepper);
-      const session = await prisma.session.findUnique({ where: { tokenHash } });
+      const session = await prisma.session.findUnique({
+        where: { tokenHash },
+        include: { user: { select: { id: true, role: true, status: true } } },
+      });
       if (session && session.expiresAt > new Date()) {
-        return { userId: session.userId, method: 'session' };
+        return {
+          userId: session.userId,
+          method: 'session',
+          role: session.user.role,
+          status: session.user.status,
+        };
       }
     }
     return null;
