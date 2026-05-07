@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createPrismaClient, type PrismaClient } from '@mediacompressor/db';
 import {
@@ -23,6 +25,10 @@ const TEST_EMAILS = [
   'job-detail-terminal@test.invalid',
   'job-detail-redact@test.invalid',
   'job-detail-flash@test.invalid',
+  'job-detail-sse@test.invalid',
+  'job-detail-fragment@test.invalid',
+  'job-detail-fragment-foreign@test.invalid',
+  'job-detail-fragment-other@test.invalid',
 ];
 
 const config: Config = {
@@ -413,5 +419,171 @@ describe('web/job-detail-page', () => {
     } finally {
       await app.close();
     }
+  });
+
+  // ────────────────────────────────────────────────────────────────────
+  // Task 4: SSE-Integration (htmx-ext-sse) + Polling-Fallback
+  // ────────────────────────────────────────────────────────────────────
+
+  // Task 4 Test 1 — SSE-target div with correct attributes (full page).
+  // C5-LI: stable id="job-detail-sse-target" so future Plan-8c admin SSE pages
+  // can co-exist with their own targets.
+  it('Task 4: GET /jobs/:id (no fragment) → page contains data-sse-target div with sse-url and fragment-url', async () => {
+    const app = await buildServer(config);
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: 'job-detail-sse@test.invalid' },
+      });
+      const job = await seedJob({
+        userId: user!.id,
+        inputFilename: 'sse-target.png',
+        status: 'queued',
+      });
+      const cookie = await login(app, 'job-detail-sse@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: `/jobs/${job.id}`,
+        headers: { accept: 'text/html', cookie },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toContain('data-sse-target');
+      expect(res.body).toContain(`data-sse-url="/api/v1/jobs/${job.id}/events"`);
+      expect(res.body).toContain(
+        `data-fragment-url="/jobs/${job.id}?fragment=1"`,
+      );
+      // C5-LI stable ID for Plan-8c co-existence.
+      expect(res.body).toContain('id="job-detail-sse-target"');
+    } finally {
+      await app.close();
+    }
+  });
+
+  // Task 4 Test 2 — fragment route returns ONLY the partial (no shell).
+  it('Task 4: GET /jobs/:id?fragment=1 → returns ONLY job-detail-status partial (no <html>/<head>/<body>)', async () => {
+    const app = await buildServer(config);
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: 'job-detail-fragment@test.invalid' },
+      });
+      const job = await seedJob({
+        userId: user!.id,
+        inputFilename: 'fragment.png',
+        status: 'processing',
+      });
+      const cookie = await login(app, 'job-detail-fragment@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: `/jobs/${job.id}?fragment=1`,
+        headers: { accept: 'text/html', cookie },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['content-type']).toMatch(/text\/html/);
+      // Fragment-only — NO shell tags from base.hbs.
+      expect(res.body).not.toMatch(/<html/i);
+      expect(res.body).not.toMatch(/<head>/i);
+      expect(res.body).not.toMatch(/<body>/i);
+      expect(res.body).not.toContain('<!doctype');
+      // But the status badge IS present.
+      expect(res.body).toContain('status-processing');
+    } finally {
+      await app.close();
+    }
+  });
+
+  // Task 4 Test 3 — fragment route on foreign job → 404 (no existence-leak).
+  it('Task 4: GET /jobs/:id?fragment=1 (foreign job) → 404', async () => {
+    const app = await buildServer(config);
+    try {
+      const otherUser = await prisma.user.findUnique({
+        where: { email: 'job-detail-fragment-other@test.invalid' },
+      });
+      const foreignJob = await seedJob({
+        userId: otherUser!.id,
+        inputFilename: 'fragment-foreign.png',
+      });
+      const cookie = await login(app, 'job-detail-fragment-foreign@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: `/jobs/${foreignJob.id}?fragment=1`,
+        headers: { accept: 'text/html', cookie },
+      });
+      expect(res.statusCode).toBe(404);
+      expect(res.body).not.toContain('fragment-foreign.png');
+    } finally {
+      await app.close();
+    }
+  });
+
+  // Task 4 Test 4 — base layout loads htmx-ext-sse.
+  it('Task 4: GET /jobs/:id base layout includes htmx-ext-sse.min.js script tag', async () => {
+    const app = await buildServer(config);
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: 'job-detail-sse@test.invalid' },
+      });
+      const job = await seedJob({
+        userId: user!.id,
+        inputFilename: 'has-ext-sse.png',
+        status: 'queued',
+      });
+      const cookie = await login(app, 'job-detail-sse@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: `/jobs/${job.id}`,
+        headers: { accept: 'text/html', cookie },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toContain(
+        '<script src="/static/vendor/htmx-ext-sse.min.js"',
+      );
+    } finally {
+      await app.close();
+    }
+  });
+
+  // Task 4 Test 5 — page loads the watchdog script.
+  it('Task 4: GET /jobs/:id includes job-detail-watchdog.js script tag', async () => {
+    const app = await buildServer(config);
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: 'job-detail-sse@test.invalid' },
+      });
+      const job = await seedJob({
+        userId: user!.id,
+        inputFilename: 'has-watchdog.png',
+        status: 'queued',
+      });
+      const cookie = await login(app, 'job-detail-sse@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: `/jobs/${job.id}`,
+        headers: { accept: 'text/html', cookie },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toContain(
+        '<script src="/static/js/job-detail-watchdog.js"',
+      );
+    } finally {
+      await app.close();
+    }
+  });
+
+  // C3-LI + C10-LI PFLICHT — the committed watchdog script binds the literal
+  // htmx-2.0.x event names. Read via fs and assert via REGEX (NOT toContain)
+  // so tokens in code-comments don't false-positive: the regex enforces that
+  // the strings appear in listener-positions (addEventListener('htmx:...')).
+  // On future htmx-3.0 bumps these patterns shift; the test fails LOUD instead
+  // of silent-broken UX.
+  it('C3-LI + C10-LI: job-detail-watchdog.js binds htmx:sseMessage + cancels swap on session-redirect', () => {
+    const watchdogPath = path.resolve(
+      __dirname,
+      '../../public/js/job-detail-watchdog.js',
+    );
+    const watchdogJs = fs.readFileSync(watchdogPath, 'utf8');
+    expect(watchdogJs).toMatch(/addEventListener\(['"]htmx:sseMessage['"]/);
+    expect(watchdogJs).toMatch(/['"]shouldSwap['"]?\s*=\s*false/);
+    expect(watchdogJs).toMatch(
+      /querySelectorAll\(['"]\[data-sse-target\]['"]\)/,
+    );
   });
 });

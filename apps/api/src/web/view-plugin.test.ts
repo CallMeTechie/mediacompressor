@@ -116,6 +116,46 @@ describe('web/view-plugin', () => {
     }
   });
 
+  // C8-LI PFLICHT-REGRESSIONSTEST — htmx-session-redirect.js is loaded GLOBALLY
+  // on every HTML page (via base.hbs), not just SSE-pages. Without this, HTMX
+  // polling responses that 303 to /login would silently swap the login HTML
+  // into the page DOM.
+  it('C8-LI: base layout loads /static/js/htmx-session-redirect.js on every HTML page', async () => {
+    const app = await buildServer(config);
+    app.get('/__test_session_redirect_script', async (_req, reply) => {
+      return reply.view('home-placeholder', { title: 'session redirect' });
+    });
+    try {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/__test_session_redirect_script',
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toContain(
+        '<script src="/static/js/htmx-session-redirect.js"',
+      );
+    } finally {
+      await app.close();
+    }
+  });
+
+  // Task 4: htmx-ext-sse extension is vendored under /static/vendor/.
+  it('Task 4: serves /static/vendor/htmx-ext-sse.min.js', async () => {
+    const app = await buildServer(config);
+    try {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/static/vendor/htmx-ext-sse.min.js',
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['content-type']).toMatch(/javascript/);
+      // Sanity: htmx-ext-sse min is at least ~1 KB.
+      expect(res.body.length).toBeGreaterThan(1_000);
+    } finally {
+      await app.close();
+    }
+  });
+
   // WC1 PFLICHT-REGRESSIONSTEST — trustProxy honors loopback x-forwarded-for.
   // Verifies that when an in-process app.inject() spoofs x-forwarded-for, the
   // inner handler's req.ip reflects the spoofed value. Without trustProxy, the

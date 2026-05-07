@@ -34,6 +34,7 @@
     "fastify-type-provider-zod": "~4.0.2",
     "file-type": "^19",
     "handlebars": "~4.7.8",
+    "htmx-ext-sse": "~2.2.0",
     "htmx.org": "~2.0.3",
     "ioredis": "~5.4.1",
     "zod": "~3.23.8"

@@ -8,12 +8,17 @@
 
 <section class="job-detail">
   {{> flash}}
-  <p>Status: {{> job-status-badge job}}</p>
+  <div id="job-detail-sse-target"
+       data-sse-target
+       data-sse-url="/api/v1/jobs/{{job.id}}/events"
+       data-fragment-url="/jobs/{{job.id}}?fragment=1"
+       hx-ext="sse"
+       sse-connect="/api/v1/jobs/{{job.id}}/events"
+       sse-swap="progress,status,snapshot">
+    {{> job-detail-status job}}
+  </div>
   <p>Kind: {{job.kind}} &middot; Profile: {{job.profile}}</p>
   {{#if job.inputBytes}}<p>Input: {{job.inputBytes}} bytes (claimed)</p>{{/if}}
-  {{#if job.outputBytes}}<p>Output: {{job.outputBytes}} bytes</p>{{/if}}
-  {{#if job.progress}}<p>Progress: {{job.progress}}%</p>{{/if}}
-  {{#if job.errorMessage}}<p class="flash flash-error">{{job.errorMessage}}</p>{{/if}}
 
   {{#if canCancel}}
   <form method="POST" action="/jobs/{{job.id}}/cancel">
@@ -26,3 +31,5 @@
   <a class="btn" href="/api/v1/jobs/{{job.id}}/download">Download</a>
   {{/if}}
 </section>
+
+<script src="/static/js/job-detail-watchdog.js" defer></script>

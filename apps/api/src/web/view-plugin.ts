@@ -52,6 +52,10 @@ const webViewPluginImpl: FastifyPluginAsync = async (app) => {
         // views/job-list-rows.hbs (not under partials/) because reply.view()
         // also renders it standalone in fragment-mode.
         'job-list-rows': 'job-list-rows.hbs',
+        // Plan 8b Task 4: job-detail-status partial (SSE-target inner block).
+        // Rendered standalone via reply.viewFragment for the ?fragment=1 polling
+        // fallback; inlined as `{{> job-detail-status job}}` inside job-detail.hbs.
+        'job-detail-status': 'job-detail-status.hbs',
       },
       useHtmlMinifier: false, // Plan 8b/8c may turn this on.
     },
@@ -100,6 +104,9 @@ const webViewPluginImpl: FastifyPluginAsync = async (app) => {
     flash: 'partials/flash.hbs',
     'job-status-badge': 'partials/job-status-badge.hbs',
     'job-list-rows': 'job-list-rows.hbs',
+    // Plan 8b Task 4: keep in sync with @fastify/view partials map above (see
+    // Rev. 2.2 DRY-smell note — Plan-8c will hoist to a shared `const`).
+    'job-detail-status': 'job-detail-status.hbs',
   };
   for (const [name, relPath] of Object.entries(FRAGMENT_PARTIALS)) {
     const src = await fs.readFile(path.join(VIEWS_ROOT, relPath), 'utf8');

@@ -19,9 +19,12 @@ import { redactErrorMessage } from './error-redact.js';
  *   via a FLASH_MAP allowlist. Unknown keys are dropped (allowlist-gate
  *   prevents arbitrary text injection through the URL).
  *
- * The `fragment` query is reserved for Task 4 (HTMX SSE-target swap) — Task 3
- * accepts it via the schema for forward-compat but ignores it (always renders
- * the full page, even when `fragment=1`).
+ * Task 4: when `?fragment=1` is set, render only the `job-detail-status`
+ * partial via `reply.viewFragment(...)` — the HTMX-polling fallback path swaps
+ * this fragment back into the SSE-target div without the global base.hbs
+ * layout. Per Rev. 2.2, `reply.view(..., { layout: undefined })` is silently
+ * broken with a globally-configured layout; the standalone-handlebars
+ * `viewFragment` decorator is the supported workaround.
  */
 
 const Params = z.object({ id: z.string().uuid() });
@@ -62,7 +65,7 @@ export const jobDetailPagePlugin: FastifyPluginAsync = async (app) => {
 
       const userId = req.auth!.userId;
       const { id } = req.params as z.infer<typeof Params>;
-      const { cancelflash } = req.query as z.infer<typeof QuerySchema>;
+      const { fragment, cancelflash } = req.query as z.infer<typeof QuerySchema>;
 
       const job = await prisma.job.findFirst({
         where: { id, userId },
@@ -84,20 +87,30 @@ export const jobDetailPagePlugin: FastifyPluginAsync = async (app) => {
         return reply.code(404).view('404', { title: 'Not found', path: req.url });
       }
 
+      const jobView = {
+        ...job,
+        inputBytes: job.inputBytes === null ? null : job.inputBytes.toString(),
+        outputBytes: job.outputBytes === null ? null : job.outputBytes.toString(),
+        createdAt: job.createdAt.toISOString(),
+        finishedAt: job.finishedAt?.toISOString() ?? null,
+        // C1-LI: redact errorMessage at view-time so server-internals (paths,
+        // ffmpeg-stderr) never reach the user.
+        errorMessage: redactErrorMessage(job.errorMessage),
+      };
+
+      // Task 4: HTMX-polling fallback path — render ONLY the inner status
+      // partial. Uses reply.viewFragment (Task-2 decorator); reply.view with
+      // `{ layout: undefined }` is a no-op when a global layout is configured
+      // (Rev. 2.2 — @fastify/view 11.x limitation).
+      if (fragment) {
+        return reply.viewFragment('job-detail-status', jobView);
+      }
+
       const flash = cancelflash ? (FLASH_MAP.get(cancelflash) ?? null) : null;
 
       return reply.view('job-detail', {
         title: `Job ${job.id.slice(0, 8)}`,
-        job: {
-          ...job,
-          inputBytes: job.inputBytes === null ? null : job.inputBytes.toString(),
-          outputBytes: job.outputBytes === null ? null : job.outputBytes.toString(),
-          createdAt: job.createdAt.toISOString(),
-          finishedAt: job.finishedAt?.toISOString() ?? null,
-          // C1-LI: redact errorMessage at view-time so server-internals (paths,
-          // ffmpeg-stderr) never reach the user.
-          errorMessage: redactErrorMessage(job.errorMessage),
-        },
+        job: jobView,
         canCancel: !TERMINAL.includes(job.status),
         canDownload: job.status === 'succeeded',
         _csrfField: reply.renderCsrfField(),
