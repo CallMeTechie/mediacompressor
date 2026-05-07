@@ -1,6 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { PROFILES } from '@mediacompressor/compression/types';
-import { tryAuth } from '../auth/auth-middleware.js';
 
 // Spec Section 7: Allowlists are HARDCODED. Do not derive dynamically.
 const ALLOWED_INPUT_MIMES = [
@@ -48,40 +47,44 @@ export const capabilitiesRoute: FastifyPluginAsync = async (app) => {
       limits: { maxUploadBytes: MAX_UPLOAD_BYTES.toString() },
     };
 
-    const userId = await tryAuth(app, req);
+    const userId = await app.tryAuth(req);
     if (!userId) return anonymousPayload;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { storageQuota: true, parallelQuota: true, hourlyQuota: true },
-    });
+    // Parallelize the four independent quota lookups. The `inFlightAggregate`
+    // combines the previous separate `_sum: reservedBytes` and `count` queries
+    // into a single round-trip. The deleted-user case (`!user`) still falls
+    // through to anonymousPayload — the small wasted aggregate work on a
+    // deleted-user hit is acceptable for the latency win on the common path.
+    const [user, inFlightAggregate, succeededSum, lastHourCount] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { storageQuota: true, parallelQuota: true, hourlyQuota: true },
+      }),
+      // In-flight reservations (uploading + queued + processing) — billed against
+      // the storage quota at reservation time so users cannot oversubscribe.
+      prisma.job.aggregate({
+        where: { userId, status: { in: ['uploading', 'queued', 'processing'] } },
+        _sum: { reservedBytes: true },
+        _count: { _all: true },
+      }),
+      // Succeeded non-expired outputs — still occupy disk and count against quota.
+      prisma.job.aggregate({
+        where: {
+          userId,
+          status: 'succeeded',
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+        _sum: { outputBytes: true },
+      }),
+      prisma.job.count({
+        where: { userId, createdAt: { gte: new Date(Date.now() - 60 * 60_000) } },
+      }),
+    ]);
     if (!user) return anonymousPayload;
 
-    // In-flight reservations (uploading + queued + processing) — billed against
-    // the storage quota at reservation time so users cannot oversubscribe.
-    const inFlightSum = await prisma.job.aggregate({
-      where: { userId, status: { in: ['uploading', 'queued', 'processing'] } },
-      _sum: { reservedBytes: true },
-    });
-    // Succeeded non-expired outputs — still occupy disk and count against quota.
-    const succeededSum = await prisma.job.aggregate({
-      where: {
-        userId,
-        status: 'succeeded',
-        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-      },
-      _sum: { outputBytes: true },
-    });
-    const inFlightCount = await prisma.job.count({
-      where: { userId, status: { in: ['uploading', 'queued', 'processing'] } },
-    });
-    const oneHourAgo = new Date(Date.now() - 60 * 60_000);
-    const lastHourCount = await prisma.job.count({
-      where: { userId, createdAt: { gte: oneHourAgo } },
-    });
-
     const usedStorageBytes =
-      (inFlightSum._sum.reservedBytes ?? 0n) + (succeededSum._sum.outputBytes ?? 0n);
+      (inFlightAggregate._sum.reservedBytes ?? 0n) + (succeededSum._sum.outputBytes ?? 0n);
+    const inFlightCount = inFlightAggregate._count._all;
 
     return {
       ...anonymousPayload,
