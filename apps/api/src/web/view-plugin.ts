@@ -6,6 +6,7 @@ import view from '@fastify/view';
 import staticPlugin from '@fastify/static';
 import formbody from '@fastify/formbody';
 import handlebars from 'handlebars';
+import { csrfHelperPlugin } from './csrf-helper.js';
 
 // __dirname-shim for ESM. The plugin file lives at apps/api/src/web/view-plugin.ts;
 // views/ is at apps/api/views/ and public/ is at apps/api/public/, so we go ../..
@@ -61,6 +62,11 @@ const webViewPluginImpl: FastifyPluginAsync = async (app) => {
     }
     return payload;
   });
+
+  // Task 2: CSRF form-helper. Decorates reply.renderCsrfField() and is registered
+  // here (inside the fp-wrapped impl) so the decorator bubbles up to the parent
+  // app scope alongside reply.view from @fastify/view.
+  await app.register(csrfHelperPlugin);
 };
 
 // Wrap with fastify-plugin so @fastify/view's reply.view decorator and
