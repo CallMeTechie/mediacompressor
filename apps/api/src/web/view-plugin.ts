@@ -29,6 +29,8 @@ const webViewPluginImpl: FastifyPluginAsync = async (app) => {
       partials: {
         csrf: 'partials/csrf.hbs',
         flash: 'partials/flash.hbs',
+        // Plan 8b Task 1: status badge reused on dashboard / job-list / job-detail.
+        'job-status-badge': 'partials/job-status-badge.hbs',
       },
       useHtmlMinifier: false, // Plan 8b/8c may turn this on.
     },

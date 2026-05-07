@@ -32,6 +32,8 @@ import { loginPagePlugin } from './web/login-page.js';
 import { inviteRedeemPagePlugin } from './web/invite-redeem-page.js';
 import { logoutRoutePlugin } from './web/logout-route.js';
 import { errorPagesPlugin } from './web/error-pages.js';
+import { requireSessionPlugin } from './web/require-session.js';
+import { dashboardPagePlugin } from './web/dashboard-page.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -121,6 +123,12 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // route plugins so partials and reply.view are available to all later
   // route registrations.
   await app.register(webViewPlugin);
+
+  // Plan 8b Task 1: requireSession decorator (HTML-aware session check that
+  // 303s to /login on miss/expired/disabled). MUST be registered BEFORE any
+  // plugin that reads `app.requireSession` — fp-wrapped (Rev. 2.3 rule) so
+  // the decorator bubbles up to the parent FastifyInstance.
+  await app.register(requireSessionPlugin);
 
   // Plan 7 Task 6: register @fastify/swagger BEFORE all documented routes —
   // its `onRoute` hook only collects metadata for routes registered after it.
@@ -240,11 +248,17 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // line is now in the spec. Exposes /api/v1/openapi.json + /api/v1/docs.
   await app.register(openapiUiPlugin);
 
-  // Plan 8a Task 6: Accept-aware 404/500 + GET / root-redirect (BFF). MUST be
-  // registered LAST so the catch-all setNotFoundHandler doesn't shadow real
-  // routes registered above. wantsHtml(req) excludes /api/* and /static/*
-  // prefixes so existing JSON-API 404 tests (and asset 404s) keep returning
-  // JSON instead of HTML.
+  // Plan 8b Task 1: dashboard page (GET /). Registered BEFORE errorPagesPlugin
+  // so the dashboard's `/` route is matched before the catch-all 404. Uses
+  // app.requireSession internally (manual invocation, not a preHandler) so
+  // the non-HTML JSON branch can return {status:'ok'} without auth.
+  await app.register(dashboardPagePlugin);
+
+  // Plan 8a Task 6: Accept-aware 404/500 (BFF). MUST be registered LAST so
+  // the catch-all setNotFoundHandler doesn't shadow real routes registered
+  // above. wantsHtml(req) excludes /api/* and /static/* prefixes so existing
+  // JSON-API 404 tests (and asset 404s) keep returning JSON instead of HTML.
+  // Plan 8b Task 1: GET / no longer registered here — owned by dashboardPagePlugin.
   await app.register(errorPagesPlugin);
 
   return app;
