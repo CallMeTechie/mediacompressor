@@ -27,6 +27,7 @@ import { preCreateHook } from './uploads/pre-create-hook.js';
 import { postFinishHook } from './uploads/post-finish-hook.js';
 import { tusdHooksDispatcher } from './uploads/hooks-dispatcher.js';
 import { openapiSpecPlugin, openapiUiPlugin } from './openapi/plugin.js';
+import { webViewPlugin } from './web/view-plugin.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -41,9 +42,23 @@ declare module 'fastify' {
 }
 
 export async function buildServer(config: Config): Promise<FastifyInstance> {
+  // WC1 + C1-Rev2: enable trustProxy so app.inject() (used by the BFF login
+  // handler) can spoof x-forwarded-for AND so Plan 9's Caddy can forward the
+  // real client IP. The list/preset passed to Fastify's trustProxy is
+  // parameterised via config so dev (loopback only) and production
+  // (loopback + caddy-subnet) can differ without code changes.
+  // Multiple CIDRs come as a comma-separated string in env; Fastify accepts
+  // either a single string preset, a single CIDR, OR a string[]. Split if
+  // the value contains a comma.
+  const trustProxyConfig: string | string[] = config.TRUSTED_PROXY_CIDR.includes(',')
+    ? config.TRUSTED_PROXY_CIDR.split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : config.TRUSTED_PROXY_CIDR;
   const app = Fastify({
     logger: { level: config.LOG_LEVEL },
     disableRequestLogging: false,
+    trustProxy: trustProxyConfig,
   }).withTypeProvider<ZodTypeProvider>();
 
   app.setValidatorCompiler(validatorCompiler);
@@ -71,7 +86,17 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
       sameSite: 'lax',
       path: '/',
     },
-    getToken: (req) => req.headers['x-csrf-token'] as string | undefined,
+    // Plan 8a Task 1 Pre-Flight: extended for HTML form posts. The web BFF posts
+    // application/x-www-form-urlencoded with a _csrf body field; legacy JSON/API-key
+    // callers still pass the x-csrf-token header. Header takes precedence so existing
+    // CSRF tests are unaffected.
+    getToken: (req) => {
+      const header = req.headers['x-csrf-token'];
+      if (typeof header === 'string') return header;
+      const body = req.body as Record<string, unknown> | undefined;
+      if (body && typeof body._csrf === 'string') return body._csrf;
+      return undefined;
+    },
   });
 
   const prisma = createPrismaClient({ databaseUrl: config.DATABASE_URL });
@@ -86,6 +111,12 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
 
   // Plan 4 Task 2: Pepper-Canary Boot-Self-Check
   await runPepperCanaryOnBoot(prisma, Buffer.from(config.API_KEY_PEPPER));
+
+  // Plan 8a Task 1: register the web BFF view-plugin (Handlebars + static
+  // assets + form-body parser + HTML CSP onSend hook). Mounted before the
+  // route plugins so partials and reply.view are available to all later
+  // route registrations.
+  await app.register(webViewPlugin);
 
   // Plan 7 Task 6: register @fastify/swagger BEFORE all documented routes —
   // its `onRoute` hook only collects metadata for routes registered after it.
