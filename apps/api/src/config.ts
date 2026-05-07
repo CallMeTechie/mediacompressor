@@ -25,6 +25,14 @@ const ConfigSchema = z.object({
   TUSD_FINAL_DIR: z.string().default('/media/uploads'),
   MEDIA_MOUNT_PATH: z.string().default('/media'),
   MIN_FREE_BYTES_RESERVE: z.coerce.bigint().default(5n * 1024n * 1024n * 1024n), // 5 GB
+  // Plan 7 Task 7: Plan-4 POST /jobs is a deprecated stub. Default OFF — only
+  // tests/dev that explicitly need the legacy endpoint should opt in via
+  // ENABLE_LEGACY_JOB_STUB=true. Production must keep this disabled so callers
+  // are forced to use the canonical tusd upload flow.
+  ENABLE_LEGACY_JOB_STUB: z
+    .union([z.boolean(), z.string()])
+    .default(false)
+    .transform((v) => v === true || v === 'true' || v === '1'),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

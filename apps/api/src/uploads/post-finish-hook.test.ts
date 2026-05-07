@@ -50,6 +50,7 @@ function makeConfig(): Config {
     NODE_ENV: 'test',
     LOG_LEVEL: 'error',
     ARGON2_MAX_CONCURRENCY: 8,
+    ENABLE_LEGACY_JOB_STUB: false,
   };
 }
 

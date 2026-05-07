@@ -39,6 +39,10 @@ const config: Config = {
   TUSD_FINAL_DIR: '/media/uploads',
   MEDIA_MOUNT_PATH: '/media',
   MIN_FREE_BYTES_RESERVE: 1n,
+  // Plan 7 Task 7: the POST /jobs describe-block below tests the deprecated
+  // legacy stub explicitly, so the feature flag must be ON. The 4th describe
+  // block (flag-OFF regression test) builds its own config with the flag off.
+  ENABLE_LEGACY_JOB_STUB: true,
 };
 
 const apiKeyPepper = Buffer.from(config.API_KEY_PEPPER);
@@ -630,6 +634,54 @@ describe('jobs routes — DELETE /api/v1/jobs/:id (Plan 4 Task 8)', () => {
       expect(messages).toHaveLength(0);
     } finally {
       await sub.quit();
+      await app.close();
+    }
+  });
+});
+
+// Plan 7 Task 7 — Pflicht-Test for the ENABLE_LEGACY_JOB_STUB feature flag.
+// With the flag OFF (production default), the POST /api/v1/jobs route MUST NOT
+// be registered and the server must respond 404. This is the regression test
+// that prevents accidental re-enabling of the deprecated Plan-4 stub.
+describe('jobs routes — POST /api/v1/jobs flag-OFF (Plan 7 Task 7 regression)', () => {
+  // Build a separate config that explicitly disables the legacy stub. The
+  // module-level `config` const has ENABLE_LEGACY_JOB_STUB=true for the other
+  // describe blocks; here we override with a fresh object.
+  const configFlagOff: Config = {
+    ...config,
+    ENABLE_LEGACY_JOB_STUB: false,
+  };
+
+  it('POST /api/v1/jobs → 404 (route not registered when flag is OFF)', async () => {
+    const app = await buildServer(configFlagOff);
+    try {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/jobs',
+        payload: {
+          inputStorageKey: `uploads/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/source.bin`,
+          kind: 'image',
+          profile: 'web-optimized',
+        },
+      });
+      // 404 (route not registered), NOT 401 — the flag-off check happens at
+      // route-registration time, before any auth guard runs.
+      expect(res.statusCode).toBe(404);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('GET /api/v1/jobs is still registered (flag only gates POST)', async () => {
+    const app = await buildServer(configFlagOff);
+    try {
+      // GET without auth → 401 (route IS registered, auth guard runs).
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/v1/jobs',
+      });
+      expect(res.statusCode).toBe(401);
+    } finally {
       await app.close();
     }
   });

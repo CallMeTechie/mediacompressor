@@ -38,6 +38,9 @@ const config: Config = {
   TUSD_FINAL_DIR: '/media/uploads',
   MEDIA_MOUNT_PATH: '/media',
   MIN_FREE_BYTES_RESERVE: 1n,
+  // Plan 7 Task 7: snapshot reflects production-default config — Plan-4 stub
+  // (POST /jobs) is OFF, so the snapshot does NOT include that path.
+  ENABLE_LEGACY_JOB_STUB: false,
 };
 
 describe('OpenAPI snapshot', () => {
