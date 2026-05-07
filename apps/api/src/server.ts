@@ -28,6 +28,7 @@ import { postFinishHook } from './uploads/post-finish-hook.js';
 import { tusdHooksDispatcher } from './uploads/hooks-dispatcher.js';
 import { openapiSpecPlugin, openapiUiPlugin } from './openapi/plugin.js';
 import { webViewPlugin } from './web/view-plugin.js';
+import { loginPagePlugin } from './web/login-page.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -149,6 +150,12 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
 
   // Tasks 3–9 register hooks/routes here.
   await app.register(loginRoutes);
+
+  // Plan 8a Task 3: GET /login + POST /login HTML page (BFF). Internally
+  // delegates to /api/v1/auth/login via app.inject(), so registered AFTER
+  // loginRoutes — although app.inject() is runtime-late-bound, keeping the
+  // dependency-aware order makes the intent obvious.
+  await app.register(loginPagePlugin);
 
   // Plan 4 Task 5: Auth-Middleware (Session ODER API-Key). Must be registered
   // BEFORE Task-4 routes (API-Key-Routes) since they call app.requireAuth.
