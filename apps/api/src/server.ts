@@ -29,6 +29,7 @@ import { tusdHooksDispatcher } from './uploads/hooks-dispatcher.js';
 import { openapiSpecPlugin, openapiUiPlugin } from './openapi/plugin.js';
 import { webViewPlugin } from './web/view-plugin.js';
 import { loginPagePlugin } from './web/login-page.js';
+import { inviteRedeemPagePlugin } from './web/invite-redeem-page.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -156,6 +157,12 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // loginRoutes — although app.inject() is runtime-late-bound, keeping the
   // dependency-aware order makes the intent obvious.
   await app.register(loginPagePlugin);
+
+  // Plan 8a Task 4: GET /invites/:token + POST /invites/:token HTML pages
+  // (BFF). Atomic-claim via updateMany (WC3) + Argon2Semaphore (WC2) +
+  // CSRF rotation (WC4) + revert-on-failure logging (C3-Rev2). Reads
+  // invite tokens hashed with SESSION_SECRET (HMAC-SHA-256).
+  await app.register(inviteRedeemPagePlugin);
 
   // Plan 4 Task 5: Auth-Middleware (Session ODER API-Key). Must be registered
   // BEFORE Task-4 routes (API-Key-Routes) since they call app.requireAuth.
