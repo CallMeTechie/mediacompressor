@@ -17,6 +17,7 @@ import { registerAuthMiddleware } from './auth/auth-middleware.js';
 import { registerAdminGuard } from './admin/role-guard.js';
 import { adminUsersRoutes } from './admin/users-routes.js';
 import { adminInvitesRoutes } from './admin/invites-routes.js';
+import { adminStatsRoute } from './admin/stats-route.js';
 import { apiKeyRoutes } from './auth/api-key-routes.js';
 import { capabilitiesRoute } from './capabilities/capabilities-route.js';
 import { jobsRoutes } from './jobs/jobs-routes.js';
@@ -129,6 +130,12 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // /admin/invites). Same registration ordering as adminUsersRoutes —
   // depends on registerAdminGuard for app.requireAdmin/requireAdminCsrf.
   await app.register(adminInvitesRoutes);
+
+  // Plan 7 Task 5: Admin operational stats (GET /api/v1/admin/stats) —
+  // users/jobs/storage/queue aggregates. Read-only GET; uses requireAdmin
+  // (no CSRF, since GETs are not state-changing). Registered alongside the
+  // other admin routes after registerAdminGuard.
+  await app.register(adminStatsRoute);
 
   // Plan 4 Task 4: API-Key-Routes (CRUD for the authenticated user's keys).
   // Registered AFTER registerAuthMiddleware because it relies on
