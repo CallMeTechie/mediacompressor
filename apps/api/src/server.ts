@@ -26,6 +26,7 @@ import { downloadRoute } from './jobs/download-route.js';
 import { preCreateHook } from './uploads/pre-create-hook.js';
 import { postFinishHook } from './uploads/post-finish-hook.js';
 import { tusdHooksDispatcher } from './uploads/hooks-dispatcher.js';
+import { openapiSpecPlugin, openapiUiPlugin } from './openapi/plugin.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -85,6 +86,12 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
 
   // Plan 4 Task 2: Pepper-Canary Boot-Self-Check
   await runPepperCanaryOnBoot(prisma, Buffer.from(config.API_KEY_PEPPER));
+
+  // Plan 7 Task 6: register @fastify/swagger BEFORE all documented routes —
+  // its `onRoute` hook only collects metadata for routes registered after it.
+  // The matching `openapiUiPlugin` is registered at the END of buildServer to
+  // mount Swagger-UI and `GET /api/v1/openapi.json`.
+  await app.register(openapiSpecPlugin);
 
   app.get('/api/v1/health', async () => ({ status: 'ok' }));
 
@@ -174,6 +181,12 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // body.Type to the per-Type routes registered above. Must run AFTER both
   // per-Type plugins so the in-process app.inject() sees them.
   await app.register(tusdHooksDispatcher);
+
+  // Plan 7 Task 6: Swagger-UI + GET /api/v1/openapi.json. MUST be registered
+  // LAST — pairs with openapiSpecPlugin (registered early); openapiSpecPlugin
+  // installed swagger's onRoute hook so every route registered above this
+  // line is now in the spec. Exposes /api/v1/openapi.json + /api/v1/docs.
+  await app.register(openapiUiPlugin);
 
   return app;
 }
