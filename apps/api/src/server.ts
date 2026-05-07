@@ -14,13 +14,19 @@ import type { Config } from './config.js';
 import { runPepperCanaryOnBoot } from './pepper-canary-hook.js';
 import { loginRoutes } from './auth/login-routes.js';
 import { registerAuthMiddleware } from './auth/auth-middleware.js';
+import { registerAdminGuard } from './admin/role-guard.js';
+import { adminUsersRoutes } from './admin/users-routes.js';
+import { adminInvitesRoutes } from './admin/invites-routes.js';
+import { adminStatsRoute } from './admin/stats-route.js';
 import { apiKeyRoutes } from './auth/api-key-routes.js';
+import { capabilitiesRoute } from './capabilities/capabilities-route.js';
 import { jobsRoutes } from './jobs/jobs-routes.js';
 import { jobsEventsRoute } from './jobs/jobs-events-route.js';
 import { downloadRoute } from './jobs/download-route.js';
 import { preCreateHook } from './uploads/pre-create-hook.js';
 import { postFinishHook } from './uploads/post-finish-hook.js';
 import { tusdHooksDispatcher } from './uploads/hooks-dispatcher.js';
+import { openapiSpecPlugin, openapiUiPlugin } from './openapi/plugin.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -81,6 +87,12 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // Plan 4 Task 2: Pepper-Canary Boot-Self-Check
   await runPepperCanaryOnBoot(prisma, Buffer.from(config.API_KEY_PEPPER));
 
+  // Plan 7 Task 6: register @fastify/swagger BEFORE all documented routes —
+  // its `onRoute` hook only collects metadata for routes registered after it.
+  // The matching `openapiUiPlugin` is registered at the END of buildServer to
+  // mount Swagger-UI and `GET /api/v1/openapi.json`.
+  await app.register(openapiSpecPlugin);
+
   app.get('/api/v1/health', async () => ({ status: 'ok' }));
 
   app.get('/api/v1/ready', async () => {
@@ -111,10 +123,36 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // BEFORE Task-4 routes (API-Key-Routes) since they call app.requireAuth.
   registerAuthMiddleware(app);
 
+  // Plan 7 Task 2 (AP1+AP5): Admin role-guard decorators. Registered AFTER
+  // registerAuthMiddleware because requireAdmin/requireAdminCsrf delegate to
+  // app.requireAuth and read req.auth.role/status (populated by resolveAuth).
+  registerAdminGuard(app);
+
+  // Plan 7 Task 3: Admin user-management routes. Registered AFTER
+  // registerAdminGuard because the routes use app.requireAdmin /
+  // app.requireAdminCsrf decorators.
+  await app.register(adminUsersRoutes);
+
+  // Plan 7 Task 4: Admin invite-management routes (POST/GET/DELETE
+  // /admin/invites). Same registration ordering as adminUsersRoutes —
+  // depends on registerAdminGuard for app.requireAdmin/requireAdminCsrf.
+  await app.register(adminInvitesRoutes);
+
+  // Plan 7 Task 5: Admin operational stats (GET /api/v1/admin/stats) —
+  // users/jobs/storage/queue aggregates. Read-only GET; uses requireAdmin
+  // (no CSRF, since GETs are not state-changing). Registered alongside the
+  // other admin routes after registerAdminGuard.
+  await app.register(adminStatsRoute);
+
   // Plan 4 Task 4: API-Key-Routes (CRUD for the authenticated user's keys).
   // Registered AFTER registerAuthMiddleware because it relies on
   // app.requireAuth / app.requireAuthCsrf decorators.
   await app.register(apiKeyRoutes);
+
+  // Plan 7 Task 1: GET /api/v1/capabilities — discovery endpoint with anonymous
+  // + authenticated subsets. Uses tryAuth (not requireAuth) so missing/invalid
+  // auth falls through to anonymous (NOT 401).
+  await app.register(capabilitiesRoute);
 
   // Plan 4 Task 6: POST /jobs stub + BullMQ producer (Outbox-Pattern).
   await app.register(jobsRoutes);
@@ -143,6 +181,12 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // body.Type to the per-Type routes registered above. Must run AFTER both
   // per-Type plugins so the in-process app.inject() sees them.
   await app.register(tusdHooksDispatcher);
+
+  // Plan 7 Task 6: Swagger-UI + GET /api/v1/openapi.json. MUST be registered
+  // LAST — pairs with openapiSpecPlugin (registered early); openapiSpecPlugin
+  // installed swagger's onRoute hook so every route registered above this
+  // line is now in the spec. Exposes /api/v1/openapi.json + /api/v1/docs.
+  await app.register(openapiUiPlugin);
 
   return app;
 }

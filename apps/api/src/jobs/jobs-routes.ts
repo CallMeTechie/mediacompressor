@@ -51,72 +51,83 @@ export const jobsRoutes: FastifyPluginAsync = async (app) => {
     await queue.close();
   });
 
-  // C1-Rev1: state-changing → CSRF-Pflicht (Bearer-API-Key bypassed via skipCsrf).
-  app.post('/api/v1/jobs', { schema: { body: PostJobBody } }, async (req, reply) => {
-    const userId = await app.requireAuthCsrf(req, reply);
-    if (!userId) return;
+  // Plan 7 Task 7: POST /jobs is gated behind ENABLE_LEGACY_JOB_STUB. Default
+  // is OFF — production deployments do not register the route at all (404),
+  // forcing callers to use the canonical tusd upload flow. Tests that need the
+  // legacy stub set `ENABLE_LEGACY_JOB_STUB: true` in their config object.
+  if (app.deps.config.ENABLE_LEGACY_JOB_STUB) {
+    app.log.warn(
+      'ENABLE_LEGACY_JOB_STUB=true — POST /jobs stub is active. Disable in production.',
+    );
+    // C1-Rev1: state-changing → CSRF-Pflicht (Bearer-API-Key bypassed via skipCsrf).
+    app.post('/api/v1/jobs', { schema: { body: PostJobBody } }, async (req, reply) => {
+      const userId = await app.requireAuthCsrf(req, reply);
+      if (!userId) return;
 
-    const { inputStorageKey, kind, profile, overrides } = req.body as z.infer<typeof PostJobBody>;
+      const { inputStorageKey, kind, profile, overrides } = req.body as z.infer<
+        typeof PostJobBody
+      >;
 
-    // C3-Rev1 + UC13: Server-Side-Check — userUuid im Pfad muss mit auth.userId
-    // übereinstimmen. parseUploadPath enforced strikte UUIDv4-Layout (Defense-in-Depth).
-    const parsed = parseUploadPath(inputStorageKey);
-    if (!parsed || parsed.userId !== userId) {
-      return reply.code(403).send({
-        error: {
-          code: 'AUTH_INVALID',
-          message: 'inputStorageKey does not belong to authenticated user',
-        },
-      });
-    }
+      // C3-Rev1 + UC13: Server-Side-Check — userUuid im Pfad muss mit auth.userId
+      // übereinstimmen. parseUploadPath enforced strikte UUIDv4-Layout (Defense-in-Depth).
+      const parsed = parseUploadPath(inputStorageKey);
+      if (!parsed || parsed.userId !== userId) {
+        return reply.code(403).send({
+          error: {
+            code: 'AUTH_INVALID',
+            message: 'inputStorageKey does not belong to authenticated user',
+          },
+        });
+      }
 
-    // C7-Rev2: Outbox-Pattern. DB-Insert + queue.add MÜSSEN atomar sein —
-    // sonst gibt es bei Crash/Redis-Ausfall zwischen den beiden Operationen
-    // einen Zombie-Job. prisma.$transaction um beide Operationen.
-    const job = await prisma.$transaction(async (tx) => {
-      const j = await tx.job.create({
-        data: {
+      // C7-Rev2: Outbox-Pattern. DB-Insert + queue.add MÜSSEN atomar sein —
+      // sonst gibt es bei Crash/Redis-Ausfall zwischen den beiden Operationen
+      // einen Zombie-Job. prisma.$transaction um beide Operationen.
+      const job = await prisma.$transaction(async (tx) => {
+        const j = await tx.job.create({
+          data: {
+            userId,
+            status: 'queued',
+            kind,
+            profile,
+            overrides: overrides ?? {},
+            inputFilename: inputStorageKey.split('/').pop() ?? 'unknown',
+            inputStorageKey,
+            uploadId: `stub-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          },
+          select: { id: true, status: true, createdAt: true },
+        });
+
+        // exactOptionalPropertyTypes: only spread `overrides` if defined.
+        const jobData: CompressJobData = {
+          jobId: j.id,
           userId,
-          status: 'queued',
-          kind,
+          inputPath: inputStorageKey,
+          outputPath: `results/${userId}/${j.id}/output`,
           profile,
-          overrides: overrides ?? {},
-          inputFilename: inputStorageKey.split('/').pop() ?? 'unknown',
-          inputStorageKey,
-          uploadId: `stub-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        },
-        select: { id: true, status: true, createdAt: true },
+          ...(overrides ? { overrides } : {}),
+        };
+        await queue.add(
+          'compress',
+          jobData,
+          // C12-Rev2: Job-Optionen — jobId für Idempotenz, attempts/backoff für transiente Fehler.
+          { jobId: j.id, attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
+        );
+
+        return j;
       });
 
-      // exactOptionalPropertyTypes: only spread `overrides` if defined.
-      const jobData: CompressJobData = {
-        jobId: j.id,
-        userId,
-        inputPath: inputStorageKey,
-        outputPath: `results/${userId}/${j.id}/output`,
-        profile,
-        ...(overrides ? { overrides } : {}),
-      };
-      await queue.add(
-        'compress',
-        jobData,
-        // C12-Rev2: Job-Optionen — jobId für Idempotenz, attempts/backoff für transiente Fehler.
-        { jobId: j.id, attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
-      );
-
-      return j;
+      return reply.code(201).send({
+        id: job.id,
+        status: 'queued',
+        createdAt: job.createdAt,
+        links: {
+          self: `/api/v1/jobs/${job.id}`,
+          events: `/api/v1/jobs/${job.id}/events`,
+        },
+      });
     });
-
-    return reply.code(201).send({
-      id: job.id,
-      status: 'queued',
-      createdAt: job.createdAt,
-      links: {
-        self: `/api/v1/jobs/${job.id}`,
-        events: `/api/v1/jobs/${job.id}/events`,
-      },
-    });
-  });
+  }
 
   // Public job projection for read-endpoints. Excludes storage keys, raw
   // overrides, errorMessage, etc. — only the safe view-model fields.

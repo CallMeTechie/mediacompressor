@@ -33,6 +33,7 @@ const config: Config = {
   TUSD_FINAL_DIR: '/media/uploads',
   MEDIA_MOUNT_PATH: '/media',
   MIN_FREE_BYTES_RESERVE: 1n,
+  ENABLE_LEGACY_JOB_STUB: false,
 };
 
 describe('login flow', () => {
