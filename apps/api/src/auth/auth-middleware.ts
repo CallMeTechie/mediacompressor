@@ -141,3 +141,65 @@ export function registerAuthMiddleware(app: FastifyInstance): void {
     },
   );
 }
+
+/**
+ * Plan-7 Task-1: Discovery-Auth-Helper for `GET /api/v1/capabilities`.
+ *
+ * Mirrors `requireAuth`'s lookup chain (Bearer-API-Key first, then session
+ * cookie fallback) but:
+ *   - NEVER touches `reply` (no `.code`, no `.send`).
+ *   - Returns `null` on miss/invalid instead of sending 401.
+ *   - No `dummyCompare` on miss — capabilities is discovery, not a credential
+ *     probe, so timing-side-channel hardening is not required.
+ *   - Only populates `req.auth` / `req.skipCsrf` on a valid hit (same semantics
+ *     as `requireAuth`), so downstream code can rely on them uniformly.
+ *
+ * Caveat: malformed Bearer tokens return `null` (no throw, no 500) — `parseApiKey`
+ * is permissive and `prisma.apiKey.findUnique` simply returns `null` for unknown
+ * hashes.
+ */
+export async function tryAuth(
+  app: FastifyInstance,
+  req: FastifyRequest,
+): Promise<string | null> {
+  const { prisma, config } = app.deps;
+  const apiKeyPepper = Buffer.from(config.API_KEY_PEPPER);
+  const sessionPepper = Buffer.from(config.SESSION_SECRET);
+
+  const auth = req.headers.authorization;
+  if (auth && auth.startsWith('Bearer ')) {
+    const key = auth.slice(7).trim();
+    const parsed = parseApiKey(key);
+    if (parsed) {
+      const keyHash = hashApiKey(key, apiKeyPepper);
+      const row = await prisma.apiKey.findUnique({
+        where: { keyHash },
+        include: { user: true },
+      });
+      if (row && !row.revokedAt && row.user.status === 'active') {
+        // Mirror requireAuth: fire-and-forget lastUsedAt update (non-blocking).
+        void prisma.apiKey
+          .update({ where: { id: row.id }, data: { lastUsedAt: new Date() } })
+          .catch(() => {});
+        req.auth = { userId: row.userId, method: 'api-key' };
+        req.skipCsrf = true;
+        return row.userId;
+      }
+    }
+    // Bearer present but invalid → discovery: fall through to anonymous (null),
+    // do NOT consult session cookie (mirrors requireAuth's "header takes priority"
+    // semantics).
+    return null;
+  }
+
+  const token = req.cookies.mc_session;
+  if (token) {
+    const tokenHash = hashSessionToken(token, sessionPepper);
+    const session = await prisma.session.findUnique({ where: { tokenHash } });
+    if (session && session.expiresAt > new Date()) {
+      req.auth = { userId: session.userId, method: 'session' };
+      return session.userId;
+    }
+  }
+  return null;
+}

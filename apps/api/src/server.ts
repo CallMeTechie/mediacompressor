@@ -15,6 +15,7 @@ import { runPepperCanaryOnBoot } from './pepper-canary-hook.js';
 import { loginRoutes } from './auth/login-routes.js';
 import { registerAuthMiddleware } from './auth/auth-middleware.js';
 import { apiKeyRoutes } from './auth/api-key-routes.js';
+import { capabilitiesRoute } from './capabilities/capabilities-route.js';
 import { jobsRoutes } from './jobs/jobs-routes.js';
 import { jobsEventsRoute } from './jobs/jobs-events-route.js';
 import { downloadRoute } from './jobs/download-route.js';
@@ -115,6 +116,11 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // Registered AFTER registerAuthMiddleware because it relies on
   // app.requireAuth / app.requireAuthCsrf decorators.
   await app.register(apiKeyRoutes);
+
+  // Plan 7 Task 1: GET /api/v1/capabilities — discovery endpoint with anonymous
+  // + authenticated subsets. Uses tryAuth (not requireAuth) so missing/invalid
+  // auth falls through to anonymous (NOT 401).
+  await app.register(capabilitiesRoute);
 
   // Plan 4 Task 6: POST /jobs stub + BullMQ producer (Outbox-Pattern).
   await app.register(jobsRoutes);
