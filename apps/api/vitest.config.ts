@@ -10,5 +10,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     fileParallelism: false,
+    // Playwright specs in apps/api/test-e2e/*.spec.ts use @playwright/test's
+    // global `test.beforeAll`, which conflicts with vitest's runner. They're
+    // launched separately via `pnpm test:e2e`; vitest must not pick them up.
+    exclude: ['**/node_modules/**', '**/dist/**', 'test-e2e/**'],
   },
 });

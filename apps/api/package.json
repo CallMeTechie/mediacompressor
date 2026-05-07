@@ -8,6 +8,7 @@
     "build": "tsc -b",
     "test": "vitest run",
     "test:snapshot:update": "UPDATE_SNAPSHOT=1 vitest run snapshot",
+    "test:e2e": "playwright test --config=test-e2e/playwright.config.ts",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js"
   },
@@ -39,6 +40,7 @@
   },
   "devDependencies": {
     "@mediacompressor/test-helpers": "workspace:*",
+    "@playwright/test": "~1.48.0",
     "@types/node": "~22.7.0",
     "tsx": "~4.19.2"
   }
