@@ -1,0 +1,18 @@
+{
+  "page_title_dashboard": "Admin",
+  "page_title_users": "Users",
+  "page_title_invites": "Invites",
+  "page_title_stats": "Stats",
+  "nav_dashboard": "Dashboard",
+  "nav_users": "Users",
+  "nav_invites": "Invites",
+  "nav_stats": "Stats",
+  "welcome": "Signed in as {{email}}",
+  "flash_user_updated": "User updated.",
+  "flash_invite_created": "Invite created.",
+  "flash_invite_revoked": "Invite revoked.",
+  "flash_csrf_stale": "Your session token had to be refreshed. Please try again.",
+  "locale_switcher_label": "Language",
+  "locale_de": "Deutsch",
+  "locale_en": "English"
+}

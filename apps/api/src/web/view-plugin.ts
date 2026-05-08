@@ -136,6 +136,31 @@ const webViewPluginImpl: FastifyPluginAsync = async (app) => {
       return this;
     },
   );
+
+  // Plan 8d Task 2: per-request wrap of reply.view + reply.viewFragment to
+  // inject `_locale: req.locale` into every render's data bag. The Handlebars
+  // `{{t 'key'}}` helper (registered in i18n.ts) reads `_locale` from
+  // `@root._locale` first (C1-AD-PR), so this single injection cascades into
+  // every partial and {{#each}}-iteration. The i18n plugin's `onRequest` hook
+  // sets `req.locale` BEFORE preHandler fires (onRequest precedes preHandler in
+  // the lifecycle), so the wrap always sees a valid locale (cookie >
+  // Accept-Language > 'en').
+  //
+  // Wrapping in a preHandler — rather than at decorateReply-time — means the
+  // wrap is per-FastifyReply instance, not shared globally; concurrent
+  // requests don't clobber each other's `_locale`.
+  app.addHook('preHandler', async (req, reply) => {
+    const origView = reply.view.bind(reply);
+    reply.view = ((template: string, data?: Record<string, unknown>, opts?: object) => {
+      return origView(template, { ...(data ?? {}), _locale: req.locale }, opts);
+    }) as typeof reply.view;
+    if (typeof reply.viewFragment === 'function') {
+      const origFragment = reply.viewFragment.bind(reply);
+      reply.viewFragment = ((template: string, data?: Record<string, unknown>) => {
+        return origFragment(template, { ...(data ?? {}), _locale: req.locale });
+      }) as typeof reply.viewFragment;
+    }
+  });
 };
 
 // Wrap with fastify-plugin so @fastify/view's reply.view decorator and

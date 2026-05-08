@@ -1,0 +1,18 @@
+{
+  "page_title_dashboard": "Admin",
+  "page_title_users": "Benutzer",
+  "page_title_invites": "Einladungen",
+  "page_title_stats": "Statistik",
+  "nav_dashboard": "Dashboard",
+  "nav_users": "Benutzer",
+  "nav_invites": "Einladungen",
+  "nav_stats": "Statistik",
+  "welcome": "Angemeldet als {{email}}",
+  "flash_user_updated": "Benutzer aktualisiert.",
+  "flash_invite_created": "Einladung erstellt.",
+  "flash_invite_revoked": "Einladung widerrufen.",
+  "flash_csrf_stale": "Dein Sitzungs-Token wurde aktualisiert. Bitte erneut versuchen.",
+  "locale_switcher_label": "Sprache",
+  "locale_de": "Deutsch",
+  "locale_en": "English"
+}

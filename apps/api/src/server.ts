@@ -45,6 +45,8 @@ import { jobListPagePlugin } from './web/job-list-page.js';
 import { jobDetailPagePlugin } from './web/job-detail-page.js';
 import { jobCancelRoutePlugin } from './web/job-cancel-route.js';
 import { uploadWizardPagePlugin } from './web/upload-wizard-page.js';
+import { i18nFastifyPlugin } from './web/i18n.js';
+import { localeRoutePlugin } from './web/locale-route.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -186,6 +188,15 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // route plugins so partials and reply.view are available to all later
   // route registrations.
   await app.register(webViewPlugin);
+
+  // Plan 8d Task 2: i18n foundation. Registered AFTER webViewPlugin so the
+  // view-plugin's `preHandler` reply.view-wrap can rely on `req.locale` being
+  // populated by this plugin's `onRequest` hook (onRequest always fires before
+  // preHandler in Fastify's lifecycle, regardless of plugin-registration
+  // order, so this is order-robust). Also AFTER `csrf` (line ~97) so the
+  // POST /locale route — registered later via localeRoutePlugin — can use
+  // app.csrfProtection. Decorates `app.i18n` and `req.locale`.
+  await app.register(i18nFastifyPlugin);
 
   // Plan 8b Task 1: requireSession decorator (HTML-aware session check that
   // 303s to /login on miss/expired/disabled). MUST be registered BEFORE any
@@ -393,6 +404,14 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // <noscript>+<style>#upload-form{display:none} hides the form when JS is
   // disabled (C7-LI), pointing the user at the JSON API docs instead.
   await app.register(uploadWizardPagePlugin);
+
+  // Plan 8d Task 2: POST /locale — locale-switcher endpoint. Sets the
+  // mc_locale cookie and 303s back to a `redirectTo` body field validated
+  // against an own-origin allowlist (WC-AD2). Registered AFTER
+  // i18nFastifyPlugin (uses SUPPORTED_LOCALES) and BEFORE errorPagesPlugin
+  // (the catch-all 404). Uses app.csrfProtection — registered globally near
+  // the top of buildServer.
+  await app.register(localeRoutePlugin);
 
   // Plan 8a Task 6: Accept-aware 404/500 (BFF). MUST be registered LAST so
   // the catch-all setNotFoundHandler doesn't shadow real routes registered

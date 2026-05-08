@@ -883,6 +883,15 @@
           }
         }
       }
+    },
+    "/locale": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
     }
   },
   "servers": [
