@@ -1,0 +1,63 @@
+<header class="page-header">
+  <h1>{{t 'page_title_invites'}}</h1>
+  <nav class="page-nav">
+    <a href="/admin">{{t 'nav_dashboard'}}</a>
+    <a href="/admin/users">{{t 'nav_users'}}</a>
+    <a href="/admin/stats">{{t 'nav_stats'}}</a>
+  </nav>
+</header>
+
+{{> flash}}
+
+<section class="admin-invite-create">
+  <form method="POST" action="/admin/invites" class="admin-form">
+    {{> csrf}}
+    <p>
+      <label for="email">{{t 'invite_create_label_email'}}</label>
+      <input id="email" name="email" type="email" autocomplete="off">
+    </p>
+    <p>
+      <label for="expiresInHours">{{t 'invite_create_label_expires_in_hours'}}</label>
+      <input id="expiresInHours" name="expiresInHours" type="number" min="1" max="168" value="24">
+    </p>
+    <p>
+      <button type="submit" class="btn">{{t 'invite_create_button_submit'}}</button>
+    </p>
+  </form>
+</section>
+
+{{#if invites.length}}
+<table class="admin-table">
+  <thead>
+    <tr>
+      <th>{{t 'invites_table_email'}}</th>
+      <th>{{t 'invites_table_expires_at'}}</th>
+      <th>{{t 'invites_table_consumed'}}</th>
+      <th>{{t 'invites_table_actions'}}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each invites}}
+      <tr>
+        <td>
+          {{#if email}}{{email}}{{else}}<span class="muted">&mdash;</span>{{/if}}
+        </td>
+        <td>
+          <time datetime="{{expiresAt}}">{{expiresAt}}</time>
+        </td>
+        <td>{{t statusKey}}</td>
+        <td>
+          {{#if canRevoke}}
+            <form method="POST" action="/admin/invites/{{id}}/revoke" class="inline-form">
+              {{> csrf}}
+              <button type="submit" class="btn-link">{{t 'invites_button_revoke'}}</button>
+            </form>
+          {{/if}}
+        </td>
+      </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p class="muted">{{t 'invites_empty'}}</p>
+{{/if}}

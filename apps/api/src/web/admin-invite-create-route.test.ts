@@ -1,0 +1,569 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createPrismaClient, type PrismaClient } from '@mediacompressor/db';
+import {
+  TEST_API_KEY_PEPPER,
+  TEST_SESSION_SECRET,
+  TEST_CSRF_SECRET,
+  testDatabaseUrl,
+  testRedisUrl,
+  createTestUser,
+  cleanupTestUsers,
+  resetLoginRateLimits,
+} from '@mediacompressor/test-helpers';
+import IORedis from 'ioredis';
+import { buildServer } from '../server.js';
+import type { Config } from '../config.js';
+
+const TEST_EMAIL_USER = 'admin-invite-create-user@test.invalid';
+const TEST_EMAIL_ADMIN = 'admin-invite-create@test.invalid';
+const TEST_EMAIL_ADMIN_NOEMAIL = 'admin-invite-create-noemail@test.invalid';
+const TEST_EMAIL_ADMIN_WITHEMAIL = 'admin-invite-create-withemail@test.invalid';
+const TEST_EMAIL_ADMIN_ONETIME = 'admin-invite-create-onetime@test.invalid';
+const TEST_EMAIL_ADMIN_NOSTORE = 'admin-invite-create-nostore@test.invalid';
+const TEST_EMAIL_ADMIN_STDOUT = 'admin-invite-create-stdout@test.invalid';
+const TEST_EMAIL_ADMIN_INVALIDMAIL = 'admin-invite-create-invalidmail@test.invalid';
+const TEST_EMAIL_ADMIN_401 = 'admin-invite-create-401@test.invalid';
+const TEST_EMAIL_ADMIN_403 = 'admin-invite-create-403@test.invalid';
+const TEST_EMAILS = [
+  TEST_EMAIL_USER,
+  TEST_EMAIL_ADMIN,
+  TEST_EMAIL_ADMIN_NOEMAIL,
+  TEST_EMAIL_ADMIN_WITHEMAIL,
+  TEST_EMAIL_ADMIN_ONETIME,
+  TEST_EMAIL_ADMIN_NOSTORE,
+  TEST_EMAIL_ADMIN_STDOUT,
+  TEST_EMAIL_ADMIN_INVALIDMAIL,
+  TEST_EMAIL_ADMIN_401,
+  TEST_EMAIL_ADMIN_403,
+];
+
+const config: Config = {
+  DATABASE_URL: testDatabaseUrl(),
+  REDIS_URL: testRedisUrl(),
+  SESSION_SECRET: TEST_SESSION_SECRET,
+  CSRF_SECRET: TEST_CSRF_SECRET,
+  API_KEY_PEPPER: TEST_API_KEY_PEPPER,
+  CORS_ALLOWED_ORIGINS: 'http://localhost:5173',
+  PORT: 0,
+  NODE_ENV: 'test',
+  LOG_LEVEL: 'error',
+  ARGON2_MAX_CONCURRENCY: 8,
+  TUSD_SHARED_SECRET: 'a'.repeat(64),
+  TUSD_REQUIRE_SHARED_SECRET: true,
+  TUSD_DATA_DIR: '/media/tusd-data',
+  TUSD_FINAL_DIR: '/media/uploads',
+  MEDIA_MOUNT_PATH: '/media',
+  MIN_FREE_BYTES_RESERVE: 1n,
+  TRUSTED_PROXY_CIDR: 'loopback',
+  ENABLE_LEGACY_JOB_STUB: false,
+};
+
+describe('web/admin-invite-create-route', () => {
+  let prisma: PrismaClient;
+  let redis: IORedis;
+
+  beforeAll(async () => {
+    prisma = createPrismaClient({ databaseUrl: config.DATABASE_URL });
+    redis = new IORedis(config.REDIS_URL);
+    await cleanupTestUsers(prisma, TEST_EMAILS);
+
+    await createTestUser(prisma, { email: TEST_EMAIL_USER, password: 'hunter22hunter22' });
+    for (const email of [
+      TEST_EMAIL_ADMIN,
+      TEST_EMAIL_ADMIN_NOEMAIL,
+      TEST_EMAIL_ADMIN_WITHEMAIL,
+      TEST_EMAIL_ADMIN_ONETIME,
+      TEST_EMAIL_ADMIN_NOSTORE,
+      TEST_EMAIL_ADMIN_STDOUT,
+      TEST_EMAIL_ADMIN_INVALIDMAIL,
+      TEST_EMAIL_ADMIN_401,
+      TEST_EMAIL_ADMIN_403,
+    ]) {
+      await createTestUser(prisma, { email, password: 'hunter22hunter22' });
+      await prisma.user.update({ where: { email }, data: { role: 'admin' } });
+    }
+  });
+
+  beforeEach(async () => {
+    await resetLoginRateLimits(redis, TEST_EMAILS);
+    const ids = await getAdminIds();
+    if (ids.length > 0) {
+      await prisma.invite.deleteMany({ where: { createdById: { in: ids } } });
+    }
+  });
+
+  async function getAdminIds(): Promise<string[]> {
+    const admins = await prisma.user.findMany({
+      where: { email: { in: TEST_EMAILS } },
+      select: { id: true },
+    });
+    return admins.map((a) => a.id);
+  }
+
+  afterAll(async () => {
+    const ids = await getAdminIds();
+    if (ids.length > 0) {
+      await prisma.invite.deleteMany({ where: { createdById: { in: ids } } });
+    }
+    await cleanupTestUsers(prisma, TEST_EMAILS);
+    await prisma.$disconnect();
+    await redis.quit();
+  });
+
+  /** Login + return merged cookies + a fresh CSRF token. */
+  async function loginAndPrepareCsrf(
+    app: Awaited<ReturnType<typeof buildServer>>,
+    email: string,
+  ): Promise<{ cookieHeader: string; csrf: string }> {
+    const get = await app.inject({ method: 'GET', url: '/login' });
+    const csrf1 = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
+    const initialCookies = (Array.isArray(get.headers['set-cookie'])
+      ? get.headers['set-cookie']
+      : [get.headers['set-cookie'] ?? ''])
+      .map((c) => c?.split(';')[0])
+      .filter(Boolean)
+      .join('; ');
+    const post = await app.inject({
+      method: 'POST',
+      url: '/login',
+      headers: {
+        cookie: initialCookies,
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf1)}`,
+    });
+    const sessCookieHeader = (Array.isArray(post.headers['set-cookie'])
+      ? post.headers['set-cookie']
+      : [post.headers['set-cookie'] ?? ''])
+      .map((c) => c?.split(';')[0])
+      .filter(Boolean)
+      .join('; ');
+    // GET /admin/invites to obtain a fresh CSRF token.
+    const get2 = await app.inject({
+      method: 'GET',
+      url: '/admin/invites',
+      headers: { cookie: sessCookieHeader, accept: 'text/html' },
+    });
+    const csrf2 = ((get2.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
+    const get2Cookies = (Array.isArray(get2.headers['set-cookie'])
+      ? get2.headers['set-cookie']
+      : get2.headers['set-cookie']
+      ? [get2.headers['set-cookie']]
+      : []
+    )
+      .map((c) => c?.split(';')[0])
+      .filter(Boolean);
+    const merged = [sessCookieHeader, ...get2Cookies].join('; ');
+    return { cookieHeader: merged, csrf: csrf2 };
+  }
+
+  /** Login only (no CSRF token fetch). */
+  async function loginAndCookies(
+    app: Awaited<ReturnType<typeof buildServer>>,
+    email: string,
+  ): Promise<string> {
+    const get = await app.inject({ method: 'GET', url: '/login' });
+    const csrf = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
+    const initialCookies = (Array.isArray(get.headers['set-cookie'])
+      ? get.headers['set-cookie']
+      : [get.headers['set-cookie'] ?? ''])
+      .map((c) => c?.split(';')[0])
+      .filter(Boolean)
+      .join('; ');
+    const post = await app.inject({
+      method: 'POST',
+      url: '/login',
+      headers: {
+        cookie: initialCookies,
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf)}`,
+    });
+    return (Array.isArray(post.headers['set-cookie'])
+      ? post.headers['set-cookie']
+      : [post.headers['set-cookie'] ?? ''])
+      .map((c) => c?.split(';')[0])
+      .filter(Boolean)
+      .join('; ');
+  }
+
+  // 1.
+  it('POST /admin/invites (no session) -> 303 to /login', async () => {
+    const app = await buildServer(config);
+    try {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/admin/invites',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        payload: '_csrf=irrelevant',
+      });
+      expect([302, 303]).toContain(res.statusCode);
+      expect(res.headers.location).toBe('/login');
+    } finally {
+      await app.close();
+    }
+  });
+
+  // 2.
+  it('POST /admin/invites (non-admin) -> 403', async () => {
+    const app = await buildServer(config);
+    try {
+      const cookie = await loginAndCookies(app, TEST_EMAIL_USER);
+      const res = await app.inject({
+        method: 'POST',
+        url: '/admin/invites',
+        headers: {
+          cookie,
+          'content-type': 'application/x-www-form-urlencoded',
+          accept: 'text/html',
+        },
+        payload: '_csrf=irrelevant',
+      });
+      expect(res.statusCode).toBe(403);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // 3. WC-AD8 / C4-AD-PR PFLICHT: valid admin session + missing _csrf -> 403.
+  it('WC-AD8 / C4-AD-PR PFLICHT: valid admin session + missing _csrf -> 403', async () => {
+    const app = await buildServer(config);
+    try {
+      const cookie = await loginAndCookies(app, TEST_EMAIL_ADMIN);
+      const res = await app.inject({
+        method: 'POST',
+        url: '/admin/invites',
+        headers: {
+          cookie,
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+        // No _csrf body, no x-csrf-token header.
+        payload: 'expiresInHours=24',
+      });
+      expect(res.statusCode).toBe(403);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // 4. POST valid (no email, default 24h) -> 200 admin-invite-created.hbs +
+  // raw token in body.
+  it('POST valid (no email, default 24h) -> 200 with raw token rendered', async () => {
+    const app = await buildServer(config);
+    try {
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
+        app,
+        TEST_EMAIL_ADMIN_NOEMAIL,
+      );
+      const res = await app.inject({
+        method: 'POST',
+        url: '/admin/invites',
+        headers: {
+          cookie: cookieHeader,
+          'content-type': 'application/x-www-form-urlencoded',
+          'x-csrf-token': csrf,
+        },
+        payload: `_csrf=${encodeURIComponent(csrf)}`,
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.body as string;
+      expect(body).toMatch(/Invite link|Einladungs-Link/);
+      // Raw token rendered into <code class="invite-token-secret">.
+      const match = body.match(
+        /<code class="invite-token-secret">([^<]+)<\/code>/,
+      );
+      expect(match).not.toBeNull();
+      expect(match![1]!.length).toBeGreaterThanOrEqual(20);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // 5. POST valid with email -> 200 + email pre-filled.
+  it('POST valid with email -> 200 with email rendered on created-page', async () => {
+    const app = await buildServer(config);
+    try {
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
+        app,
+        TEST_EMAIL_ADMIN_WITHEMAIL,
+      );
+      const inviteEmail = 'invitee-1@test.invalid';
+      const res = await app.inject({
+        method: 'POST',
+        url: '/admin/invites',
+        headers: {
+          cookie: cookieHeader,
+          'content-type': 'application/x-www-form-urlencoded',
+          'x-csrf-token': csrf,
+        },
+        payload: `email=${encodeURIComponent(inviteEmail)}&_csrf=${encodeURIComponent(csrf)}`,
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toContain(inviteEmail);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // 6. WC-AD6 PFLICHT (one-time-reveal): subsequent GET /admin/invites does
+  // NOT contain the raw token.
+  it('WC-AD6 PFLICHT: POST renders raw token; subsequent GET /admin/invites does NOT contain it', async () => {
+    const app = await buildServer(config);
+    try {
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
+        app,
+        TEST_EMAIL_ADMIN_ONETIME,
+      );
+      const post = await app.inject({
+        method: 'POST',
+        url: '/admin/invites',
+        headers: {
+          cookie: cookieHeader,
+          'content-type': 'application/x-www-form-urlencoded',
+          'x-csrf-token': csrf,
+        },
+        payload: `_csrf=${encodeURIComponent(csrf)}`,
+      });
+      expect(post.statusCode).toBe(200);
+      const match = (post.body as string).match(
+        /<code class="invite-token-secret">([^<]+)<\/code>/,
+      );
+      expect(match).not.toBeNull();
+      const rawToken = match![1]!;
+      expect(rawToken.length).toBeGreaterThanOrEqual(20);
+
+      // Subsequent GET must NOT contain the raw token.
+      const list = await app.inject({
+        method: 'GET',
+        url: '/admin/invites',
+        headers: { cookie: cookieHeader, accept: 'text/html' },
+      });
+      expect(list.statusCode).toBe(200);
+      expect(list.body).not.toContain(rawToken);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // 7. WC-AD7-eqv: Cache-Control no-store on created-page.
+  it('WC-AD7-eqv: POST success -> response cache-control matches /no-store/', async () => {
+    const app = await buildServer(config);
+    try {
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
+        app,
+        TEST_EMAIL_ADMIN_NOSTORE,
+      );
+      const res = await app.inject({
+        method: 'POST',
+        url: '/admin/invites',
+        headers: {
+          cookie: cookieHeader,
+          'content-type': 'application/x-www-form-urlencoded',
+          'x-csrf-token': csrf,
+        },
+        payload: `_csrf=${encodeURIComponent(csrf)}`,
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['cache-control']).toMatch(/no-store/);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // 8. WC-AD8-eqv (no raw-token in stdout) PFLICHT.
+  it('WC-AD8-eqv PFLICHT: raw invite token never appears in stdout (LOG_LEVEL=info)', async () => {
+    const captured: string[] = [];
+    const origWrite = process.stdout.write.bind(process.stdout);
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(
+      ((chunk: unknown, ...rest: unknown[]) => {
+        captured.push(typeof chunk === 'string' ? chunk : String(chunk));
+        return (origWrite as unknown as (...args: unknown[]) => boolean)(
+          chunk,
+          ...rest,
+        );
+      }) as typeof process.stdout.write,
+    );
+    const app = await buildServer({ ...config, LOG_LEVEL: 'info' });
+    try {
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
+        app,
+        TEST_EMAIL_ADMIN_STDOUT,
+      );
+      const post = await app.inject({
+        method: 'POST',
+        url: '/admin/invites',
+        headers: {
+          cookie: cookieHeader,
+          'content-type': 'application/x-www-form-urlencoded',
+          'x-csrf-token': csrf,
+        },
+        payload: `_csrf=${encodeURIComponent(csrf)}`,
+      });
+      expect(post.statusCode).toBe(200);
+      const match = (post.body as string).match(
+        /<code class="invite-token-secret">([^<]+)<\/code>/,
+      );
+      expect(match).not.toBeNull();
+      const rawToken = match![1]!;
+
+      const allStdout = captured.join('');
+      // C5-PR: audit-log markers PRESENT.
+      expect(allStdout).toMatch(/"action":"invite_create"/);
+      expect(allStdout).toMatch(/"adminId":"[^"]+"/);
+      expect(allStdout).toMatch(/"inviteId":"[^"]+"/);
+      // C2-PR: raw token NOT in stdout.
+      expect(allStdout).not.toContain(rawToken);
+    } finally {
+      stdoutSpy.mockRestore();
+      await app.close();
+    }
+  });
+
+  // 9. POST invalid email format -> 400 + list-page re-render with error flash.
+  it('POST invalid email format -> 400 + list re-render with error flash', async () => {
+    const app = await buildServer(config);
+    try {
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
+        app,
+        TEST_EMAIL_ADMIN_INVALIDMAIL,
+      );
+      const res = await app.inject({
+        method: 'POST',
+        url: '/admin/invites',
+        headers: {
+          cookie: cookieHeader,
+          'content-type': 'application/x-www-form-urlencoded',
+          'x-csrf-token': csrf,
+        },
+        payload: `email=not-an-email&_csrf=${encodeURIComponent(csrf)}`,
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.body).toMatch(/flash flash-error/);
+      // Form is re-rendered in the list page.
+      expect(res.body).toMatch(/<form[^>]+action="\/admin\/invites"/);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // 10. Inner-401 (mock) -> 303 to /login + clearCookie.
+  it('inner POST 401 -> 303 to /login + mc_session cleared', async () => {
+    const app = await buildServer(config);
+    try {
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
+        app,
+        TEST_EMAIL_ADMIN_401,
+      );
+
+      const originalInject = app.inject.bind(app);
+      const fakeInject = ((opts: unknown) => {
+        const isInnerPost =
+          typeof opts === 'object' &&
+          opts !== null &&
+          'method' in opts &&
+          'url' in opts &&
+          (opts as { method?: string }).method === 'POST' &&
+          (opts as { url?: string }).url === '/api/v1/admin/invites';
+        if (isInnerPost) {
+          return Promise.resolve({
+            statusCode: 401,
+            headers: {},
+            body: '',
+            payload: '',
+            rawPayload: Buffer.alloc(0),
+            cookies: [],
+            json: () => ({}),
+            trailers: {},
+          });
+        }
+        return (originalInject as (o: unknown) => unknown)(opts);
+      }) as unknown as typeof app.inject;
+      const injectSpy = vi.spyOn(app, 'inject').mockImplementation(fakeInject);
+
+      const res = await originalInject({
+        method: 'POST',
+        url: '/admin/invites',
+        headers: {
+          cookie: cookieHeader,
+          'content-type': 'application/x-www-form-urlencoded',
+          'x-csrf-token': csrf,
+        },
+        payload: `_csrf=${encodeURIComponent(csrf)}`,
+      });
+      expect([302, 303]).toContain(res.statusCode);
+      expect(res.headers.location).toBe('/login');
+      const setCookie = res.headers['set-cookie'];
+      const cookies = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
+      expect(
+        cookies.some(
+          (c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c),
+        ),
+      ).toBe(true);
+
+      injectSpy.mockRestore();
+    } finally {
+      await app.close();
+    }
+  });
+
+  // 11. Inner-403 (mock) -> 303 csrf-stale.
+  it('inner POST 403 -> 303 /admin/invites?updateflash=csrf-stale', async () => {
+    const app = await buildServer(config);
+    try {
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
+        app,
+        TEST_EMAIL_ADMIN_403,
+      );
+
+      const originalInject = app.inject.bind(app);
+      const fakeInject = ((opts: unknown) => {
+        const isInnerPost =
+          typeof opts === 'object' &&
+          opts !== null &&
+          'method' in opts &&
+          'url' in opts &&
+          (opts as { method?: string }).method === 'POST' &&
+          (opts as { url?: string }).url === '/api/v1/admin/invites';
+        if (isInnerPost) {
+          return Promise.resolve({
+            statusCode: 403,
+            headers: {},
+            body: '',
+            payload: '',
+            rawPayload: Buffer.alloc(0),
+            cookies: [],
+            json: () => ({}),
+            trailers: {},
+          });
+        }
+        return (originalInject as (o: unknown) => unknown)(opts);
+      }) as unknown as typeof app.inject;
+      const injectSpy = vi.spyOn(app, 'inject').mockImplementation(fakeInject);
+
+      const res = await originalInject({
+        method: 'POST',
+        url: '/admin/invites',
+        headers: {
+          cookie: cookieHeader,
+          'content-type': 'application/x-www-form-urlencoded',
+          'x-csrf-token': csrf,
+        },
+        payload: `_csrf=${encodeURIComponent(csrf)}`,
+      });
+      expect([302, 303]).toContain(res.statusCode);
+      expect(res.headers.location).toBe('/admin/invites?updateflash=csrf-stale');
+      // mc_session NOT cleared (CSRF rotation race; session valid).
+      const setCookie = res.headers['set-cookie'];
+      const cookies = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
+      expect(
+        cookies.some(
+          (c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c),
+        ),
+      ).toBe(false);
+
+      injectSpy.mockRestore();
+    } finally {
+      await app.close();
+    }
+  });
+});

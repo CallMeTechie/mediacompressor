@@ -51,6 +51,9 @@ import { adminDashboardPagePlugin } from './web/admin-dashboard-page.js';
 import { adminUsersListPagePlugin } from './web/admin-users-list-page.js';
 import { adminUserEditPagePlugin } from './web/admin-user-edit-page.js';
 import { adminUserUpdateRoutePlugin } from './web/admin-user-update-route.js';
+import { adminInvitesListPagePlugin } from './web/admin-invites-list-page.js';
+import { adminInviteCreateRoutePlugin } from './web/admin-invite-create-route.js';
+import { adminInviteRevokeRoutePlugin } from './web/admin-invite-revoke-route.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -445,6 +448,24 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // _csrf body field. C5/C6-AD-PR audit-log via app.log.info on success
   // (BigInt-safe via patchForJson).
   await app.register(adminUserUpdateRoutePlugin);
+
+  // Plan 8d Task 5: GET /admin/invites -- list active/consumed/expired invites.
+  // Forwards to inner GET /api/v1/admin/invites. preHandler:
+  // app.requireAdminSession. Cache-Control: no-store. NOT fp-wrapped.
+  await app.register(adminInvitesListPagePlugin);
+
+  // Plan 8d Task 5: POST /admin/invites -- one-time-reveal invite-create flow
+  // mirroring Plan-8c api-key-create. Forwards to inner POST /api/v1/admin/
+  // invites and renders admin-invite-created.hbs DIRECTLY with the raw token
+  // and Cache-Control: no-store (C1-PR/C2-PR/C7-PR). Audit-log payload
+  // whitelist NEVER includes the raw token (C5-PR).
+  await app.register(adminInviteCreateRoutePlugin);
+
+  // Plan 8d Task 5: POST /admin/invites/:id/revoke -- delegates to inner
+  // DELETE /api/v1/admin/invites/:id. 204 -> 303 ?updateflash=revoked.
+  // 404 -> 404 HTML (consumed/missing/foreign collapsed; preserves
+  // audit-trail invariant Plan-7's deleteMany enforces).
+  await app.register(adminInviteRevokeRoutePlugin);
 
   // Plan 8a Task 6: Accept-aware 404/500 (BFF). MUST be registered LAST so
   // the catch-all setNotFoundHandler doesn't shadow real routes registered
