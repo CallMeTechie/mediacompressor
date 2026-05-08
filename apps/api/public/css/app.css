@@ -131,3 +131,8 @@ body {
 .profile-table code { font-size: 0.85em; color: var(--color-muted); }
 .session-row.current { background: rgba(79, 142, 247, 0.08); }
 .profile-summary { margin-bottom: 1.5rem; }
+
+/* Plan 8c Task 4 — API-key one-time-reveal page */
+.api-key-detail dt { font-weight: 600; margin-top: 0.5rem; }
+.api-key-detail dd { margin: 0 0 0.25rem 0; }
+.api-key-secret { user-select: all; word-break: break-all; }
