@@ -48,6 +48,9 @@ import { uploadWizardPagePlugin } from './web/upload-wizard-page.js';
 import { i18nFastifyPlugin } from './web/i18n.js';
 import { localeRoutePlugin } from './web/locale-route.js';
 import { adminDashboardPagePlugin } from './web/admin-dashboard-page.js';
+import { adminUsersListPagePlugin } from './web/admin-users-list-page.js';
+import { adminUserEditPagePlugin } from './web/admin-user-edit-page.js';
+import { adminUserUpdateRoutePlugin } from './web/admin-user-update-route.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -422,6 +425,26 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // i18nFastifyPlugin (uses app.i18n + req.locale), and BEFORE
   // errorPagesPlugin (the catch-all 404). NOT fp-wrapped (no decorators).
   await app.register(adminDashboardPagePlugin);
+
+  // Plan 8d Task 4: GET /admin/users -- paginated user list. Forwards to
+  // inner GET /api/v1/admin/users via app.inject(). preHandler:
+  // app.requireAdminSession (303 unauth, 403 non-admin). Cache-Control:
+  // no-store, max-age=0. Registered AFTER adminDashboardPagePlugin (sibling
+  // ordering) and BEFORE errorPagesPlugin (the catch-all 404). NOT fp-wrapped
+  // (no decorators).
+  await app.register(adminUsersListPagePlugin);
+
+  // Plan 8d Task 4: GET /admin/users/:id -- edit-form for a single user.
+  // Reads user via Prisma directly (Plan-7 admin JSON-API has no single-user
+  // GET). preHandler: app.requireAdminSession. Cache-Control: no-store.
+  await app.register(adminUserEditPagePlugin);
+
+  // Plan 8d Task 4: POST /admin/users/:id -- delegates to inner
+  // PATCH /api/v1/admin/users/:id via app.inject(). preHandler chain
+  // [requireAdminSession, csrfProtection]. Rev. 2.2 manual safeParse for
+  // _csrf body field. C5/C6-AD-PR audit-log via app.log.info on success
+  // (BigInt-safe via patchForJson).
+  await app.register(adminUserUpdateRoutePlugin);
 
   // Plan 8a Task 6: Accept-aware 404/500 (BFF). MUST be registered LAST so
   // the catch-all setNotFoundHandler doesn't shadow real routes registered

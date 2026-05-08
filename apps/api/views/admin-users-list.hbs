@@ -1,0 +1,45 @@
+<header class="page-header">
+  <h1>{{t 'page_title_users'}}</h1>
+  <nav class="page-nav">
+    <a href="/admin">{{t 'nav_dashboard'}}</a>
+    <a href="/admin/invites">{{t 'nav_invites'}}</a>
+    <a href="/admin/stats">{{t 'nav_stats'}}</a>
+  </nav>
+</header>
+
+{{> flash}}
+
+{{#if users.length}}
+<table class="admin-table">
+  <thead>
+    <tr>
+      <th>{{t 'users_table_email'}}</th>
+      <th>{{t 'users_table_role'}}</th>
+      <th>{{t 'users_table_status'}}</th>
+      <th>{{t 'users_table_quotas'}}</th>
+      <th>{{t 'users_table_actions'}}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each users}}
+      <tr>
+        <td>{{email}}</td>
+        <td>{{role}}</td>
+        <td>{{status}}</td>
+        <td>
+          <span class="muted">{{storageQuota}} / {{parallelQuota}} / {{hourlyQuota}}</span>
+        </td>
+        <td>
+          <a href="/admin/users/{{id}}">{{t 'users_table_edit'}}</a>
+        </td>
+      </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+
+{{#if nextCursor}}
+  <p>
+    <a href="/admin/users?cursor={{nextCursor}}">{{t 'users_table_next_page'}}</a>
+  </p>
+{{/if}}

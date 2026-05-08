@@ -1,0 +1,45 @@
+<header class="page-header">
+  <h1>{{t 'page_title_edit_user'}}</h1>
+  <nav class="page-nav">
+    <a href="/admin">{{t 'nav_dashboard'}}</a>
+    <a href="/admin/users">{{t 'nav_users'}}</a>
+  </nav>
+</header>
+
+{{> flash}}
+
+<form method="POST" action="/admin/users/{{user.id}}" class="admin-form">
+  {{> csrf}}
+
+  <p>
+    <strong>{{t 'users_table_email'}}:</strong> {{user.email}}
+  </p>
+
+  <p>
+    <label for="status">{{t 'edit_user_label_status'}}</label>
+    <select id="status" name="status">
+      <option value="active" {{#ifEq user.status 'active'}}selected{{/ifEq}}>active</option>
+      <option value="disabled" {{#ifEq user.status 'disabled'}}selected{{/ifEq}}>disabled</option>
+    </select>
+  </p>
+
+  <p>
+    <label for="storageQuota">{{t 'edit_user_label_storage_quota'}}</label>
+    <input id="storageQuota" name="storageQuota" type="text" inputmode="numeric" pattern="[0-9]+" value="{{user.storageQuota}}">
+  </p>
+
+  <p>
+    <label for="parallelQuota">{{t 'edit_user_label_parallel_quota'}}</label>
+    <input id="parallelQuota" name="parallelQuota" type="number" min="1" max="100" value="{{user.parallelQuota}}">
+  </p>
+
+  <p>
+    <label for="hourlyQuota">{{t 'edit_user_label_hourly_quota'}}</label>
+    <input id="hourlyQuota" name="hourlyQuota" type="number" min="1" max="1000" value="{{user.hourlyQuota}}">
+  </p>
+
+  <p>
+    <button type="submit" class="btn">{{t 'edit_user_button_save'}}</button>
+    <a href="/admin/users" class="btn-link">{{t 'edit_user_button_cancel'}}</a>
+  </p>
+</form>
