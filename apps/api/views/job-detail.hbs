@@ -14,7 +14,9 @@
        data-fragment-url="/jobs/{{job.id}}?fragment=1"
        hx-ext="sse"
        sse-connect="/api/v1/jobs/{{job.id}}/events"
-       sse-swap="progress,status,snapshot">
+       hx-get="/jobs/{{job.id}}?fragment=1"
+       hx-trigger="sse:status, sse:progress, sse:snapshot"
+       hx-swap="innerHTML">
     {{> job-detail-status job}}
   </div>
   <p>Kind: {{job.kind}} &middot; Profile: {{job.profile}}</p>

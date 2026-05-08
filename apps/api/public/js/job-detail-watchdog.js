@@ -45,12 +45,16 @@
       lastEventAt = Date.now();
     });
 
+    // FU1: SSE mode now uses hx-get + hx-trigger="sse:..." (not sse-swap), so
+    // the SSE event TRIGGERS an HTMX-GET to the fragment route, which renders
+    // the styled status-badge from job-detail-status.hbs. Switching to polling
+    // means: keep hx-get/hx-swap, but replace `hx-trigger="sse:..."` with
+    // `hx-trigger="every 3s"` and tear down the SSE connection.
     function switchToPolling() {
       if (mode === 'polling') return;
       mode = 'polling';
       target.removeAttribute('hx-ext');
       target.removeAttribute('sse-connect');
-      target.removeAttribute('sse-swap');
       target.setAttribute('hx-get', target.dataset.fragmentUrl);
       target.setAttribute('hx-trigger', 'every 3s');
       target.setAttribute('hx-swap', 'innerHTML');
@@ -63,10 +67,9 @@
       mode = 'sse';
       target.setAttribute('hx-ext', 'sse');
       target.setAttribute('sse-connect', target.dataset.sseUrl);
-      target.setAttribute('sse-swap', 'progress,status,snapshot');
-      target.removeAttribute('hx-get');
-      target.removeAttribute('hx-trigger');
-      target.removeAttribute('hx-swap');
+      target.setAttribute('hx-get', target.dataset.fragmentUrl);
+      target.setAttribute('hx-trigger', 'sse:status, sse:progress, sse:snapshot');
+      target.setAttribute('hx-swap', 'innerHTML');
       if (window.htmx) window.htmx.process(target);
       lastEventAt = Date.now();
     }

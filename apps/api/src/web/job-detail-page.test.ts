@@ -458,6 +458,43 @@ describe('web/job-detail-page', () => {
     }
   });
 
+  // FU1 PFLICHT-REGRESSIONSTEST — SSE swap pattern uses hx-trigger + hx-get,
+  // NOT sse-swap. htmx-ext-sse's `sse-swap` would inject the raw JSON event-
+  // payload into the DOM (e.g. {"status":"succeeded","outputBytes":340}),
+  // clobbering the styled status-badge with raw text. Using `hx-trigger="sse:..."`
+  // makes the SSE event trigger an HTMX GET to the fragment route, which re-
+  // renders the server-side template with the styled <span class="status ...">
+  // badge. This regression test pins the attribute set so a future "fix" that
+  // re-introduces `sse-swap` fails LOUD instead of silent-broken UX.
+  it('FU1: GET /jobs/:id contains hx-trigger="sse:..." + hx-get (NOT sse-swap)', async () => {
+    const app = await buildServer(config);
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: 'job-detail-sse@test.invalid' },
+      });
+      const job = await seedJob({
+        userId: user!.id,
+        inputFilename: 'fu1-trigger.png',
+        status: 'queued',
+      });
+      const cookie = await login(app, 'job-detail-sse@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: `/jobs/${job.id}`,
+        headers: { accept: 'text/html', cookie },
+      });
+      expect(res.statusCode).toBe(200);
+      // Must contain the new hx-trigger + hx-get pattern.
+      expect(res.body).toContain('hx-trigger="sse:status, sse:progress, sse:snapshot"');
+      expect(res.body).toContain(`hx-get="/jobs/${job.id}?fragment=1"`);
+      expect(res.body).toContain('hx-swap="innerHTML"');
+      // Must NOT contain the legacy sse-swap attribute (which would inject raw JSON).
+      expect(res.body).not.toContain('sse-swap=');
+    } finally {
+      await app.close();
+    }
+  });
+
   // Task 4 Test 2 — fragment route returns ONLY the partial (no shell).
   it('Task 4: GET /jobs/:id?fragment=1 → returns ONLY job-detail-status partial (no <html>/<head>/<body>)', async () => {
     const app = await buildServer(config);
