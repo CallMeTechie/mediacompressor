@@ -198,4 +198,48 @@ describe('web/admin-user-edit-page', () => {
       await app.close();
     }
   });
+
+  // 5. Concern #2 -- ?updateflash=csrf-stale renders the translated banner
+  // so the inner-403 redirect from POST /admin/users/:id back to GET
+  // /admin/users/:id?updateflash=csrf-stale shows the user the CSRF-stale
+  // message. Unknown ?updateflash values fall through silently (allowlist).
+  it('Concern #2: GET /admin/users/:id?updateflash=csrf-stale renders translated flash banner', async () => {
+    const app = await buildServer(config);
+    try {
+      const cookie = await loginAndCookies(app, TEST_EMAIL_ADMIN);
+      const res = await app.inject({
+        method: 'GET',
+        url: `/admin/users/${targetUserId}?updateflash=csrf-stale`,
+        headers: { accept: 'text/html', cookie },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.body as string;
+      // Flash banner present with the translated csrf-stale message
+      // (English locale by default in tests).
+      expect(body).toMatch(/<div[^>]*class="flash flash-error"/);
+      expect(body).toMatch(/session token had to be refreshed/i);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // 6. Concern #2 -- unknown ?updateflash value is allowlist-gated to null,
+  // so no flash banner renders (no XSS / message-injection vector).
+  it('Concern #2: GET /admin/users/:id?updateflash=evil renders NO flash banner', async () => {
+    const app = await buildServer(config);
+    try {
+      const cookie = await loginAndCookies(app, TEST_EMAIL_ADMIN);
+      const res = await app.inject({
+        method: 'GET',
+        url: `/admin/users/${targetUserId}?updateflash=evil%3Cscript%3E`,
+        headers: { accept: 'text/html', cookie },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.body as string;
+      // No flash banner element at all.
+      expect(body).not.toMatch(/<div[^>]*class="flash /);
+    } finally {
+      await app.close();
+    }
+  });
 });

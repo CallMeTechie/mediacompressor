@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { FastifyPluginAsync } from 'fastify';
+import type { AdminUserFlashKey } from './admin-user-flash-keys.js';
 
 /**
  * Plan 8d Task 4: POST /admin/users/:id -- HTML form-target that delegates
@@ -23,9 +24,10 @@ import type { FastifyPluginAsync } from 'fastify';
  * mirrors Plan-8b's jobs-events-route fix.
  *
  * Inner-status mapping:
- *  - 200 / 204 -> 303 /admin/users?updateflash=updated  (success)
- *  - 401       -> clearCookie + 303 /login              (session race)
- *  - 403       -> 303 /admin/users?updateflash=csrf-stale (CSRF rotation)
+ *  - 200 / 204 -> 303 /admin/users?updateflash=updated      (success)
+ *  - 400       -> 400 HTML edit-form re-render with error   (BFF/inner drift)
+ *  - 401       -> clearCookie + 303 /login                  (session race)
+ *  - 403       -> 303 /admin/users/:id?updateflash=csrf-stale (CSRF rotation)
  *  - 404       -> 404 HTML
  *  - else      -> 500 HTML
  *
@@ -59,7 +61,10 @@ export const adminUserUpdateRoutePlugin: FastifyPluginAsync = async (app) => {
       const { id } = req.params as z.infer<typeof Params>;
       const parsed = UpdateForm.safeParse(req.body);
       if (!parsed.success) {
-        // Re-render the edit form with a flash, prefilled with current values.
+        // Concern #5: re-fetch user for re-render so the form shows current
+        // DB values rather than the user's submitted (invalid) values. Adds
+        // one DB roundtrip per malformed POST -- acceptable for this admin-
+        // only path; not a public endpoint.
         const user = await prisma.user.findUnique({
           where: { id },
           select: {
@@ -91,19 +96,36 @@ export const adminUserUpdateRoutePlugin: FastifyPluginAsync = async (app) => {
 
       const { _csrf, ...patch } = parsed.data;
 
-      // C6-AD-PR: BigInt -> string for inner JSON payload AND audit-log.
-      // Plan-7's PatchBody uses z.coerce.bigint(), which accepts numeric
-      // strings. JSON has no BigInt literal anyway.
-      const patchForJson: Record<string, unknown> = { ...patch };
-      if (patch.storageQuota !== undefined) {
-        patchForJson.storageQuota = patch.storageQuota.toString();
-      }
+      // C6-AD-PR + concern #6: BigInt -> string for inner JSON payload AND
+      // audit-log. Plan-7's PatchBody uses z.coerce.bigint(), which accepts
+      // numeric strings. JSON has no BigInt literal anyway. Explicit type
+      // (instead of Record<string, unknown>) keeps the status / parallel /
+      // hourly union narrow downstream (logger + inject payload).
+      type PatchForJson = Omit<
+        z.infer<typeof UpdateForm>,
+        '_csrf' | 'storageQuota'
+      > & {
+        storageQuota?: string;
+      };
+      const patchForJson: PatchForJson = {
+        ...(patch.status !== undefined ? { status: patch.status } : {}),
+        ...(patch.storageQuota !== undefined
+          ? { storageQuota: patch.storageQuota.toString() }
+          : {}),
+        ...(patch.parallelQuota !== undefined
+          ? { parallelQuota: patch.parallelQuota }
+          : {}),
+        ...(patch.hourlyQuota !== undefined
+          ? { hourlyQuota: patch.hourlyQuota }
+          : {}),
+      };
 
       // Forward CSRF: header takes precedence over body (matches the global
-      // getToken-shim wired in server.ts).
+      // getToken-shim wired in server.ts). Concern #4: fall-through ternary
+      // is equivalent to the previous `(... ?? undefined) ?? _csrf` and reads
+      // cleaner.
       const headerToken = req.headers['x-csrf-token'];
-      const csrfToken =
-        (typeof headerToken === 'string' ? headerToken : undefined) ?? _csrf;
+      const csrfToken = typeof headerToken === 'string' ? headerToken : _csrf;
 
       const inner = await app.inject({
         method: 'PATCH',
@@ -131,20 +153,84 @@ export const adminUserUpdateRoutePlugin: FastifyPluginAsync = async (app) => {
           },
           'admin action',
         );
+        const successKey: AdminUserFlashKey = 'updated';
         return reply
           .code(303)
-          .header('location', '/admin/users?updateflash=updated')
+          .header('location', `/admin/users?updateflash=${successKey}`)
           .send();
+      }
+      if (inner.statusCode === 400) {
+        // Concern #1: BFF UpdateForm and Plan-7 PatchBody bounds match today
+        // so this branch is unreachable in production. If they ever drift,
+        // re-render the edit-form with the inner's error message instead of
+        // a generic 500. Defensive parse: inner body might not be JSON.
+        let innerErrorMessage: string | undefined;
+        try {
+          const payload = inner.json() as
+            | { error?: { message?: unknown } }
+            | undefined;
+          if (typeof payload?.error?.message === 'string') {
+            innerErrorMessage = payload.error.message;
+          }
+        } catch {
+          // Inner body wasn't JSON; fall through to translated default.
+        }
+        const user = await prisma.user.findUnique({
+          where: { id },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            status: true,
+            storageQuota: true,
+            parallelQuota: true,
+            hourlyQuota: true,
+          },
+        });
+        if (!user) {
+          return reply.code(404).view('404', { title: 'Not found', path: req.url });
+        }
+        return reply.code(400).view('admin-user-edit', {
+          title: app.i18n.t('page_title_edit_user', { lng: req.locale }),
+          flash: {
+            level: 'error',
+            message:
+              innerErrorMessage ??
+              app.i18n.t('flash_invalid_input', { lng: req.locale }),
+          },
+          user: {
+            ...user,
+            // Re-render with submitted values so the admin doesn't lose typed
+            // input. patchForJson holds the (already-validated-by-BFF) values.
+            status: patchForJson.status ?? user.status,
+            storageQuota:
+              patchForJson.storageQuota ?? user.storageQuota.toString(),
+            parallelQuota: patchForJson.parallelQuota ?? user.parallelQuota,
+            hourlyQuota: patchForJson.hourlyQuota ?? user.hourlyQuota,
+          },
+          _csrfField: reply.renderCsrfField(),
+        });
       }
       if (inner.statusCode === 401) {
         reply.clearCookie('mc_session', { path: '/' });
         return reply.code(303).header('location', '/login').send();
       }
       if (inner.statusCode === 403) {
-        return reply
-          .code(303)
-          .header('location', '/admin/users?updateflash=csrf-stale')
-          .send();
+        // Concern #2: redirect to the EDIT-form (not the list) so the admin
+        // can retry the update against the rotated CSRF token without losing
+        // their place. Mirrors the api-key-create precedent.
+        //
+        // Open-redirect defense-in-depth: `id` is already a zod-validated
+        // UUID (Params.id = z.string().uuid()), so it cannot contain `/`,
+        // `?`, `#`, or `\`. The explicit regex re-check below makes that
+        // invariant local-and-obvious so static analyzers don't have to
+        // trace the value back through the schema.
+        if (!/^[0-9a-f-]{36}$/i.test(id)) {
+          return reply.code(404).view('404', { title: 'Not found', path: req.url });
+        }
+        const csrfStaleKey: AdminUserFlashKey = 'csrf-stale';
+        const safeLocation = '/admin/users/' + id + '?updateflash=' + csrfStaleKey;
+        return reply.code(303).header('location', safeLocation).send();
       }
       if (inner.statusCode === 404) {
         return reply.code(404).view('404', { title: 'Not found', path: req.url });

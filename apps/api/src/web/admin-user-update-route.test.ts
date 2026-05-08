@@ -20,6 +20,7 @@ const TEST_EMAIL_ADMIN_SELF = 'admin-user-update-self@test.invalid';
 const TEST_EMAIL_ADMIN_BIG = 'admin-user-update-big@test.invalid';
 const TEST_EMAIL_ADMIN_401 = 'admin-user-update-401@test.invalid';
 const TEST_EMAIL_ADMIN_403 = 'admin-user-update-403@test.invalid';
+const TEST_EMAIL_ADMIN_400 = 'admin-user-update-400@test.invalid';
 const TEST_EMAIL_TARGET = 'admin-user-update-target@test.invalid';
 
 const TEST_EMAILS = [
@@ -29,6 +30,7 @@ const TEST_EMAILS = [
   TEST_EMAIL_ADMIN_BIG,
   TEST_EMAIL_ADMIN_401,
   TEST_EMAIL_ADMIN_403,
+  TEST_EMAIL_ADMIN_400,
   TEST_EMAIL_TARGET,
 ];
 
@@ -75,6 +77,7 @@ describe('web/admin-user-update-route', () => {
       TEST_EMAIL_ADMIN_BIG,
       TEST_EMAIL_ADMIN_401,
       TEST_EMAIL_ADMIN_403,
+      TEST_EMAIL_ADMIN_400,
     ]) {
       await createTestUser(prisma, { email, password: 'hunter22hunter22' });
       await prisma.user.update({ where: { email }, data: { role: 'admin' } });
@@ -455,7 +458,10 @@ describe('web/admin-user-update-route', () => {
           payload: `status=active&_csrf=${encodeURIComponent(csrf)}`,
         });
         expect([302, 303]).toContain(res.statusCode);
-        expect(res.headers.location).toBe('/admin/users?updateflash=csrf-stale');
+        // Concern #2: redirect goes to the EDIT-form for retry, not the list.
+        expect(res.headers.location).toBe(
+          `/admin/users/${targetUserId}?updateflash=csrf-stale`,
+        );
         // mc_session NOT cleared (CSRF rotation race, session valid).
         const setCookie = res.headers['set-cookie'];
         const cookies = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
@@ -469,6 +475,82 @@ describe('web/admin-user-update-route', () => {
       } finally {
         await app.close();
       }
+    }
+  });
+
+  // 7. Concern #1 PFLICHT -- inner 400 (BFF/inner schema drift). Mock the
+  // inner PATCH to return 400 with a JSON error body. The route must:
+  //  - respond 400 (NOT 500)
+  //  - re-render the edit-form with the inner's error message
+  //  - preserve the admin's submitted form values in the inputs
+  it('Concern #1: inner 400 -> 400 HTML edit-form re-render with inner error message', async () => {
+    const app = await buildServer(config);
+    try {
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
+        app,
+        TEST_EMAIL_ADMIN_400,
+        targetUserId,
+      );
+      const innerErrorMsg = 'storageQuota must be a multiple of 1024';
+      const innerErrorBody = JSON.stringify({
+        error: { code: 'INVALID_INPUT', message: innerErrorMsg },
+      });
+      const originalInject = app.inject.bind(app);
+      const fakeInject = ((opts: unknown) => {
+        const isInnerPatch =
+          typeof opts === 'object' &&
+          opts !== null &&
+          'method' in opts &&
+          'url' in opts &&
+          (opts as { method?: string }).method === 'PATCH' &&
+          typeof (opts as { url?: string }).url === 'string' &&
+          (opts as { url: string }).url.startsWith('/api/v1/admin/users/');
+        if (isInnerPatch) {
+          return Promise.resolve({
+            statusCode: 400,
+            headers: { 'content-type': 'application/json' },
+            body: innerErrorBody,
+            payload: innerErrorBody,
+            rawPayload: Buffer.from(innerErrorBody),
+            cookies: [],
+            json: () => JSON.parse(innerErrorBody),
+            trailers: {},
+          });
+        }
+        return (originalInject as (o: unknown) => unknown)(opts);
+      }) as unknown as typeof app.inject;
+      const injectSpy = vi.spyOn(app, 'inject').mockImplementation(fakeInject);
+
+      // Submit a value that the BFF UpdateForm accepts but pretend the inner
+      // rejects (mocked above). Use a non-default storageQuota so we can
+      // assert it round-trips into the re-rendered form.
+      const submittedQuota = '999999';
+      const res = await originalInject({
+        method: 'POST',
+        url: `/admin/users/${targetUserId}`,
+        headers: {
+          cookie: cookieHeader,
+          'content-type': 'application/x-www-form-urlencoded',
+          'x-csrf-token': csrf,
+          accept: 'text/html',
+        },
+        payload: `storageQuota=${submittedQuota}&_csrf=${encodeURIComponent(csrf)}`,
+      });
+      expect(res.statusCode).toBe(400);
+      const body = res.body as string;
+      // Edit form re-rendered (form action targets the same edit-URL).
+      // Plain substring assertion avoids the dynamic-regex lint warning.
+      expect(body).toContain(`action="/admin/users/${targetUserId}"`);
+      // Inner's error message surfaces in the flash banner.
+      expect(body).toContain(innerErrorMsg);
+      // Submitted storageQuota value is preserved in the input. Plain
+      // substring assertion avoids the dynamic-regex lint warning.
+      expect(body).toContain(`name="storageQuota"`);
+      expect(body).toContain(`value="${submittedQuota}"`);
+
+      injectSpy.mockRestore();
+    } finally {
+      await app.close();
     }
   });
 });

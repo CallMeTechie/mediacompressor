@@ -1,5 +1,9 @@
 import { z } from 'zod';
 import type { FastifyPluginAsync } from 'fastify';
+import {
+  ADMIN_USER_FLASH_MAP,
+  type AdminUserFlashKey,
+} from './admin-user-flash-keys.js';
 
 /**
  * Plan 8d Task 4: GET /admin/users -- paginated user list (BFF).
@@ -30,12 +34,8 @@ const Query = z.object({
   updateflash: z.string().optional(),
 });
 
-// C1-AD-PR + C3-PR allowlist gate: only known flash-keys render. Any
-// arbitrary `?updateflash=evil` value falls through to `null`.
-const FLASH_MAP = new Map<string, { level: 'error' | 'info'; messageKey: string }>([
-  ['updated', { level: 'info', messageKey: 'flash_user_updated' }],
-  ['csrf-stale', { level: 'error', messageKey: 'flash_csrf_stale' }],
-]);
+// Allowlist + i18n-key map lives in admin-user-flash-keys.ts so the
+// list-page and edit-page render identical banners (concern #3).
 
 export const adminUsersListPagePlugin: FastifyPluginAsync = async (app) => {
   app.get(
@@ -69,7 +69,9 @@ export const adminUsersListPagePlugin: FastifyPluginAsync = async (app) => {
         nextCursor: string | null;
       };
 
-      const flashEntry = q.updateflash ? FLASH_MAP.get(q.updateflash) : undefined;
+      const flashEntry = q.updateflash
+        ? ADMIN_USER_FLASH_MAP.get(q.updateflash as AdminUserFlashKey)
+        : undefined;
       const flash = flashEntry
         ? {
             level: flashEntry.level,

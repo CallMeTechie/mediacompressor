@@ -945,6 +945,14 @@
         "parameters": [
           {
             "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "updateflash",
+            "required": false
+          },
+          {
+            "schema": {
               "type": "string",
               "format": "uuid"
             },
