@@ -1,0 +1,273 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createPrismaClient, type PrismaClient } from '@mediacompressor/db';
+import { hashSessionToken } from '@mediacompressor/auth';
+import {
+  TEST_API_KEY_PEPPER,
+  TEST_SESSION_SECRET,
+  TEST_CSRF_SECRET,
+  testDatabaseUrl,
+  testRedisUrl,
+  createTestUser,
+  cleanupTestUsers,
+  resetLoginRateLimits,
+} from '@mediacompressor/test-helpers';
+import IORedis from 'ioredis';
+import { buildServer } from '../server.js';
+import type { Config } from '../config.js';
+
+const TEST_EMAILS = [
+  'profile@test.invalid',
+  'profile-multi@test.invalid',
+  'profile-xss@test.invalid',
+  'profile-flash@test.invalid',
+];
+
+const config: Config = {
+  DATABASE_URL: testDatabaseUrl(),
+  REDIS_URL: testRedisUrl(),
+  SESSION_SECRET: TEST_SESSION_SECRET,
+  CSRF_SECRET: TEST_CSRF_SECRET,
+  API_KEY_PEPPER: TEST_API_KEY_PEPPER,
+  CORS_ALLOWED_ORIGINS: 'http://localhost:5173',
+  PORT: 0,
+  NODE_ENV: 'test',
+  LOG_LEVEL: 'error',
+  ARGON2_MAX_CONCURRENCY: 8,
+  TUSD_SHARED_SECRET: 'a'.repeat(64),
+  TUSD_REQUIRE_SHARED_SECRET: true,
+  TUSD_DATA_DIR: '/media/tusd-data',
+  TUSD_FINAL_DIR: '/media/uploads',
+  MEDIA_MOUNT_PATH: '/media',
+  MIN_FREE_BYTES_RESERVE: 1n,
+  TRUSTED_PROXY_CIDR: 'loopback',
+  ENABLE_LEGACY_JOB_STUB: false,
+};
+
+describe('web/profile-page', () => {
+  let prisma: PrismaClient;
+  let redis: IORedis;
+
+  beforeAll(async () => {
+    prisma = createPrismaClient({ databaseUrl: config.DATABASE_URL });
+    redis = new IORedis(config.REDIS_URL);
+    await cleanupTestUsers(prisma, TEST_EMAILS);
+    for (const email of TEST_EMAILS) {
+      await createTestUser(prisma, { email, password: 'hunter22hunter22' });
+    }
+  });
+
+  beforeEach(async () => {
+    await resetLoginRateLimits(redis, TEST_EMAILS);
+  });
+
+  afterAll(async () => {
+    await cleanupTestUsers(prisma, TEST_EMAILS);
+    await prisma.$disconnect();
+    await redis.quit();
+  });
+
+  /**
+   * Logs in via /login and returns the merged cookie header
+   * (mc_session + mc_csrf). Mirrors the loginAndCookies helper from
+   * require-session.test.ts.
+   */
+  async function loginAndCookies(
+    app: Awaited<ReturnType<typeof buildServer>>,
+    email: string,
+  ): Promise<string> {
+    const get = await app.inject({ method: 'GET', url: '/login' });
+    const csrf = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
+    const initialCookies = (Array.isArray(get.headers['set-cookie'])
+      ? get.headers['set-cookie']
+      : [get.headers['set-cookie'] ?? ''])
+      .map((c) => c?.split(';')[0])
+      .filter(Boolean)
+      .join('; ');
+    const post = await app.inject({
+      method: 'POST',
+      url: '/login',
+      headers: {
+        cookie: initialCookies,
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf)}`,
+    });
+    return (Array.isArray(post.headers['set-cookie'])
+      ? post.headers['set-cookie']
+      : [post.headers['set-cookie'] ?? ''])
+      .map((c) => c?.split(';')[0])
+      .filter(Boolean)
+      .join('; ');
+  }
+
+  it('GET /profile (no session) → 303 to /login', async () => {
+    const app = await buildServer(config);
+    try {
+      const res = await app.inject({ method: 'GET', url: '/profile' });
+      expect([302, 303]).toContain(res.statusCode);
+      expect(res.headers.location).toBe('/login');
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('GET /profile (session) → 200 with email + quota summary + sessions table', async () => {
+    const app = await buildServer(config);
+    try {
+      const cookie = await loginAndCookies(app, 'profile@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: '/profile',
+        headers: { cookie, accept: 'text/html' },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['content-type']).toMatch(/text\/html/);
+      expect(res.body).toContain('profile@test.invalid');
+      // Quota summary
+      expect(res.body).toMatch(/bytes storage/);
+      expect(res.body).toMatch(/parallel/);
+      // Sessions table header
+      expect(res.body).toMatch(/<table class="profile-table">/);
+      expect(res.body).toMatch(/User-Agent/);
+      // Nav to API Keys + Sign out
+      expect(res.body).toMatch(/href="\/profile\/api-keys"/);
+      expect(res.body).toMatch(/action="\/logout"/);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('GET /profile (session) → CURRENT session row carries class="session-row current"', async () => {
+    const app = await buildServer(config);
+    try {
+      const cookie = await loginAndCookies(app, 'profile@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: '/profile',
+        headers: { cookie, accept: 'text/html' },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toMatch(/class="session-row current"/);
+      // and "(this device)" muted text on the current row
+      expect(res.body).toMatch(/\(this device\)/);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('GET /profile (multi-session) → both visible; only the cookie-matching one is current', async () => {
+    const app = await buildServer(config);
+    try {
+      // Seed an extra non-current session for this user.
+      const user = await prisma.user.findUnique({
+        where: { email: 'profile-multi@test.invalid' },
+      });
+      const otherToken = 'other-device-token-xxxxxxxxxxxxxx';
+      const otherTokenHash = hashSessionToken(
+        otherToken,
+        Buffer.from(config.SESSION_SECRET),
+      );
+      await prisma.session.create({
+        data: {
+          userId: user!.id,
+          tokenHash: otherTokenHash,
+          userAgent: 'OtherBrowser/1.0',
+          ip: '10.20.30.40',
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        },
+      });
+
+      const cookie = await loginAndCookies(app, 'profile-multi@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: '/profile',
+        headers: { cookie, accept: 'text/html' },
+      });
+      expect(res.statusCode).toBe(200);
+      // Both sessions visible.
+      expect(res.body).toContain('OtherBrowser/1.0');
+      // Exactly one row marked current.
+      const currentMatches = res.body.match(/class="session-row current"/g) ?? [];
+      expect(currentMatches.length).toBe(1);
+      // The non-current row carries a revoke form (no "this device" on it).
+      expect(res.body).toMatch(/action="\/profile\/sessions\/[^"]+\/revoke"/);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('GET /profile response Cache-Control: no-store', async () => {
+    const app = await buildServer(config);
+    try {
+      const cookie = await loginAndCookies(app, 'profile@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: '/profile',
+        headers: { cookie, accept: 'text/html' },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['cache-control']).toMatch(/no-store/);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // WC-PR1 PFLICHT — XSS via session.userAgent: Handlebars must escape the raw
+  // <script>…</script> string. Without escape, a malicious user-agent could
+  // inject stored XSS into the profile page.
+  it('WC-PR1: session.userAgent containing <script> tag is HTML-escaped (no stored-XSS)', async () => {
+    const app = await buildServer(config);
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: 'profile-xss@test.invalid' },
+      });
+      // Seed a session with a malicious user-agent FIRST. Then we log in,
+      // which creates a SECOND (current) session for the same user. Both
+      // are returned by the listing query.
+      const evilUA = '<script>alert(1)</script>';
+      const evilToken = 'evil-ua-token-xxxxxxxxxxxxxxxxxxxx';
+      const evilHash = hashSessionToken(evilToken, Buffer.from(config.SESSION_SECRET));
+      await prisma.session.create({
+        data: {
+          userId: user!.id,
+          tokenHash: evilHash,
+          userAgent: evilUA,
+          ip: '127.0.0.1',
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        },
+      });
+
+      const cookie = await loginAndCookies(app, 'profile-xss@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: '/profile',
+        headers: { cookie, accept: 'text/html' },
+      });
+      expect(res.statusCode).toBe(200);
+      // Escape-presence: rendered HTML-escaped form.
+      expect(res.body).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+      // Raw-absence: must not contain the literal evil substring anywhere.
+      expect(res.body).not.toContain(evilUA);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // C3-PR PFLICHT — revokeflash allowlist gate: arbitrary query values must
+  // NOT be rendered as flash text (URL-injection phishing vector).
+  it('C3-PR: GET /profile?revokeflash=evil-marker-profile does NOT render the marker', async () => {
+    const app = await buildServer(config);
+    try {
+      const cookie = await loginAndCookies(app, 'profile-flash@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: '/profile?revokeflash=evil-marker-profile',
+        headers: { cookie, accept: 'text/html' },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.body).not.toContain('evil-marker-profile');
+    } finally {
+      await app.close();
+    }
+  });
+});

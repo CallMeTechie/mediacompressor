@@ -35,6 +35,7 @@ import { logoutRoutePlugin } from './web/logout-route.js';
 import { errorPagesPlugin } from './web/error-pages.js';
 import { requireSessionPlugin } from './web/require-session.js';
 import { dashboardPagePlugin } from './web/dashboard-page.js';
+import { profilePagePlugin } from './web/profile-page.js';
 import { jobListPagePlugin } from './web/job-list-page.js';
 import { jobDetailPagePlugin } from './web/job-detail-page.js';
 import { jobCancelRoutePlugin } from './web/job-cancel-route.js';
@@ -310,6 +311,15 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // app.requireSession internally (manual invocation, not a preHandler) so
   // the non-HTML JSON branch can return {status:'ok'} without auth.
   await app.register(dashboardPagePlugin);
+
+  // Plan 8c Task 1: GET /profile — email + quota summary + active-sessions
+  // list (current session highlighted via tokenHash equality so the user
+  // can't accidentally revoke the cookie in use). Registered AFTER
+  // dashboardPagePlugin (which owns `/`) and BEFORE errorPagesPlugin (the
+  // catch-all 404). preHandler: app.requireSession → unauthenticated GETs
+  // 303 to /login. Cache-Control: no-store, max-age=0 (post-login HTML
+  // carries user-bound data).
+  await app.register(profilePagePlugin);
 
   // Plan 8b Task 2: GET /jobs HTML list page with HTMX polling. Registered
   // AFTER dashboardPagePlugin (which owns `/`) and BEFORE errorPagesPlugin
