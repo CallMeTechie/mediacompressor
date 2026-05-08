@@ -37,6 +37,7 @@ import { requireSessionPlugin } from './web/require-session.js';
 import { dashboardPagePlugin } from './web/dashboard-page.js';
 import { profilePagePlugin } from './web/profile-page.js';
 import { sessionRevokeRoutePlugin } from './web/session-revoke-route.js';
+import { apiKeysListPagePlugin } from './web/api-keys-list-page.js';
 import { jobListPagePlugin } from './web/job-list-page.js';
 import { jobDetailPagePlugin } from './web/job-detail-page.js';
 import { jobCancelRoutePlugin } from './web/job-cancel-route.js';
@@ -329,6 +330,16 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // AFTER profilePagePlugin (which renders the form) and BEFORE
   // errorPagesPlugin (the catch-all 404).
   await app.register(sessionRevokeRoutePlugin);
+
+  // Plan 8c Task 3: GET /profile/api-keys — lists the authenticated user's
+  // NON-revoked API keys (id, name, keyPrefix, scopes, createdAt, lastUsedAt).
+  // The raw key is NEVER exposed here — only shown ONCE during create
+  // (Task 4). Revoked keys are EXCLUDED via the `revokedAt: null` filter.
+  // Registered AFTER sessionRevokeRoutePlugin (which owns the session-revoke
+  // form posted from /profile) and BEFORE errorPagesPlugin (the catch-all
+  // 404). preHandler: app.requireSession → unauthenticated GETs 303 to
+  // /login. Cache-Control: no-store, max-age=0.
+  await app.register(apiKeysListPagePlugin);
 
   // Plan 8b Task 2: GET /jobs HTML list page with HTMX polling. Registered
   // AFTER dashboardPagePlugin (which owns `/`) and BEFORE errorPagesPlugin

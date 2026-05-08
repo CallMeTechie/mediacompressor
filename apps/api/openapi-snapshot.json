@@ -708,6 +708,25 @@
         }
       }
     },
+    "/profile/api-keys": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "revokeflash",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
     "/jobs": {
       "get": {
         "parameters": [
