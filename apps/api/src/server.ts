@@ -34,6 +34,7 @@ import { inviteRedeemPagePlugin } from './web/invite-redeem-page.js';
 import { logoutRoutePlugin } from './web/logout-route.js';
 import { errorPagesPlugin } from './web/error-pages.js';
 import { requireSessionPlugin } from './web/require-session.js';
+import { requireAdminSessionPlugin } from './web/require-admin-session.js';
 import { dashboardPagePlugin } from './web/dashboard-page.js';
 import { profilePagePlugin } from './web/profile-page.js';
 import { sessionRevokeRoutePlugin } from './web/session-revoke-route.js';
@@ -191,6 +192,15 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // plugin that reads `app.requireSession` — fp-wrapped (Rev. 2.3 rule) so
   // the decorator bubbles up to the parent FastifyInstance.
   await app.register(requireSessionPlugin);
+
+  // Plan 8d Task 1: requireAdminSession decorator (HTML-aware admin-gate that
+  // wraps requireSession + checks role==='admin' && status==='active'). On
+  // valid-but-non-admin: renders 403 HTML (NOT 303 — non-admin user IS
+  // authenticated, just lacks privileges). MUST be registered AFTER
+  // requireSessionPlugin (it calls app.requireSession) and BEFORE any
+  // admin-page plugin that reads `app.requireAdminSession` — fp-wrapped
+  // (Rev. 2.3 rule).
+  await app.register(requireAdminSessionPlugin);
 
   // Plan 7 Task 6: register @fastify/swagger BEFORE all documented routes —
   // its `onRoute` hook only collects metadata for routes registered after it.
