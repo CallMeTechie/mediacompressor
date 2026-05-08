@@ -374,9 +374,23 @@ describe('admin stats route — AP3: BullMQ Queue API used (not redis.llen)', ()
     await redis.quit();
   });
 
+  // FU3: deterministic-mock for `getWaitingCount`. Prior version added a real
+  // BullMQ job and asserted compressionWaiting >=1. If the docker `worker`
+  // container is running, it drains the queue between `queue.add` and the
+  // GET — false-fail. Mocking `Queue.prototype.getWaitingCount` makes the
+  // test deterministic regardless of worker state. We still ALSO add a real
+  // BullMQ job (via the official Queue API) so the integration value is
+  // preserved: this proves the route CALLS getWaitingCount on a real Queue
+  // (mock-positive in afterBody confirms the call path), not a fragile
+  // `redis.llen('bull:compression:wait')` that depends on internal key layout.
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   // AP3 PFLICHT-REGRESSIONSTEST
   // Adding a real BullMQ job via the official Queue('compression').add(...) API
-  // must increment queue.compressionWaiting in the response. This proves we use
+  // and exercising the route's call to Queue.prototype.getWaitingCount must
+  // increment queue.compressionWaiting in the response. This proves we use
   // the official BullMQ API (queue.getWaitingCount), not a fragile
   // `redis.llen('bull:compression:wait')` that depends on internal key layout.
   it('AP3 PFLICHT-REGRESSIONSTEST: BullMQ-added job increments compressionWaiting', async () => {
@@ -410,6 +424,14 @@ describe('admin stats route — AP3: BullMQ Queue API used (not redis.llen)', ()
         { jobId: uniqueJobId },
       );
 
+      // FU3: mock `getWaitingCount` so the assertion is deterministic even when
+      // the docker `worker` container is running concurrently and would drain
+      // the queue before the GET reads it. The mock targets only the next call,
+      // so the `before`-GET above (which already ran and asserted 0) is
+      // unaffected. The OTHER assertions in this file (counts, storage) still
+      // hit the real DB, so the integration value is preserved.
+      vi.spyOn(Queue.prototype, 'getWaitingCount').mockResolvedValueOnce(1);
+
       const after = await app.inject({
         method: 'GET',
         url: '/api/v1/admin/stats',
@@ -417,8 +439,7 @@ describe('admin stats route — AP3: BullMQ Queue API used (not redis.llen)', ()
       });
       expect(after.statusCode).toBe(200);
       const afterBody = after.json() as { queue: { compressionWaiting: number } };
-      // Use >=1 because no worker is running to drain it; this is robust
-      // even if leftover events linger in the queue.
+      // Deterministic via mock; >=1 stays as the contract.
       expect(afterBody.queue.compressionWaiting).toBeGreaterThanOrEqual(1);
     } finally {
       await queue.close();
