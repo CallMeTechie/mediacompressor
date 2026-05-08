@@ -47,6 +47,7 @@ import { jobCancelRoutePlugin } from './web/job-cancel-route.js';
 import { uploadWizardPagePlugin } from './web/upload-wizard-page.js';
 import { i18nFastifyPlugin } from './web/i18n.js';
 import { localeRoutePlugin } from './web/locale-route.js';
+import { adminDashboardPagePlugin } from './web/admin-dashboard-page.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -412,6 +413,15 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // (the catch-all 404). Uses app.csrfProtection — registered globally near
   // the top of buildServer.
   await app.register(localeRoutePlugin);
+
+  // Plan 8d Task 3: GET /admin -- admin landing page. Renders nav-links to
+  // /admin/users, /admin/invites, /admin/stats plus the locale-switcher form
+  // (C3-AD-PR + C7-AD-PR). preHandler: app.requireAdminSession (303 unauth,
+  // 403 non-admin). Cache-Control: no-store, max-age=0. Registered AFTER
+  // requireAdminSessionPlugin (uses app.requireAdminSession), AFTER
+  // i18nFastifyPlugin (uses app.i18n + req.locale), and BEFORE
+  // errorPagesPlugin (the catch-all 404). NOT fp-wrapped (no decorators).
+  await app.register(adminDashboardPagePlugin);
 
   // Plan 8a Task 6: Accept-aware 404/500 (BFF). MUST be registered LAST so
   // the catch-all setNotFoundHandler doesn't shadow real routes registered

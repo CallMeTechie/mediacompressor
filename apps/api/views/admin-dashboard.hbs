@@ -1,0 +1,36 @@
+<header class="page-header">
+  <h1>{{t 'page_title_dashboard'}}</h1>
+  <nav class="page-nav">
+    <a href="/">Dashboard</a>
+    <a href="/admin/users">{{t 'nav_users'}}</a>
+    <a href="/admin/invites">{{t 'nav_invites'}}</a>
+    <a href="/admin/stats">{{t 'nav_stats'}}</a>
+    <form method="POST" action="/logout" class="inline-form">
+      {{> csrf}}
+      <button type="submit" class="btn-link">Sign out</button>
+    </form>
+  </nav>
+</header>
+
+<section class="admin-summary">
+  <p>{{t 'welcome' email=adminEmail}}</p>
+</section>
+
+{{!-- C3-AD-PR: locale-switcher UI. CSP-clean (no inline JS) -- uses submit-
+buttons rather than a select+onchange. Each button submits the form with its
+own value. The redirectTo hidden field returns the user to /admin after switch.
+C7-AD-PR: current locale's button is disabled + .active styled so the user
+sees which locale is currently set. --}}
+<section class="locale-switcher">
+  <form method="POST" action="/locale" class="inline-form">
+    {{> csrf}}
+    <input type="hidden" name="redirectTo" value="/admin">
+    <span class="muted">{{t 'locale_switcher_label'}}:</span>
+    <button type="submit" name="locale" value="en"
+            class="btn-link{{#ifEq _locale 'en'}} active{{/ifEq}}"
+            {{#ifEq _locale 'en'}}disabled{{/ifEq}}>{{t 'locale_en'}}</button>
+    <button type="submit" name="locale" value="de"
+            class="btn-link{{#ifEq _locale 'de'}} active{{/ifEq}}"
+            {{#ifEq _locale 'de'}}disabled{{/ifEq}}>{{t 'locale_de'}}</button>
+  </form>
+</section>
