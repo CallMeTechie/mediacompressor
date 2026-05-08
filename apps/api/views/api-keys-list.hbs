@@ -1,0 +1,36 @@
+<header class="page-header">
+  <h1>API Keys</h1>
+  <nav class="page-nav">
+    <a href="/profile">Profile</a>
+    <a href="/profile/api-keys/new" class="btn">Create API key</a>
+  </nav>
+</header>
+
+{{> flash}}
+
+{{#if keys.length}}
+<table class="profile-table">
+  <thead><tr><th>Name</th><th>Prefix</th><th>Scopes</th><th>Created</th><th>Last used</th><th></th></tr></thead>
+  <tbody>
+    {{#each keys}}
+      <tr>
+        <td>{{name}}</td>
+        <td><code>{{keyPrefix}}&hellip;</code></td>
+        <td><code>{{#each scopes}}{{this}} {{/each}}</code></td>
+        <td><time datetime="{{createdAt}}">{{createdAt}}</time></td>
+        <td>
+          {{#if lastUsedAt}}<time datetime="{{lastUsedAt}}">{{lastUsedAt}}</time>{{else}}<span class="muted">never</span>{{/if}}
+        </td>
+        <td>
+          <form method="POST" action="/profile/api-keys/{{id}}/revoke" class="inline-form">
+            {{> csrf}}
+            <button type="submit" class="btn-link">Revoke</button>
+          </form>
+        </td>
+      </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p class="muted">No API keys yet. <a href="/profile/api-keys/new">Create your first one</a>.</p>
+{{/if}}

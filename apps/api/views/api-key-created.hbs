@@ -1,0 +1,16 @@
+<header class="page-header">
+  <h1>API key created</h1>
+  <nav class="page-nav"><a href="/profile/api-keys">Back to API keys</a></nav>
+</header>
+
+<div class="flash flash-info">
+  <p><strong>Copy your key NOW. It will not be shown again.</strong></p>
+</div>
+
+<dl class="api-key-detail">
+  <dt>Name</dt><dd>{{keyName}}</dd>
+  <dt>Prefix</dt><dd><code>{{keyPrefix}}</code></dd>
+  <dt>Key</dt><dd><code class="api-key-secret">{{key}}</code></dd>
+</dl>
+
+<p>Use this key in the <code>Authorization: Bearer &lt;key&gt;</code> header of every request.</p>

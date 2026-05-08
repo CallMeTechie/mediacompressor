@@ -35,6 +35,11 @@ import { logoutRoutePlugin } from './web/logout-route.js';
 import { errorPagesPlugin } from './web/error-pages.js';
 import { requireSessionPlugin } from './web/require-session.js';
 import { dashboardPagePlugin } from './web/dashboard-page.js';
+import { profilePagePlugin } from './web/profile-page.js';
+import { sessionRevokeRoutePlugin } from './web/session-revoke-route.js';
+import { apiKeysListPagePlugin } from './web/api-keys-list-page.js';
+import { apiKeyCreateRoutePlugin } from './web/api-key-create-route.js';
+import { apiKeyRevokeRoutePlugin } from './web/api-key-revoke-route.js';
 import { jobListPagePlugin } from './web/job-list-page.js';
 import { jobDetailPagePlugin } from './web/job-detail-page.js';
 import { jobCancelRoutePlugin } from './web/job-cancel-route.js';
@@ -310,6 +315,48 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // app.requireSession internally (manual invocation, not a preHandler) so
   // the non-HTML JSON branch can return {status:'ok'} without auth.
   await app.register(dashboardPagePlugin);
+
+  // Plan 8c Task 1: GET /profile — email + quota summary + active-sessions
+  // list (current session highlighted via tokenHash equality so the user
+  // can't accidentally revoke the cookie in use). Registered AFTER
+  // dashboardPagePlugin (which owns `/`) and BEFORE errorPagesPlugin (the
+  // catch-all 404). preHandler: app.requireSession → unauthenticated GETs
+  // 303 to /login. Cache-Control: no-store, max-age=0 (post-login HTML
+  // carries user-bound data).
+  await app.register(profilePagePlugin);
+
+  // Plan 8c Task 2: POST /profile/sessions/:id/revoke — revoke a specific
+  // session by deleting the row. Refuses to delete the CURRENT session
+  // (that flow is /logout). CSRF-protected. Owner-checked. WC-PR6 uses
+  // crypto.timingSafeEqual for the current-session compare. Registered
+  // AFTER profilePagePlugin (which renders the form) and BEFORE
+  // errorPagesPlugin (the catch-all 404).
+  await app.register(sessionRevokeRoutePlugin);
+
+  // Plan 8c Task 3: GET /profile/api-keys — lists the authenticated user's
+  // NON-revoked API keys (id, name, keyPrefix, scopes, createdAt, lastUsedAt).
+  // The raw key is NEVER exposed here — only shown ONCE during create
+  // (Task 4). Revoked keys are EXCLUDED via the `revokedAt: null` filter.
+  // Registered AFTER sessionRevokeRoutePlugin (which owns the session-revoke
+  // form posted from /profile) and BEFORE errorPagesPlugin (the catch-all
+  // 404). preHandler: app.requireSession → unauthenticated GETs 303 to
+  // /login. Cache-Control: no-store, max-age=0.
+  await app.register(apiKeysListPagePlugin);
+
+  // Plan 8c Task 4: GET /profile/api-keys/new + POST /profile/api-keys —
+  // create form + one-time-reveal flow. Forwards to inner /api/v1/users/me/
+  // api-keys via app.inject() and renders the raw key directly with
+  // Cache-Control:no-store (C1-PR). Registered AFTER apiKeysListPagePlugin
+  // (which owns the list this form is reached from) and BEFORE
+  // errorPagesPlugin (the catch-all 404).
+  await app.register(apiKeyCreateRoutePlugin);
+
+  // Plan 8c Task 4: POST /profile/api-keys/:id/revoke — HTML form-target
+  // that delegates to the JSON-API DELETE /api/v1/users/me/api-keys/:id via
+  // app.inject(). Translates inner statuses into 303 redirects with flash
+  // hints. Registered AFTER apiKeyCreateRoutePlugin and BEFORE
+  // errorPagesPlugin (the catch-all 404).
+  await app.register(apiKeyRevokeRoutePlugin);
 
   // Plan 8b Task 2: GET /jobs HTML list page with HTMX polling. Registered
   // AFTER dashboardPagePlugin (which owns `/`) and BEFORE errorPagesPlugin

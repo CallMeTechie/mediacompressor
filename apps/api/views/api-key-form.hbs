@@ -1,0 +1,16 @@
+<header class="page-header">
+  <h1>Create API key</h1>
+  <nav class="page-nav"><a href="/profile/api-keys">Cancel</a></nav>
+</header>
+
+{{> flash}}
+
+<form method="POST" action="/profile/api-keys" class="api-key-form">
+  {{> csrf}}
+  <div class="form-field">
+    <label for="name">Name</label>
+    <input id="name" name="name" type="text" required maxlength="64" autofocus>
+  </div>
+  <p class="muted">Scopes: <code>jobs:read jobs:write</code></p>
+  <button type="submit" class="btn">Create</button>
+</form>

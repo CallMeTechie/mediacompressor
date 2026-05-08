@@ -1,0 +1,45 @@
+<header class="page-header">
+  <h1>Profile</h1>
+  <nav class="page-nav">
+    <a href="/">Dashboard</a>
+    <a href="/profile/api-keys">API Keys</a>
+    <form method="POST" action="/logout" class="inline-form">
+      {{> csrf}}
+      <button type="submit" class="btn-link">Sign out</button>
+    </form>
+  </nav>
+</header>
+
+{{> flash}}
+
+<section class="profile-summary">
+  <p><strong>{{user.email}}</strong> &middot; {{user.role}} &middot; {{user.status}}</p>
+  <p class="muted">Quota: {{user.storageQuota}} bytes storage &middot; {{user.parallelQuota}} parallel &middot; {{user.hourlyQuota}}/h</p>
+</section>
+
+<section>
+  <h2>Active sessions ({{sessions.length}})</h2>
+  <table class="profile-table">
+    <thead><tr><th>User-Agent</th><th>IP</th><th>Last used</th><th>Expires</th><th></th></tr></thead>
+    <tbody>
+      {{#each sessions}}
+        <tr class="session-row{{#if isCurrent}} current{{/if}}">
+          <td><code>{{userAgent}}</code></td>
+          <td>{{ip}}</td>
+          <td><time datetime="{{lastUsedAt}}">{{lastUsedAt}}</time></td>
+          <td><time datetime="{{expiresAt}}">{{expiresAt}}</time></td>
+          <td>
+            {{#if isCurrent}}
+              <span class="muted">(this device)</span>
+            {{else}}
+              <form method="POST" action="/profile/sessions/{{id}}/revoke" class="inline-form">
+                {{> csrf}}
+                <button type="submit" class="btn-link">Sign out</button>
+              </form>
+            {{/if}}
+          </td>
+        </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</section>
