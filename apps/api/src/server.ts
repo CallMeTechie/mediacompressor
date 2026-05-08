@@ -36,6 +36,7 @@ import { errorPagesPlugin } from './web/error-pages.js';
 import { requireSessionPlugin } from './web/require-session.js';
 import { dashboardPagePlugin } from './web/dashboard-page.js';
 import { profilePagePlugin } from './web/profile-page.js';
+import { sessionRevokeRoutePlugin } from './web/session-revoke-route.js';
 import { jobListPagePlugin } from './web/job-list-page.js';
 import { jobDetailPagePlugin } from './web/job-detail-page.js';
 import { jobCancelRoutePlugin } from './web/job-cancel-route.js';
@@ -320,6 +321,14 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // 303 to /login. Cache-Control: no-store, max-age=0 (post-login HTML
   // carries user-bound data).
   await app.register(profilePagePlugin);
+
+  // Plan 8c Task 2: POST /profile/sessions/:id/revoke — revoke a specific
+  // session by deleting the row. Refuses to delete the CURRENT session
+  // (that flow is /logout). CSRF-protected. Owner-checked. WC-PR6 uses
+  // crypto.timingSafeEqual for the current-session compare. Registered
+  // AFTER profilePagePlugin (which renders the form) and BEFORE
+  // errorPagesPlugin (the catch-all 404).
+  await app.register(sessionRevokeRoutePlugin);
 
   // Plan 8b Task 2: GET /jobs HTML list page with HTMX polling. Registered
   // AFTER dashboardPagePlugin (which owns `/`) and BEFORE errorPagesPlugin
