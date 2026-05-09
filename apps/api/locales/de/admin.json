@@ -65,7 +65,7 @@
   "stats_jobs_failed": "Fehlgeschlagen",
   "stats_jobs_canceled": "Abgebrochen",
   "stats_jobs_expired": "Abgelaufen",
-  "stats_jobs_unknown": "Unbekannter Status",
+  "stats_jobs_unknown": "Unbekannter Status ({{status}})",
   "stats_storage_used": "Belegt (Bytes)",
   "stats_storage_disk_available": "Festplatte verfügbar (Bytes)",
   "stats_storage_disk_total": "Festplatte gesamt (Bytes)",

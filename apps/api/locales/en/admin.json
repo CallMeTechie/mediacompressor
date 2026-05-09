@@ -65,7 +65,7 @@
   "stats_jobs_failed": "Failed",
   "stats_jobs_canceled": "Canceled",
   "stats_jobs_expired": "Expired",
-  "stats_jobs_unknown": "Unknown status",
+  "stats_jobs_unknown": "Unknown status ({{status}})",
   "stats_storage_used": "Used (bytes)",
   "stats_storage_disk_available": "Disk available (bytes)",
   "stats_storage_disk_total": "Disk total (bytes)",

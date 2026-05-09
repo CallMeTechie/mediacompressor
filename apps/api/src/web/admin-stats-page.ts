@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
+import { JobStatus } from '@mediacompressor/db';
 
 /**
  * Plan 8d Task 6: GET /admin/stats -- read-only operational dashboard.
@@ -40,23 +41,19 @@ const InnerStatsResponse = z.object({
 });
 
 /**
- * Known job statuses for which we have explicit i18n labels. Mirrors the
- * Prisma `JobStatus` enum (packages/db/prisma/schema.prisma): if Plan-7 ever
- * adds a new status enum value, the BFF MUST be updated to add a
- * `stats_jobs_<status>` key in both locale files. Until then, unknown
- * statuses are rendered with a generic `stats_jobs_unknown` label and the
- * raw status string so they don't disappear from the dashboard.
+ * Known job statuses for which we have explicit i18n labels. Derived directly
+ * from the Prisma `JobStatus` enum (packages/db/prisma/schema.prisma) via the
+ * `@mediacompressor/db` re-export so the BFF can never silently drift from
+ * the database schema. If Plan-7 / the schema ever adds a new status, the
+ * `KNOWN_JOB_STATUSES` set picks it up automatically — but the `stats_jobs_*`
+ * locale lookup will return the raw key, so the drift-guard test in
+ * admin-stats-page.test.ts asserts both locale files cover every enum value.
+ *
+ * Unknown statuses (e.g. mid-deploy where the DB has a value the BFF binary
+ * was built before) are rendered with a generic `stats_jobs_unknown` label
+ * plus the raw status string so they don't disappear from the dashboard.
  */
-const KNOWN_JOB_STATUSES = new Set([
-  'pending',
-  'uploading',
-  'queued',
-  'processing',
-  'succeeded',
-  'failed',
-  'canceled',
-  'expired',
-]);
+const KNOWN_JOB_STATUSES: ReadonlySet<string> = new Set(Object.values(JobStatus));
 
 export const adminStatsPagePlugin: FastifyPluginAsync = async (app) => {
   app.get(
@@ -87,7 +84,27 @@ export const adminStatsPagePlugin: FastifyPluginAsync = async (app) => {
         return reply.code(500).view('500', { title: 'Could not load stats' });
       }
 
-      const parsed = InnerStatsResponse.safeParse(inner.json());
+      // Concern #4 (Plan 8d Task 6 review): defensive parse around inner.json().
+      // Plan-7 currently always returns valid JSON on 200, but if a content-type
+      // drift / proxy interpolation ever produces non-JSON on 200 we MUST still
+      // hit the 500 + Cache-Control: no-store path. A sync throw would otherwise
+      // bypass the 500 view (Fastify default 500 has no no-store). Mirrors the
+      // try/catch precedent in admin-invite-create-route.ts (Plan 8d Task 5).
+      let parsedJson: unknown;
+      try {
+        parsedJson = inner.json();
+      } catch (err) {
+        app.log.error(
+          {
+            adminId: req.auth!.userId,
+            action: 'stats_view',
+            err: err instanceof Error ? err.message : String(err),
+          },
+          'inner-200 returned non-JSON body -- possible content-type drift',
+        );
+        return reply.code(500).view('500', { title: 'Could not load stats' });
+      }
+      const parsed = InnerStatsResponse.safeParse(parsedJson);
       if (!parsed.success) {
         app.log.error(
           {

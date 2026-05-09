@@ -27,7 +27,7 @@
       <tbody>
         {{#each stats.jobRows}}
           <tr>
-            <td>{{t labelKey}}{{#ifEq labelKey 'stats_jobs_unknown'}} ({{status}}){{/ifEq}}</td>
+            <td>{{t labelKey status=status}}</td>
             <td>{{count}}</td>
           </tr>
         {{/each}}
