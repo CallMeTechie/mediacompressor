@@ -1,11 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import handlebars from 'handlebars';
-import type { FastifyRequest } from 'fastify';
+import Fastify, { type FastifyRequest } from 'fastify';
+import cookie from '@fastify/cookie';
 import {
   DEFAULT_LOCALE,
   SUPPORTED_LOCALES,
   detectLocale,
   detectLocaleFromHeader,
+  i18nFastifyPlugin,
   initI18n,
   registerI18nHelper,
   registerIfEqHelper,
@@ -130,6 +132,126 @@ describe('web/i18n', () => {
       );
       expect(tmpl({ _locale: 'en' })).toBe('EN');
       expect(tmpl({ _locale: 'de' })).toBe('OTHER');
+    });
+
+    it('Plan 8e Task 1 PFLICHT: loads all 6 namespaces (common, auth, dashboard, jobs, profile, admin) for each locale', async () => {
+      // After Plan 8e Task 1, the ns-list spans 6 namespaces. This test
+      // verifies i18next-fs-backend actually loaded the resource bundle for
+      // every (locale, namespace) pair — catching missing-file regressions
+      // (e.g. a locale-file deleted in a refactor) and load-path-template
+      // breakage (`{{lng}}/{{ns}}.json`).
+      resetI18n();
+      const i18n = await initI18n();
+      const namespaces = ['common', 'auth', 'dashboard', 'jobs', 'profile', 'admin'];
+      for (const ns of namespaces) {
+        expect(i18n.hasResourceBundle('en', ns), `en/${ns}`).toBe(true);
+        expect(i18n.hasResourceBundle('de', ns), `de/${ns}`).toBe(true);
+      }
+    });
+
+    it('Plan 8e Task 1 PFLICHT: unknown key falls back to the key itself (i18next default)', async () => {
+      // i18next's default missing-key handler returns the key string verbatim
+      // — NOT empty, NOT undefined. Pflicht because templates rely on this:
+      // a forgotten key renders as `does_not_exist_anywhere` in the page,
+      // which is loud-broken (visible to QA) rather than silent-empty.
+      resetI18n();
+      const i18n = await initI18n();
+      const result = i18n.t('does_not_exist_anywhere', { lng: 'en', ns: 'common' });
+      expect(result).toBe('does_not_exist_anywhere');
+      expect(result).not.toBe('');
+    });
+  });
+
+  describe('req.t() decorator (Plan 8e Task 1, WC-i18n-13 + WC-i18n-15)', () => {
+    /**
+     * Builds a minimal Fastify app with just `@fastify/cookie` + `i18nFastifyPlugin`
+     * registered. Avoids dragging the full `buildServer()` rig (Postgres + Redis
+     * + auth plugins) into a pure i18n unit test — `req.t()` only depends on
+     * the cookie-plugin (for `mc_locale` cookie parsing in `detectLocale`) and
+     * the i18n plugin itself.
+     */
+    async function buildI18nApp() {
+      resetI18n();
+      const app = Fastify({ logger: false });
+      // `@fastify/cookie` MUST register before `i18nFastifyPlugin` because the
+      // latter's onRequest hook calls `detectLocale(req)` which reads
+      // `req.cookies.mc_locale`. Without cookie-plugin first, `req.cookies`
+      // is undefined and detectLocale crashes.
+      await app.register(cookie, { secret: 'a'.repeat(64) });
+      await app.register(i18nFastifyPlugin);
+      return app;
+    }
+
+    it('req.t() returns translated string for explicit ns + locale-from-cookie', async () => {
+      const app = await buildI18nApp();
+      try {
+        // Probe-route: returns the translated key. Uses the `admin` namespace
+        // (only one with real keys at Task-1 stage); `nav_users` is "Benutzer"
+        // in DE per Plan 8d's existing locale file.
+        app.get('/__test_req_t', async (req) => req.t('nav_users', undefined, 'admin'));
+        const res = await app.inject({
+          method: 'GET',
+          url: '/__test_req_t',
+          headers: { cookie: 'mc_locale=de' },
+        });
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toBe('Benutzer');
+      } finally {
+        await app.close();
+      }
+    });
+
+    it('req.t() merges interpolation vars into the i18next options bag', async () => {
+      // Sanity: `vars` reach i18next.t and feed `{{placeholder}}`-interpolation.
+      // Uses the existing DE `welcome` key from admin.json: "Angemeldet als {{email}}".
+      const app = await buildI18nApp();
+      try {
+        app.get('/__test_vars', async (req) =>
+          req.t('welcome', { email: 'jane@example.invalid' }, 'admin'),
+        );
+        const res = await app.inject({
+          method: 'GET',
+          url: '/__test_vars',
+          headers: { cookie: 'mc_locale=de' },
+        });
+        expect(res.body).toBe('Angemeldet als jane@example.invalid');
+      } finally {
+        await app.close();
+      }
+    });
+
+    it('PFLICHT WC-i18n-15: req.t() falls back to DEFAULT_LOCALE when this.locale is undefined (no crash)', async () => {
+      // Simulate the regression-scenario: the i18nFastifyPlugin onRequest hook
+      // didn't run before this handler (e.g. a future plugin reorder, or a
+      // synthesized request bypassing onRequest). The request object then has
+      // no `locale` property, and `req.t()` must NOT crash — it must fall
+      // back to DEFAULT_LOCALE deterministically.
+      //
+      // We construct this by registering a route that explicitly clears
+      // req.locale BEFORE invoking req.t(). If the helper crashed, we'd see a
+      // 500 response; the contract is that req.t() returns the EN string
+      // ("Users" for nav_users in admin.json, since DEFAULT_LOCALE === 'en').
+      const app = await buildI18nApp();
+      try {
+        app.get('/__test_locale_undef', async (req) => {
+          // Cast away readonly typing to simulate the regression.
+          (req as unknown as { locale: undefined }).locale = undefined;
+          return req.t('nav_users', undefined, 'admin');
+        });
+        const res = await app.inject({
+          method: 'GET',
+          url: '/__test_locale_undef',
+          // Even with mc_locale=de cookie, our handler explicitly nukes
+          // req.locale, so the fallback path must engage.
+          headers: { cookie: 'mc_locale=de' },
+        });
+        expect(res.statusCode).toBe(200);
+        // DEFAULT_LOCALE is 'en', so nav_users -> "Users", not "Benutzer".
+        expect(res.body).toBe('Users');
+        expect(DEFAULT_LOCALE).toBe('en'); // sanity-anchor for future readers
+      } finally {
+        await app.close();
+      }
     });
   });
 });

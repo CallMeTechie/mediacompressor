@@ -19,6 +19,19 @@ export const DEFAULT_LOCALE: SupportedLocale = 'en';
 declare module 'fastify' {
   interface FastifyRequest {
     locale: SupportedLocale;
+    /**
+     * Plan 8e Task 1 (Rev. 2.1, WC-i18n-13 + WC-i18n-15): per-request
+     * `req.t(key, vars?, ns?)` helper to remove the
+     * `app.i18n.t(key, {lng: req.locale, ns: 'foo'})` boilerplate.
+     *
+     * - `ns` defaults to `'common'` (target post-Task-7 defaultNS); for
+     *   non-default namespaces pass it explicitly.
+     * - If `req.locale` is not yet set (e.g. plugin-load-order regression
+     *   places a handler BEFORE `i18nFastifyPlugin`'s onRequest hook), the
+     *   helper falls back to `DEFAULT_LOCALE` rather than crashing — see the
+     *   PFLICHT-Test for WC-i18n-15.
+     */
+    t(key: string, vars?: Record<string, unknown>, ns?: string): string;
   }
   interface FastifyInstance {
     i18n: i18n;
@@ -84,7 +97,18 @@ export async function initI18n(): Promise<i18n> {
     supportedLngs: [...SUPPORTED_LOCALES],
     preload: [...SUPPORTED_LOCALES],
     initImmediate: false,
-    ns: ['admin'],
+    // Plan 8e Task 1 (Rev. 2.1): expanded from ['admin'] to all 6 namespaces
+    // so i18next-fs-backend preloads each `apps/api/locales/{lng}/{ns}.json`
+    // bundle at boot. Tasks 2-6 fill in real translation keys; Task 1 creates
+    // sentinel-only files (`{"_namespace": "<ns>"}`).
+    //
+    // `defaultNS` stays at `'admin'` because the Pre-Task-1 audit (Plan 8e
+    // Step 0, Rev. 2.1) found Plan-8d admin handlers + admin-*.hbs templates
+    // that rely on the implicit default-namespace lookup. Switching the
+    // default before those sites are migrated would silently render raw key
+    // strings. The defaultNS flip to `'common'` is deferred to Task 7
+    // (cleanup), after Tasks 2-6 have made every admin call-site explicit.
+    ns: ['common', 'auth', 'dashboard', 'jobs', 'profile', 'admin'],
     defaultNS: 'admin',
     backend: {
       loadPath: path.join(LOCALES_ROOT, '{{lng}}/{{ns}}.json'),
@@ -154,6 +178,51 @@ const i18nFastifyPluginImpl = async (app: FastifyInstance) => {
   });
 
   app.decorate('i18n', i18n);
+
+  // Plan 8e Task 1 (Rev. 2.1, WC-i18n-13 + WC-i18n-15):
+  // `req.t(key, vars?, ns?)` decorator — per-request shorthand for
+  // `app.i18n.t(key, {lng: req.locale, ns: '<X>'})`.
+  //
+  // Three load-order/this-binding requirements (WC-i18n-15):
+  //
+  //   1. **Order:** decorateRequest('t', ...) MUST run AFTER
+  //      `app.decorate('i18n', ...)` in the same plugin body — the closure
+  //      captures `app.i18n`, so the decorate-call must already have
+  //      attached it.
+  //   2. **`function`-form, NOT arrow:** decorator must use
+  //      `function (this: FastifyRequest, ...)` so `this` binds to the
+  //      per-request FastifyRequest. An arrow function would silently
+  //      capture the lexical `this` (= the plugin scope) and read the wrong
+  //      object for `this.locale`, surfacing as wrong-locale renders, not a
+  //      compile error.
+  //   3. **Locale-fallback:** if `this.locale` is undefined (the
+  //      `i18nFastifyPlugin`'s onRequest hook somehow didn't run before this
+  //      handler — e.g. a future plugin re-order regression), fall back to
+  //      `DEFAULT_LOCALE` rather than crash. `i18next.t` with `lng:
+  //      undefined` would silently use the i18next-default language, which
+  //      happens to coincide with DEFAULT_LOCALE today but isn't guaranteed.
+  //      Explicit fallback makes the contract clear and is asserted by the
+  //      WC-i18n-15 PFLICHT-Test.
+  //
+  // `ns` defaults to `'common'` to match the target post-Task-7 default
+  // namespace; admin/auth/dashboard/jobs/profile call-sites pass `ns`
+  // explicitly. `vars` (e.g. `{count: 3, path: '/foo'}`) are merged into the
+  // i18next options bag so interpolation (`{{count}}`, `{{path}}`) and
+  // pluralization (`count` triggers `_one`/`_other` lookup) both work.
+  app.decorateRequest(
+    't',
+    function (
+      this: FastifyRequest,
+      key: string,
+      vars?: Record<string, unknown>,
+      ns?: string,
+    ): string {
+      const lng: SupportedLocale = this.locale ?? DEFAULT_LOCALE;
+      const opts: Record<string, unknown> = { lng, ns: ns ?? 'common' };
+      if (vars) Object.assign(opts, vars);
+      return app.i18n.t(key, opts) as string;
+    },
+  );
 };
 
 // fp-wrap so the `req.locale` onRequest hook AND the `app.i18n` decorator
