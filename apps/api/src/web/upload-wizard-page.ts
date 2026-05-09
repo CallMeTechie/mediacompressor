@@ -17,11 +17,26 @@ import { PROFILES } from '@mediacompressor/compression/types';
  * multipart/form-data POST to /upload that would silently 404.
  */
 export const uploadWizardPagePlugin: FastifyPluginAsync = async (app) => {
-  app.get('/upload', { preHandler: app.requireSession }, async (_req, reply) => {
+  app.get('/upload', { preHandler: app.requireSession }, async (req, reply) => {
     reply.header('cache-control', 'no-store, max-age=0');
+    // Plan 8e Task 5: page-title resolved via req.t with explicit
+    // `ns: 'jobs'` (typed Namespace). defaultNS is still `'admin'`
+    // (Task 7 cleanup), so the namespace MUST be passed explicitly.
+    //
+    // `profiles` is mapped to `[{ value, label }]` so the template can
+    // render `<option value="{{value}}">{{label}}</option>` —
+    // Translation-Discipline (Plan 8e Sektion "Translation Discipline"):
+    // the option VALUE stays canonical English (matches tusd's strict
+    // pre-create-hook allowlist; see apps/api/src/uploads/pre-create-hook.ts
+    // and PROFILES in packages/compression/src/types.ts); only the inner
+    // LABEL is translated. A leaked translated value would be rejected by
+    // tusd with a 400 (WC-i18n-8 PFLICHT-Test asserts this contract).
     return reply.view('upload-wizard', {
-      title: 'Upload',
-      profiles: PROFILES,
+      title: req.t('page_title_upload', undefined, 'jobs'),
+      profiles: PROFILES.map((value) => ({
+        value,
+        label: req.t(`profile_${value.replaceAll('-', '_')}`, undefined, 'jobs'),
+      })),
       _csrfField: reply.renderCsrfField(),
     });
   });

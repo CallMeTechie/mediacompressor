@@ -24,6 +24,7 @@ const TEST_EMAILS = [
   'job-list-cache@test.invalid',
   'job-list-inflight@test.invalid',
   'job-list-terminal@test.invalid',
+  'job-list-de-fragment@test.invalid',
 ];
 
 const config: Config = {
@@ -364,6 +365,47 @@ describe('web/job-list-page', () => {
       });
       expect(res.statusCode).toBe(200);
       expect(res.body).not.toContain('hx-trigger="every 3s"');
+    } finally {
+      await app.close();
+    }
+  });
+
+  // PFLICHT WC-i18n-4 (Plan 8e Task 5 Step 1 — HTMX-fragment locale guard):
+  // GET /jobs?fragment=1 is the polling endpoint that re-renders the
+  // job-list-rows partial via reply.viewFragment. The view-plugin's
+  // viewFragment-wrapper (apps/api/src/web/view-plugin.ts) MUST inject
+  // `_locale: req.locale` so the {{tStatus}} helper resolves DE labels for
+  // a DE-cookie session. If the fragment-render path silently dropped
+  // _locale, every DE user would see English status badges in the polled
+  // rows — the test catches that regression.
+  it('PFLICHT WC-i18n-4: GET /jobs?fragment=1 with mc_locale=de renders DE job-status labels', async () => {
+    const app = await buildServer(config);
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: 'job-list-de-fragment@test.invalid' },
+      });
+      await seedJob({
+        userId: user!.id,
+        inputFilename: 'de-frag-1.png',
+        status: 'succeeded',
+      });
+      const sessionCookie = await login(app, 'job-list-de-fragment@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: '/jobs?fragment=1',
+        headers: {
+          accept: 'text/html',
+          cookie: `${sessionCookie}; mc_locale=de`,
+          'hx-request': 'true',
+        },
+      });
+      expect(res.statusCode).toBe(200);
+      // Fragment-only render — must NOT include the layout chrome.
+      expect(res.body).not.toMatch(/<html\b/i);
+      // DE-translated status label (de.common.job_status_succeeded ===
+      // "Erfolgreich"; en.common.job_status_succeeded === "Succeeded").
+      expect(res.body).toMatch(/Erfolgreich/);
+      expect(res.body).not.toMatch(/Succeeded/);
     } finally {
       await app.close();
     }

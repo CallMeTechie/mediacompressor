@@ -1,41 +1,40 @@
 <header class="page-header">
-  <h1>Upload a file</h1>
-  <nav class="page-nav"><a href="/">Dashboard</a></nav>
+  <h1>{{t 'upload_heading' ns='jobs'}}</h1>
+  <nav class="page-nav"><a href="/">{{t 'upload_nav_dashboard' ns='jobs'}}</a></nav>
 </header>
 
 <noscript>
   <style>#upload-form { display: none; }</style>
   <p class="flash flash-error">
-    This upload requires JavaScript (resumable uploads via <code>tus.min.js</code>).
-    With JavaScript disabled, please use the JSON API directly &mdash; see
-    <a href="/api/v1/docs">API documentation</a>.
+    {{t 'upload_noscript_body' ns='jobs'}}
+    <a href="/api/v1/docs">{{t 'upload_noscript_link' ns='jobs'}}</a>.
   </p>
 </noscript>
 
 <form id="upload-form" class="upload-form">
   {{> csrf}}
   <div class="form-field">
-    <label for="file">File</label>
+    <label for="file">{{t 'upload_label_file' ns='jobs'}}</label>
     <input id="file" type="file" name="file" required>
   </div>
   <div class="form-field">
     <fieldset>
-      <legend>Kind</legend>
-      <label><input type="radio" name="kind" value="image" checked> Image</label>
-      <label><input type="radio" name="kind" value="video"> Video</label>
+      <legend>{{t 'upload_legend_kind' ns='jobs'}}</legend>
+      <label><input type="radio" name="kind" value="image" checked> {{t 'upload_kind_image' ns='jobs'}}</label>
+      <label><input type="radio" name="kind" value="video"> {{t 'upload_kind_video' ns='jobs'}}</label>
     </fieldset>
   </div>
   <div class="form-field">
-    <label for="profile">Profile</label>
+    <label for="profile">{{t 'upload_label_profile' ns='jobs'}}</label>
     <select id="profile" name="profile">
-      {{#each profiles}}<option value="{{this}}">{{this}}</option>{{/each}}
+      {{#each profiles}}<option value="{{value}}">{{label}}</option>{{/each}}
     </select>
   </div>
-  <button type="submit" class="btn">Upload</button>
+  <button type="submit" class="btn">{{t 'upload_button_submit' ns='jobs'}}</button>
 </form>
 
 <div id="upload-progress" hidden>
-  <p>Uploading&hellip; <span id="upload-percent">0</span>%</p>
+  <p>{{t 'upload_progress_inline_prefix' ns='jobs'}} <span id="upload-percent">0</span>%</p>
   <progress id="upload-bar" value="0" max="100"></progress>
 </div>
 

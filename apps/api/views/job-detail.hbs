@@ -1,8 +1,8 @@
 <header class="page-header">
   <h1>{{job.inputFilename}}</h1>
   <nav class="page-nav">
-    <a href="/jobs">All jobs</a>
-    <a href="/">Dashboard</a>
+    <a href="/jobs">{{t 'detail_nav_all_jobs' ns='jobs'}}</a>
+    <a href="/">{{t 'detail_nav_dashboard' ns='jobs'}}</a>
   </nav>
 </header>
 
@@ -19,18 +19,18 @@
        hx-swap="innerHTML">
     {{> job-detail-status job}}
   </div>
-  <p>Kind: {{job.kind}} &middot; Profile: {{job.profile}}</p>
-  {{#if job.inputBytes}}<p>Input: {{job.inputBytes}} bytes (claimed)</p>{{/if}}
+  <p>{{t 'detail_label_kind_profile' ns='jobs' kind=job.kind profile=job.profile}}</p>
+  {{#if job.inputBytes}}<p>{{t 'detail_label_input_size' ns='jobs' bytes=job.inputBytes}}</p>{{/if}}
 
   {{#if canCancel}}
   <form method="POST" action="/jobs/{{job.id}}/cancel">
     {{{_csrfField}}}
-    <button type="submit" class="btn">Cancel</button>
+    <button type="submit" class="btn">{{t 'detail_button_cancel' ns='jobs'}}</button>
   </form>
   {{/if}}
 
   {{#if canDownload}}
-  <a class="btn" href="/api/v1/jobs/{{job.id}}/download">Download</a>
+  <a class="btn" href="/api/v1/jobs/{{job.id}}/download">{{t 'detail_button_download' ns='jobs'}}</a>
   {{/if}}
 </section>
 

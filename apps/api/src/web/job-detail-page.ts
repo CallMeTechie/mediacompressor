@@ -109,7 +109,10 @@ export const jobDetailPagePlugin: FastifyPluginAsync = async (app) => {
       const flash = cancelflash ? (FLASH_MAP.get(cancelflash) ?? null) : null;
 
       return reply.view('job-detail', {
-        title: `Job ${job.id.slice(0, 8)}`,
+        // Plan 8e Task 5: page-title resolved via req.t with explicit
+        // `ns: 'jobs'` (typed Namespace). The 8-char id-prefix stays
+        // canonical (DB primary-key fragment, not translatable).
+        title: `${req.t('page_title_detail', undefined, 'jobs')} (${job.id.slice(0, 8)})`,
         job: jobView,
         canCancel: !TERMINAL.includes(job.status),
         canDownload: job.status === 'succeeded',

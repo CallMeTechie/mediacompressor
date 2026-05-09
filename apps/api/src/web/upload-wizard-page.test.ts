@@ -148,7 +148,7 @@ describe('web/upload-wizard-page', () => {
     }
   });
 
-  it('PROFILES from compression/types are all rendered as <option> elements', async () => {
+  it('PROFILES from compression/types are all rendered as <option> elements (canonical values)', async () => {
     const app = await buildServer(config);
     try {
       const cookie = await login(app, 'upload-wizard@test.invalid');
@@ -158,8 +158,14 @@ describe('web/upload-wizard-page', () => {
         headers: { accept: 'text/html', cookie },
       });
       expect(res.statusCode).toBe(200);
+      // Plan 8e Task 5 Translation-Discipline: every PROFILES entry MUST
+      // appear as `value="<canonical>"` exactly (canonical English string,
+      // matching the tusd pre-create-hook allowlist; see
+      // apps/api/src/uploads/pre-create-hook.ts). The inner label is now
+      // translated, so we only assert the canonical value-attribute here —
+      // see WC-i18n-8 PFLICHT-Test below for the locale-leak guard.
       for (const profile of PROFILES) {
-        expect(res.body).toContain(`<option value="${profile}">${profile}</option>`);
+        expect(res.body).toContain(`<option value="${profile}">`);
       }
       // count match: number of <option ...> tags inside the profile <select> equals PROFILES.length
       const optionMatches = res.body.match(/<option\s+value="[^"]+">/g) ?? [];
@@ -229,6 +235,53 @@ describe('web/upload-wizard-page', () => {
       expect(noscript).toMatch(/<style[^>]*>[\s\S]*?<\/style>/);
       // display: none rule targeting #upload-form
       expect(noscript).toMatch(/#upload-form\s*\{[^}]*display:\s*none[^}]*\}/);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // PFLICHT WC-i18n-8 (Plan 8e Task 5 Step 6b — form-VALUE leak protection):
+  // when mc_locale=de, the rendered form's option/radio VALUES MUST stay
+  // canonical English (`image`, `video`, `web-optimized`, `mobile-low`,
+  // `archive-medium`) — only inner text/labels are translated. If a future
+  // refactor accidentally rewrites the template to
+  // `<option value="{{t '...'}}">` (or similar), the tusd pre-create-hook
+  // strict allowlist (apps/api/src/uploads/pre-create-hook.ts:100,
+  // metadata.kind must be "image" | "video"; PROFILES from
+  // packages/compression/src/types.ts) would 400 every DE upload. This test
+  // catches that regression at the GET-render stage so it never reaches
+  // tusd / users.
+  it('PFLICHT WC-i18n-8: GET /upload with mc_locale=de still emits canonical EN option/radio VALUES (form-VALUE-leak guard)', async () => {
+    const app = await buildServer(config);
+    try {
+      const sessionCookie = await login(app, 'upload-wizard@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: '/upload',
+        headers: {
+          accept: 'text/html',
+          cookie: `${sessionCookie}; mc_locale=de`,
+        },
+      });
+      expect(res.statusCode).toBe(200);
+      // Kind radio buttons must keep canonical EN values regardless of locale.
+      expect(res.body).toMatch(/<input[^>]*type="radio"[^>]*name="kind"[^>]*value="image"/);
+      expect(res.body).toMatch(/<input[^>]*type="radio"[^>]*name="kind"[^>]*value="video"/);
+      // Profile <option> values MUST be canonical PROFILES enum-strings, not
+      // their DE translations (e.g. NOT `value="Web-optimiert"`).
+      for (const profile of PROFILES) {
+        expect(res.body).toContain(`<option value="${profile}">`);
+      }
+      // Negative-asserts: the DE translation strings MUST NOT leak into any
+      // value-attribute (Translation-Discipline contract).
+      expect(res.body).not.toMatch(/value="Bild"/);
+      expect(res.body).not.toMatch(/value="Web-optimiert"/);
+      expect(res.body).not.toMatch(/value="Mobil[ -]\(niedrig\)"/);
+      expect(res.body).not.toMatch(/value="Archiv[ -]\(mittel\)"/);
+      // Sanity-check: the response IS rendering the DE locale (so the test
+      // actually exercised the translated path) — DE-only strings appear
+      // somewhere in the body's user-visible text.
+      expect(res.body).toMatch(/Hochladen|Datei|Typ/);
     } finally {
       await app.close();
     }

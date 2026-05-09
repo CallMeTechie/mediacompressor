@@ -1,23 +1,23 @@
 <header class="page-header">
-  <h1>Your jobs</h1>
+  <h1>{{t 'list_heading' ns='jobs'}}</h1>
   <nav class="page-nav">
-    <a href="/">Dashboard</a>
-    <a href="/upload">Upload</a>
+    <a href="/">{{t 'list_nav_dashboard' ns='jobs'}}</a>
+    <a href="/upload">{{t 'list_nav_upload' ns='jobs'}}</a>
   </nav>
 </header>
 
 <section class="filter-bar">
-  <a href="/jobs" class="filter-pill {{#unless statusFilter}}active{{/unless}}">All</a>
+  <a href="/jobs" class="filter-pill {{#unless statusFilter}}active{{/unless}}">{{t 'list_filter_all' ns='jobs'}}</a>
   {{#each statusOptions}}
-    <a href="/jobs?status={{value}}" class="filter-pill {{#if active}}active{{/if}}">{{value}}</a>
+    <a href="/jobs?status={{value}}" class="filter-pill {{#if active}}active{{/if}}">{{tStatus value}}</a>
   {{/each}}
 </section>
 
 <table class="job-table">
-  <thead><tr><th>File</th><th>Status</th><th>Profile</th><th>Created</th></tr></thead>
+  <thead><tr><th>{{t 'list_table_filename' ns='jobs'}}</th><th>{{t 'list_table_status' ns='jobs'}}</th><th>{{t 'list_table_profile' ns='jobs'}}</th><th>{{t 'list_table_created' ns='jobs'}}</th></tr></thead>
   {{> job-list-rows}}
 </table>
 
 {{#if nextCursor}}
-  <a class="btn" href="/jobs?cursor={{nextCursor}}{{#if statusFilter}}&status={{statusFilter}}{{/if}}">Load more</a>
+  <a class="btn" href="/jobs?cursor={{nextCursor}}{{#if statusFilter}}&status={{statusFilter}}{{/if}}">{{t 'list_button_load_more' ns='jobs'}}</a>
 {{/if}}

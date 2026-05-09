@@ -105,7 +105,10 @@ export const jobListPagePlugin: FastifyPluginAsync = async (app) => {
       }));
 
       const view = {
-        title: 'Jobs',
+        // Plan 8e Task 5: page-title resolved via req.t with explicit
+        // `ns: 'jobs'` (typed Namespace). defaultNS is still `'admin'`
+        // (Task 7 cleanup), so the namespace MUST be passed explicitly.
+        title: req.t('page_title_list', undefined, 'jobs'),
         jobs: slice.map((j) => ({
           ...j,
           // BigInt is not JSON-serializable / not useful in templates — string.

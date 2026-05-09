@@ -62,6 +62,18 @@ const IDENTICAL_BY_DESIGN = new Set<string>([
   // "MediaCompressor" — proper-noun product brand; never translated.
   'common.nav_brand',
 
+  // -- Plan 8e Task 5 jobs namespace --
+  // "Status" — identical noun and meaning in DE; preferred over "Zustand"
+  // (already established for the admin namespace, see entries above).
+  'jobs.list_table_status',
+  'jobs.detail_label_status',
+  // "Video" — established Anglicism in DE technical UI vocabulary; the
+  // standard German noun for moving image content has no native equivalent
+  // in common use. Both the kind-selector label AND the form-radio label
+  // render the same string regardless of locale.
+  'jobs.kind_video',
+  'jobs.upload_kind_video',
+
   // Add new entries here as deliberate exceptions, with a justifying comment.
 ]);
 

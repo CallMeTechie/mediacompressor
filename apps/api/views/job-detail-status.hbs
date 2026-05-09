@@ -1,4 +1,4 @@
-<p>Status: {{> job-status-badge}}</p>
-{{#if progress}}<p>Progress: {{progress}}%</p>{{/if}}
-{{#if outputBytes}}<p>Output: {{outputBytes}} bytes</p>{{/if}}
+<p>{{t 'detail_label_status' ns='jobs'}}: {{> job-status-badge}}</p>
+{{#if progress}}<p>{{t 'detail_label_progress' ns='jobs'}}: {{progress}}%</p>{{/if}}
+{{#if outputBytes}}<p>{{t 'detail_label_output_size' ns='jobs' bytes=outputBytes}}</p>{{/if}}
 {{#if errorMessage}}<p class="flash flash-error">{{errorMessage}}</p>{{/if}}
