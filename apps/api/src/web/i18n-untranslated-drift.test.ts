@@ -35,10 +35,6 @@ const IDENTICAL_BY_DESIGN = new Set<string>([
   'jobs._namespace',
   'profile._namespace',
   'admin._namespace',
-  // Product brand name — kept identical in both locales.
-  'common.nav_brand', // "MediaCompressor"
-  // German loaned the English word for the technical role label.
-  'common.nav_admin', // "Admin"
 
   // -- Plan 8d admin namespace (pre-existing, ratified in code-review) --
   // "Admin" — same word in DE; German uses it as the standard term for the role.

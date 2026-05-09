@@ -16,6 +16,19 @@ export const SUPPORTED_LOCALES = ['en', 'de'] as const;
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
 export const DEFAULT_LOCALE: SupportedLocale = 'en';
 
+/**
+ * Plan 8e Task 1 (Rev. 2.1, code-review concern #4): const-tuple of all
+ * registered i18next namespaces. Tasks 2-6 import this so the type-system
+ * list and the runtime `i18next.init({ ns })` list stay in lockstep — adding
+ * a namespace in one place forces the other to update at compile time.
+ *
+ * Used as the type for `req.t()`'s `ns` parameter so a typo like
+ * `req.t('foo', undefined, 'admins')` is a compile-error, not a silent
+ * runtime miss.
+ */
+export const NAMESPACES = ['common', 'auth', 'dashboard', 'jobs', 'profile', 'admin'] as const;
+export type Namespace = (typeof NAMESPACES)[number];
+
 declare module 'fastify' {
   interface FastifyRequest {
     locale: SupportedLocale;
@@ -24,14 +37,15 @@ declare module 'fastify' {
      * `req.t(key, vars?, ns?)` helper to remove the
      * `app.i18n.t(key, {lng: req.locale, ns: 'foo'})` boilerplate.
      *
-     * - `ns` defaults to `'common'` (target post-Task-7 defaultNS); for
-     *   non-default namespaces pass it explicitly.
+     * - `ns` is typed as `Namespace` (const-tuple union) so typos are
+     *   compile-errors. Defaults to `'common'` (target post-Task-7
+     *   defaultNS); for non-default namespaces pass it explicitly.
      * - If `req.locale` is not yet set (e.g. plugin-load-order regression
      *   places a handler BEFORE `i18nFastifyPlugin`'s onRequest hook), the
      *   helper falls back to `DEFAULT_LOCALE` rather than crashing — see the
      *   PFLICHT-Test for WC-i18n-15.
      */
-    t(key: string, vars?: Record<string, unknown>, ns?: string): string;
+    t(key: string, vars?: Record<string, unknown>, ns?: Namespace): string;
   }
   interface FastifyInstance {
     i18n: i18n;
@@ -108,7 +122,7 @@ export async function initI18n(): Promise<i18n> {
     // default before those sites are migrated would silently render raw key
     // strings. The defaultNS flip to `'common'` is deferred to Task 7
     // (cleanup), after Tasks 2-6 have made every admin call-site explicit.
-    ns: ['common', 'auth', 'dashboard', 'jobs', 'profile', 'admin'],
+    ns: [...NAMESPACES],
     defaultNS: 'admin',
     backend: {
       loadPath: path.join(LOCALES_ROOT, '{{lng}}/{{ns}}.json'),
@@ -215,11 +229,19 @@ const i18nFastifyPluginImpl = async (app: FastifyInstance) => {
       this: FastifyRequest,
       key: string,
       vars?: Record<string, unknown>,
-      ns?: string,
+      ns?: Namespace,
     ): string {
       const lng: SupportedLocale = this.locale ?? DEFAULT_LOCALE;
-      const opts: Record<string, unknown> = { lng, ns: ns ?? 'common' };
-      if (vars) Object.assign(opts, vars);
+      // Code-review concern #1: spread `vars` FIRST so any caller-supplied
+      // `lng`/`ns` keys are overridden by the canonical per-request locale +
+      // per-call namespace below. Reverse-order (Object.assign(opts, vars))
+      // would silently let `req.t('key', { lng: 'fr' })` break the locked
+      // locale.
+      const opts: Record<string, unknown> = {
+        ...(vars ?? {}),
+        lng,
+        ns: ns ?? 'common',
+      };
       return app.i18n.t(key, opts) as string;
     },
   );
