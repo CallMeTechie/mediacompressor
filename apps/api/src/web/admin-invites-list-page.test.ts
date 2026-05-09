@@ -285,6 +285,69 @@ describe('web/admin-invites-list-page', () => {
     }
   });
 
+  // Plan 8d Task 7 regression PFLICHT (per CLAUDE.md "Pflicht-Regressions-
+  // Test pro Sicherheits-/Race-Annahme"):
+  //
+  // Bug B: inside {{#each invites}} the {{> csrf}} partial saw the row as
+  // its own context, so {{{_csrfField}}} resolved to undefined and the
+  // per-row revoke-form shipped without an `_csrf` input. POST submit
+  // 403'd. Fixed by passing @root explicitly: {{> csrf @root}}.
+  //
+  // Why earlier tests missed this: extractCsrfToken() above matches the
+  // FIRST `<input name="_csrf">` on the page, which is always the create-
+  // form's CSRF (top-level scope, has the field). The revoke-form's
+  // missing CSRF inside the loop was never observed.
+  //
+  // This test seeds an active invite (=> exactly one revoke form),
+  // extracts the CSRF input scoped to the revoke-form's HTML substring,
+  // and asserts the value is non-empty (and >= 16 chars to match real
+  // tokens, not stray empty `value=""`).
+  it('PFLICHT regression Bug B: revoke-form inside {{#each}} carries a non-empty _csrf input', async () => {
+    const app = await buildServer(config);
+    try {
+      // Seed exactly one active invite so the form-extractor cannot pick
+      // a stale one from a previous test (beforeEach already wiped).
+      const future = new Date(Date.now() + 24 * 3600_000);
+      const created = await prisma.invite.create({
+        data: {
+          token: 'd'.repeat(64),
+          email: 'csrf-regression@test.invalid',
+          createdById: adminId,
+          expiresAt: future,
+        },
+      });
+
+      const cookie = await loginAndCookies(app, TEST_EMAIL_ADMIN);
+      const res = await app.inject({
+        method: 'GET',
+        url: '/admin/invites',
+        headers: { accept: 'text/html', cookie },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.body as string;
+
+      // Scope CSRF extraction to the revoke-form's HTML substring (literal-
+      // substring split on the action attribute, ReDoS-safe). If the form
+      // is missing OR the _csrf input has empty value, this throws.
+      const action = `/admin/invites/${created.id}/revoke`;
+      const needle = `action="${action}"`;
+      const start = body.indexOf(needle);
+      expect(start).toBeGreaterThanOrEqual(0);
+      const formOpen = body.lastIndexOf('<form', start);
+      const formClose = body.indexOf('</form>', start);
+      expect(formOpen).toBeGreaterThanOrEqual(0);
+      expect(formClose).toBeGreaterThan(formOpen);
+      const formBody = body.slice(formOpen, formClose);
+      const csrfMatch = formBody.match(
+        /<input[^>]*name="_csrf"[^>]*value="([^"]+)"/,
+      );
+      expect(csrfMatch).not.toBeNull();
+      expect(csrfMatch![1]!.length).toBeGreaterThanOrEqual(16);
+    } finally {
+      await app.close();
+    }
+  });
+
   // 6. Allowlist gate: arbitrary updateflash value rejected by Zod enum ->
   // 400 (no flash render path executed). Proves URL-supplied flash text
   // cannot be injected into the rendered banner. The Fastify validator

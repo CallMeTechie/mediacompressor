@@ -276,6 +276,61 @@ describe('web/api-keys-list-page', () => {
     }
   });
 
+  // Plan 8d Task 7 regression PFLICHT (per CLAUDE.md "Pflicht-Regressions-
+  // Test pro Sicherheits-/Race-Annahme"):
+  //
+  // Bug B (mirror): inside {{#each keys}} the {{> csrf}} partial saw the
+  // row as its own context, so the per-row revoke-form shipped without a
+  // populated `_csrf` input. Fixed by passing @root explicitly.
+  // This test seeds one active API key, then asserts -- scoped to the
+  // revoke-form's HTML substring -- that the CSRF input has a non-empty
+  // value (>= 16 chars to match real tokens).
+  it('PFLICHT regression Bug B: revoke-form inside {{#each keys}} carries a non-empty _csrf input', async () => {
+    const app = await buildServer(config);
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: 'apikeys-list@test.invalid' },
+      });
+      const created = await prisma.apiKey.create({
+        data: {
+          userId: user!.id,
+          name: 'csrf-regression',
+          keyHash: 'f'.repeat(64),
+          keyPrefix: 'ffffffff',
+          scopes: ['jobs:read'],
+        },
+      });
+
+      const cookie = await loginAndCookies(app, 'apikeys-list@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: '/profile/api-keys',
+        headers: { cookie, accept: 'text/html' },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.body as string;
+
+      // Scope CSRF extraction to the revoke-form's HTML substring (literal-
+      // substring split on the action attribute, ReDoS-safe).
+      const action = `/profile/api-keys/${created.id}/revoke`;
+      const needle = `action="${action}"`;
+      const start = body.indexOf(needle);
+      expect(start).toBeGreaterThanOrEqual(0);
+      const formOpen = body.lastIndexOf('<form', start);
+      const formClose = body.indexOf('</form>', start);
+      expect(formOpen).toBeGreaterThanOrEqual(0);
+      expect(formClose).toBeGreaterThan(formOpen);
+      const formBody = body.slice(formOpen, formClose);
+      const csrfMatch = formBody.match(
+        /<input[^>]*name="_csrf"[^>]*value="([^"]+)"/,
+      );
+      expect(csrfMatch).not.toBeNull();
+      expect(csrfMatch![1]!.length).toBeGreaterThanOrEqual(16);
+    } finally {
+      await app.close();
+    }
+  });
+
   // 6. C3-PR PFLICHT — revokeflash allowlist gate.
   it('C3-PR: GET /profile/api-keys?revokeflash=evil-marker-list does NOT render the marker', async () => {
     const app = await buildServer(config);

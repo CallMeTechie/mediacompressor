@@ -33,7 +33,12 @@
               <span class="muted">(this device)</span>
             {{else}}
               <form method="POST" action="/profile/sessions/{{id}}/revoke" class="inline-form">
-                {{> csrf}}
+                {{!-- Inside {{#each sessions}} the partial sees the row as
+                     its own context. Pass @root so {{> csrf}} resolves
+                     _csrfField against the parent view-context (Plan-8d
+                     Task 7 regression fix; same pattern as
+                     admin-invites-list.hbs). --}}
+                {{> csrf @root}}
                 <button type="submit" class="btn-link">Sign out</button>
               </form>
             {{/if}}

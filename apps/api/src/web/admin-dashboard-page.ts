@@ -36,6 +36,11 @@ export const adminDashboardPagePlugin: FastifyPluginAsync = async (app) => {
     return reply.view('admin-dashboard', {
       title: app.i18n.t('page_title_dashboard', { lng: req.locale }),
       adminEmail: admin?.email ?? '',
+      // The dashboard contains two state-changing forms (logout + locale-
+      // switcher) that need a CSRF token. {{> csrf}} reads `_csrfField` from
+      // the view context. Without this line the forms ship empty CSRF inputs
+      // and POST submits 403 (regression discovered by Plan-8d Task 7 E2E).
+      _csrfField: reply.renderCsrfField(),
     });
   });
 };

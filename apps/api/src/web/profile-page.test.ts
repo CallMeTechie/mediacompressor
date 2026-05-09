@@ -253,6 +253,70 @@ describe('web/profile-page', () => {
     }
   });
 
+  // Plan 8d Task 7 regression PFLICHT (per CLAUDE.md "Pflicht-Regressions-
+  // Test pro Sicherheits-/Race-Annahme"):
+  //
+  // Bug B (mirror): inside {{#each sessions}} the {{> csrf}} partial saw
+  // the row as its own context, so the per-row session-revoke form shipped
+  // without a populated `_csrf` input. Fixed by passing @root explicitly.
+  // This test seeds an extra non-current session, then asserts -- scoped
+  // to the revoke-form's HTML substring -- that the CSRF input is non-empty.
+  it('PFLICHT regression Bug B: session-revoke form inside {{#each sessions}} carries a non-empty _csrf input', async () => {
+    const app = await buildServer(config);
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: 'profile-multi@test.invalid' },
+      });
+      // Seed an extra non-current session (not matching our cookie token)
+      // so the loop renders at least one revoke-form row.
+      const otherToken = 'csrf-regression-token-yyyyyyyyyy';
+      const otherTokenHash = hashSessionToken(
+        otherToken,
+        Buffer.from(config.SESSION_SECRET),
+      );
+      const created = await prisma.session.create({
+        data: {
+          userId: user!.id,
+          tokenHash: otherTokenHash,
+          userAgent: 'CsrfRegressionBrowser/1.0',
+          ip: '127.0.0.1',
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        },
+      });
+
+      const cookie = await loginAndCookies(app, 'profile-multi@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: '/profile',
+        headers: { cookie, accept: 'text/html' },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.body as string;
+
+      // Scope CSRF extraction to the revoke-form's HTML substring (literal-
+      // substring split on the action attribute, ReDoS-safe).
+      const action = `/profile/sessions/${created.id}/revoke`;
+      const needle = `action="${action}"`;
+      const start = body.indexOf(needle);
+      expect(start).toBeGreaterThanOrEqual(0);
+      const formOpen = body.lastIndexOf('<form', start);
+      const formClose = body.indexOf('</form>', start);
+      expect(formOpen).toBeGreaterThanOrEqual(0);
+      expect(formClose).toBeGreaterThan(formOpen);
+      const formBody = body.slice(formOpen, formClose);
+      const csrfMatch = formBody.match(
+        /<input[^>]*name="_csrf"[^>]*value="([^"]+)"/,
+      );
+      expect(csrfMatch).not.toBeNull();
+      expect(csrfMatch![1]!.length).toBeGreaterThanOrEqual(16);
+
+      // Cleanup: the seeded session would otherwise pollute later tests.
+      await prisma.session.delete({ where: { id: created.id } });
+    } finally {
+      await app.close();
+    }
+  });
+
   // C3-PR PFLICHT — revokeflash allowlist gate: arbitrary query values must
   // NOT be rendered as flash text (URL-injection phishing vector).
   it('C3-PR: GET /profile?revokeflash=evil-marker-profile does NOT render the marker', async () => {

@@ -39,6 +39,52 @@ const config: Config = {
   ENABLE_LEGACY_JOB_STUB: false,
 };
 
+/**
+ * Plan 8d Task 7 regression-helper. Earlier `_csrf`-extraction in this file
+ * relied on the FIRST `value="..."` of length >= 16 (login-flow boilerplate).
+ * That regex matches the page's first CSRF input but cannot prove a SPECIFIC
+ * <form>'s CSRF input is populated -- if the form ships an empty `value=""`
+ * the regex silently picks up a different form's token instead.
+ *
+ * `extractCsrfFromForm` extracts a <form>'s body by literal-substring split
+ * on its `action="..."` attribute (no dynamic-RegExp construction, ReDoS-
+ * safe), then runs a STATIC regex against the form-body to assert the
+ * `_csrf` input is populated. Throws if the form is missing OR the form
+ * contains no `_csrf` input with a non-empty value -- both of which are
+ * the regressions Bug A (logout/locale forms shipped empty CSRF inputs =>
+ * 403) was designed to catch.
+ *
+ * @param html         page HTML to search
+ * @param formAction   exact `action` attribute value of the target <form>
+ *                     (e.g. "/logout"). Compared as literal substring.
+ */
+function extractCsrfFromForm(html: string, formAction: string): string {
+  const needle = `action="${formAction}"`;
+  const start = html.indexOf(needle);
+  if (start < 0) {
+    throw new Error(`No <form action="${formAction}"> found in HTML`);
+  }
+  // Walk back to the opening "<form" so we capture attributes before action=.
+  const formOpen = html.lastIndexOf('<form', start);
+  if (formOpen < 0) {
+    throw new Error(`Malformed HTML: action="${formAction}" not inside <form>`);
+  }
+  const formClose = html.indexOf('</form>', start);
+  if (formClose < 0) {
+    throw new Error(`Unclosed <form action="${formAction}">`);
+  }
+  const formBody = html.slice(formOpen, formClose);
+  const inputMatch = formBody.match(
+    /<input[^>]*name="_csrf"[^>]*value="([^"]+)"/,
+  );
+  if (!inputMatch) {
+    throw new Error(
+      `No <input name="_csrf" value="..."> with non-empty value inside <form action="${formAction}">`,
+    );
+  }
+  return inputMatch[1]!;
+}
+
 describe('web/admin-dashboard-page', () => {
   let prisma: PrismaClient;
   let redis: IORedis;
@@ -264,6 +310,41 @@ describe('web/admin-dashboard-page', () => {
       expect(deButtonDe).toMatch(/class="[^"]*active/);
       expect(enButtonDe).not.toMatch(/disabled/);
       expect(enButtonDe).not.toMatch(/class="[^"]*active/);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // Plan 8d Task 7 regression PFLICHT (per CLAUDE.md "Pflicht-Regressions-
+  // Test pro Sicherheits-/Race-Annahme"):
+  //
+  // Bug A: admin-dashboard-page.ts forgot to pass `_csrfField` to the view,
+  // so {{> csrf}} (which prints {{{_csrfField}}}) emitted nothing. The
+  // <form action="/logout"> AND <form action="/locale"> on /admin both
+  // shipped empty CSRF inputs and POST-submits 403'd. The earlier
+  // "first match wins" extractor masked this because the page's first
+  // `value="..."` match was the locale-switcher's `value="en"` button,
+  // not a CSRF input.
+  //
+  // This test asserts -- scoped to each form's HTML substring -- that
+  // BOTH state-changing forms on the admin dashboard contain a non-empty
+  // `_csrf` input. extractCsrfFromForm() throws if the form is missing
+  // OR the input value is empty.
+  it('PFLICHT regression Bug A: /logout AND /locale forms each carry a non-empty _csrf input', async () => {
+    const app = await buildServer(config);
+    try {
+      const cookie = await loginAndCookies(app, TEST_EMAIL_ADMIN);
+      const res = await app.inject({
+        method: 'GET',
+        url: '/admin',
+        headers: { accept: 'text/html', cookie },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.body as string;
+      const logoutToken = extractCsrfFromForm(body, '/logout');
+      const localeToken = extractCsrfFromForm(body, '/locale');
+      expect(logoutToken.length).toBeGreaterThanOrEqual(16);
+      expect(localeToken.length).toBeGreaterThanOrEqual(16);
     } finally {
       await app.close();
     }

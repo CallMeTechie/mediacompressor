@@ -49,7 +49,13 @@
         <td>
           {{#if canRevoke}}
             <form method="POST" action="/admin/invites/{{id}}/revoke" class="inline-form">
-              {{> csrf}}
+              {{!-- Inside {{#each}} the partial sees the row as its own
+                   context, so plain {{> csrf}} would resolve `_csrfField`
+                   against the row (=> empty) and ship an empty CSRF input
+                   (=> 403 on submit). Pass @root explicitly so the partial
+                   re-binds to the parent view-context where _csrfField was
+                   set by the handler (Plan-8d Task 7 regression fix). --}}
+              {{> csrf @root}}
               <button type="submit" class="btn-link">{{t 'invites_button_revoke'}}</button>
             </form>
           {{/if}}
