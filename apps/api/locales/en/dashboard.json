@@ -6,8 +6,8 @@
   "empty_no_jobs": "You haven't uploaded any media yet.",
   "button_new_upload": "New upload",
   "link_view_all_jobs": "View all jobs",
-  "nav_link_all_jobs": "All jobs",
+  "page_nav_all_jobs": "All jobs",
   "nav_link_upload": "Upload",
-  "summary_in_flight": "{{count}} job(s) in flight.",
-  "home_tagline": "You are signed in. The dashboard ships in Plan 8b."
+  "summary_in_flight": "{{n}} job(s) in flight.",
+  "home_placeholder_tagline": "You are signed in. The dashboard ships in Plan 8b."
 }

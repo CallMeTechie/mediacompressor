@@ -1,14 +1,14 @@
 <header class="page-header">
   <h1>{{t 'page_title' ns='dashboard'}}</h1>
   <nav class="page-nav">
-    <a href="/jobs">{{t 'nav_link_all_jobs' ns='dashboard'}}</a>
+    <a href="/jobs">{{t 'page_nav_all_jobs' ns='dashboard'}}</a>
     <a href="/upload">{{t 'nav_link_upload' ns='dashboard'}}</a>
   </nav>
 </header>
 
 <section class="dashboard-summary">
   <p>{{t 'welcome_heading' ns='dashboard' email=user.email}}</p>
-  <p class="muted">{{t 'summary_in_flight' ns='dashboard' count=inFlightCount}} <a href="/jobs">{{t 'link_view_all_jobs' ns='dashboard'}}</a></p>
+  <p class="muted">{{t 'summary_in_flight' ns='dashboard' n=inFlightCount}} <a href="/jobs">{{t 'link_view_all_jobs' ns='dashboard'}}</a>.</p>
 </section>
 
 <section class="recent-jobs">

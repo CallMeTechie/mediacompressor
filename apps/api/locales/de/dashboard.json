@@ -6,8 +6,8 @@
   "empty_no_jobs": "Du hast noch keine Medien hochgeladen.",
   "button_new_upload": "Neue Datei hochladen",
   "link_view_all_jobs": "Alle Aufgaben anzeigen",
-  "nav_link_all_jobs": "Alle Aufgaben",
+  "page_nav_all_jobs": "Alle Aufgaben",
   "nav_link_upload": "Hochladen",
-  "summary_in_flight": "{{count}} Aufgabe(n) in Bearbeitung.",
-  "home_tagline": "Du bist angemeldet. Die Übersicht erscheint mit Plan 8b."
+  "summary_in_flight": "{{n}} Aufgabe(n) in Bearbeitung.",
+  "home_placeholder_tagline": "Du bist angemeldet. Die Übersicht erscheint mit Plan 8b."
 }
