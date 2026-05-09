@@ -26,9 +26,16 @@ const Query = z.object({
 // security/detect-object-injection lint warning. Any value outside the
 // map → flash null (C3-PR allowlist gate, prevents URL-injection of
 // arbitrary flash text).
+//
+// Plan 8e Task 6 review concern #5: messageKey is typed as a template-literal
+// union `flash_${string}` so a typo like `'flash_apikey_revked'` still
+// compiles, but `'apikey_revoked'` (missing prefix) is caught at compile
+// time. A future Plan 8f code-generated typed-keys system can tighten this
+// to a literal union of valid key-names.
+type ProfileFlashMessageKey = `flash_${string}`;
 const REVOKE_FLASH_MAP = new Map<
   string,
-  { level: 'error' | 'info'; messageKey: string }
+  { level: 'error' | 'info'; messageKey: ProfileFlashMessageKey }
 >([
   ['revoked', { level: 'info', messageKey: 'flash_apikey_revoked' }],
   ['csrf-stale', { level: 'error', messageKey: 'flash_csrf_stale' }],

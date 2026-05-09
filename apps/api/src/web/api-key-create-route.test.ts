@@ -586,11 +586,18 @@ describe('web/api-key-create-route', () => {
         payload: `name=de-test-key&_csrf=${encodeURIComponent(csrf)}`,
       });
       expect(res.statusCode).toBe(200);
-      // DE strings from apps/api/locales/de/profile.json: heading
-      // "API-Schlüssel erstellt" and warning "Schlüssel jetzt kopieren".
-      expect(res.body).toMatch(/API-Schlüssel erstellt|Schlüssel jetzt kopieren/);
-      // Sanity: the EN heading must NOT appear (would mean locale-fallback to EN).
-      expect(res.body).not.toMatch(/<h1>API key created<\/h1>/);
+      // DE strings from apps/api/locales/de/profile.json: split into two
+      // positive assertions so a half-migrated state (heading translated
+      // but warning still EN, or vice versa) cannot slip through —
+      // see Plan 8e Task 6 review concern #2.
+      // Heading: "API-Schlüssel erstellt" (page_title_api_key_created).
+      expect(res.body).toMatch(/API-Schlüssel erstellt/);
+      // Warning: "Schlüssel jetzt kopieren" (apikey_created_warning).
+      expect(res.body).toMatch(/Schlüssel jetzt kopieren/);
+      // Negative side: EN heading + EN warning must NOT appear (locale
+      // fallback to EN would surface either string).
+      expect(res.body).not.toMatch(/<h1[^>]*>API key created<\/h1>/);
+      expect(res.body).not.toMatch(/Copy your key NOW/);
     } finally {
       await app.close();
     }

@@ -32,9 +32,16 @@ const Query = z.object({
 // doesn't flag the lookup (Map.get() doesn't expose prototype properties to
 // arbitrary string keys the way bracket-indexing a plain object does).
 // Mirrors the FLASH_MAP pattern in job-detail-page.ts (Plan 8b C6-LI).
+//
+// Plan 8e Task 6 review concern #5: messageKey is typed as a template-literal
+// union `flash_${string}` so a typo like `'flash_session_revked'` still
+// compiles, but `'session_revoked'` (missing prefix) is caught at compile
+// time. A future Plan 8f code-generated typed-keys system can tighten this
+// to a literal union of valid key-names.
+type ProfileFlashMessageKey = `flash_${string}`;
 const REVOKE_FLASH_MAP = new Map<
   string,
-  { level: 'error' | 'info'; messageKey: string }
+  { level: 'error' | 'info'; messageKey: ProfileFlashMessageKey }
 >([
   ['current-session', { level: 'error', messageKey: 'flash_session_current_blocked' }],
   ['revoked', { level: 'info', messageKey: 'flash_session_revoked' }],

@@ -45,9 +45,16 @@ const CreateQuery = z.object({
 // security/detect-object-injection lint warnings. Values outside the map →
 // flash null (C3-PR allowlist gate, prevents URL-injection of arbitrary
 // flash text).
+//
+// Plan 8e Task 6 review concern #5: messageKey is typed as a template-literal
+// union `flash_${string}` so a typo like `'flash_csrff_stale'` still compiles
+// (would render the raw key), but `'csrf_stale'` (missing prefix) is caught
+// at compile time. A future Plan 8f code-generated typed-keys system can
+// tighten this to a literal union of valid key-names.
+type ProfileFlashMessageKey = `flash_${string}`;
 const CREATE_FLASH_MAP = new Map<
   string,
-  { level: 'error' | 'info'; messageKey: string }
+  { level: 'error' | 'info'; messageKey: ProfileFlashMessageKey }
 >([
   ['csrf-stale', { level: 'error', messageKey: 'flash_csrf_stale' }],
 ]);

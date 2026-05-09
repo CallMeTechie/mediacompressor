@@ -85,9 +85,9 @@ const IDENTICAL_BY_DESIGN = new Set<string>([
   'profile.label_session_ip',
   // "Name" — the form-field label for an API key's user-chosen display name.
   // DE uses the same noun "Name" in the same context (Karteikarten-/
-  // Formular-Beschriftung). Both the table column and the form label.
+  // Formular-Beschriftung). Used in both the table column header and the
+  // form input label (single key, see Plan 8e Task 6 review concern #4).
   'profile.label_apikey_name',
-  'profile.apikey_form_label_name',
 
   // Add new entries here as deliberate exceptions, with a justifying comment.
 ]);
