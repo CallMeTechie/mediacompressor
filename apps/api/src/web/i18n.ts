@@ -158,8 +158,12 @@ export function registerIfEqHelper(): void {
  * value (e.g. `succeeded`) stays untouched in CSS classes and form values
  * (Translation Discipline — value-attributes never translated).
  *
- * `_locale` lookup mirrors registerI18nHelper (C1-AD-PR): `@root._locale`
- * first, fallback to DEFAULT_LOCALE. The status string itself is the
+ * `_locale` lookup mirrors registerI18nHelper (C1-AD-PR) with the full
+ * 3-tier priority: `@root._locale` -> `this._locale` -> DEFAULT_LOCALE.
+ * The middle tier (`this._locale`) covers plain top-level renders where the
+ * helper is invoked outside any `{{#each}}` / partial scope; without it,
+ * such call-sites would fall through to DEFAULT_LOCALE and silently render
+ * English status labels for German users. The status string itself is the
  * canonical enum-value from `packages/db/prisma/schema.prisma::JobStatus`
  * (`pending|uploading|queued|processing|succeeded|failed|canceled|expired`).
  *
@@ -168,9 +172,14 @@ export function registerIfEqHelper(): void {
 export function registerTStatusHelper(i18n: i18n): void {
   handlebars.registerHelper(
     'tStatus',
-    function (this: unknown, status: string, opts: handlebars.HelperOptions) {
+    function (
+      this: { _locale?: SupportedLocale } | null,
+      status: string,
+      opts: handlebars.HelperOptions,
+    ) {
       const root = (opts?.data?.root ?? {}) as { _locale?: SupportedLocale };
-      const locale: SupportedLocale = root._locale ?? DEFAULT_LOCALE;
+      const thisLocale = this?._locale;
+      const locale: SupportedLocale = root._locale ?? thisLocale ?? DEFAULT_LOCALE;
       const out = i18n.t(`job_status_${status}`, { lng: locale, ns: 'common' });
       // SafeString prevents Handlebars from re-escaping the (already-i18next-
       // returned) string; values come from translator-controlled JSON not

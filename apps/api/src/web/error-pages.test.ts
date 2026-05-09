@@ -125,4 +125,32 @@ describe('web/error-pages', () => {
       await app.close();
     }
   });
+
+  // Plan 8e Task 2 review (Concern #6) PFLICHT-Regressionstest:
+  // The layout-base nav's brand link MUST be visible on unauthenticated
+  // pages (404, 500, /login) so users can always click "home". Earlier
+  // iterations of this task wrapped the entire <nav> in a
+  // {{#if currentUser}} guard, hiding the brand for logged-out users —
+  // this test pins the spec'd behavior so a future regression that
+  // re-gates the brand would fail loudly instead of silently shipping.
+  // Authenticated nav-links (jobs/profile/admin/logout) stay gated; only
+  // the brand and the surrounding <nav class="site-nav"> chrome render.
+  it('layout-nav brand link is visible on unauthenticated 404 page', async () => {
+    const app = await buildServer(config);
+    try {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/this-route-does-not-exist',
+        headers: { accept: 'text/html' },
+      });
+      expect(res.statusCode).toBe(404);
+      expect(res.body).toMatch(/<a[^>]*class="brand"[^>]*href="\/"|<a[^>]*href="\/"[^>]*class="brand"/);
+      expect(res.body).toMatch(/MediaCompressor/);
+      // Authenticated nav-chrome MUST NOT render — no logout-form, no
+      // /jobs / /profile / /admin links — when there is no session cookie.
+      expect(res.body).not.toMatch(/<form[^>]*action="\/logout"/);
+    } finally {
+      await app.close();
+    }
+  });
 });

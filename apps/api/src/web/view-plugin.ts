@@ -1,13 +1,32 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { FastifyPluginAsync, FastifyReply } from 'fastify';
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
 import view from '@fastify/view';
 import staticPlugin from '@fastify/static';
 import formbody from '@fastify/formbody';
 import handlebars from 'handlebars';
 import { csrfHelperPlugin } from './csrf-helper.js';
+
+/**
+ * Plan 8e Task 2 (code-review concern #7): security-relevant projection of
+ * `req.auth` to the layout-base view-context. Hoisted to module-scope so the
+ * whitelist of fields exposed to Handlebars templates is auditable in one
+ * place — the view-wrap site below MUST go through this function rather than
+ * spreading `req.auth` directly. Adding a new field here is a deliberate
+ * decision, not an accidental leak (e.g. exposing `userId` would let any
+ * `<a href="...">` template construct user-enumerating URLs from the layout).
+ *
+ * Returns null for unauthenticated requests so `{{#if currentUser}}` in
+ * `layouts/base.hbs` cleanly hides the authed nav-chrome.
+ */
+type CurrentUserView = { role: 'user' | 'admin'; status: 'active' | 'disabled' } | null;
+
+function safeCurrentUser(auth: FastifyRequest['auth']): CurrentUserView {
+  if (!auth) return null;
+  return { role: auth.role, status: auth.status };
+}
 
 declare module 'fastify' {
   interface FastifyReply {
@@ -169,13 +188,19 @@ const webViewPluginImpl: FastifyPluginAsync = async (app) => {
   app.addHook('preHandler', async (req, reply) => {
     const origView = reply.view.bind(reply);
     reply.view = ((template: string, data?: Record<string, unknown>, opts?: object) => {
-      const currentUser = req.auth
-        ? { role: req.auth.role, status: req.auth.status }
-        : null;
-      // Generate CSRF token only for authed pages — logged-out pages (404,
-      // 500, /login) don't render the layout's logout-form, so generating
-      // a token there would set an mc_csrf cookie unnecessarily on every
-      // error/login page-load.
+      // Concern #7 (Plan 8e Task 2 review): projection goes through the
+      // module-scope `safeCurrentUser` whitelist, NOT a literal `{role, status}`
+      // spread, so adding a sensitive field to `req.auth` (e.g. an `email` or
+      // `userId`) does not silently surface in every Handlebars template.
+      const currentUser = safeCurrentUser(req.auth);
+      // Concern #3 (Plan 8e Task 2 review): the CSRF token is generated FRESH
+      // per authed render — not per session — so it rotates on every page-view.
+      // Cost: one HMAC per authed GET (renderCsrfField is HMAC-only, no DB).
+      // Benefit: strong replay-attack resistance for every state-changing form
+      // on the rendered page (logout, locale-switch, session-revoke, etc.) —
+      // a leaked token from one page-render is invalid for the next.
+      // Logged-out pages (404, 500, /login) skip generation so they don't set
+      // an mc_csrf cookie unnecessarily on every error/login page-load.
       const csrfDefault = req.auth ? reply.renderCsrfField() : '';
       return origView(
         template,
