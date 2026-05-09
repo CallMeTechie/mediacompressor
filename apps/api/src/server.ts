@@ -54,6 +54,7 @@ import { adminUserUpdateRoutePlugin } from './web/admin-user-update-route.js';
 import { adminInvitesListPagePlugin } from './web/admin-invites-list-page.js';
 import { adminInviteCreateRoutePlugin } from './web/admin-invite-create-route.js';
 import { adminInviteRevokeRoutePlugin } from './web/admin-invite-revoke-route.js';
+import { adminStatsPagePlugin } from './web/admin-stats-page.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -466,6 +467,15 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // 404 -> 404 HTML (consumed/missing/foreign collapsed; preserves
   // audit-trail invariant Plan-7's deleteMany enforces).
   await app.register(adminInviteRevokeRoutePlugin);
+
+  // Plan 8d Task 6: GET /admin/stats -- read-only operational dashboard.
+  // Forwards to inner GET /api/v1/admin/stats via app.inject() with cookie
+  // pass-through; Zod-parses the inner-200 response (drift detection).
+  // preHandler: app.requireAdminSession (303 unauth, 403 non-admin).
+  // Cache-Control: no-store, max-age=0 set on every response path.
+  // Registered AFTER the invite plugins (sibling ordering) and BEFORE
+  // errorPagesPlugin (the catch-all 404). NOT fp-wrapped (no decorators).
+  await app.register(adminStatsPagePlugin);
 
   // Plan 8a Task 6: Accept-aware 404/500 (BFF). MUST be registered LAST so
   // the catch-all setNotFoundHandler doesn't shadow real routes registered

@@ -1036,6 +1036,15 @@
           }
         }
       }
+    },
+    "/admin/stats": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
     }
   },
   "servers": [
