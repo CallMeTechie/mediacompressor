@@ -74,6 +74,21 @@ const IDENTICAL_BY_DESIGN = new Set<string>([
   'jobs.kind_video',
   'jobs.upload_kind_video',
 
+  // -- Plan 8e Task 6 profile namespace --
+  // "User-Agent" — technical HTTP-header name; canonical RFC 9110 token.
+  // Translating it would obscure the meaning for technical readers; the
+  // identical-by-design rule applies because this is a proper noun for an
+  // HTTP-protocol field, not free prose.
+  'profile.label_session_user_agent',
+  // "IP" — universally recognised network-protocol acronym; rendered
+  // identically in DE and EN technical UI.
+  'profile.label_session_ip',
+  // "Name" — the form-field label for an API key's user-chosen display name.
+  // DE uses the same noun "Name" in the same context (Karteikarten-/
+  // Formular-Beschriftung). Both the table column and the form label.
+  'profile.label_apikey_name',
+  'profile.apikey_form_label_name',
+
   // Add new entries here as deliberate exceptions, with a justifying comment.
 ]);
 

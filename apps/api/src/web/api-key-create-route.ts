@@ -39,18 +39,17 @@ const CreateQuery = z.object({
   createflash: z.string().optional(),
 });
 
-// Allowlist for createflash. Map (not Record) to avoid
+// Plan 8e Task 6: createflash allowlist now maps to i18n message-keys
+// (resolved via req.t(... 'profile') at render-time). EN/DE flash texts
+// live in apps/api/locales/<lng>/profile.json. Map (not Record) to avoid
 // security/detect-object-injection lint warnings. Values outside the map →
 // flash null (C3-PR allowlist gate, prevents URL-injection of arbitrary
 // flash text).
-const CREATE_FLASH_MAP = new Map<string, { level: 'error' | 'info'; message: string }>([
-  [
-    'csrf-stale',
-    {
-      level: 'error',
-      message: 'Your session token had to be refreshed. Please try again.',
-    },
-  ],
+const CREATE_FLASH_MAP = new Map<
+  string,
+  { level: 'error' | 'info'; messageKey: string }
+>([
+  ['csrf-stale', { level: 'error', messageKey: 'flash_csrf_stale' }],
 ]);
 
 export const apiKeyCreateRoutePlugin: FastifyPluginAsync = async (app) => {
@@ -60,9 +59,18 @@ export const apiKeyCreateRoutePlugin: FastifyPluginAsync = async (app) => {
     async (req, reply) => {
       reply.header('cache-control', 'no-store, max-age=0');
       const { createflash } = req.query as z.infer<typeof CreateQuery>;
-      const flash = createflash ? (CREATE_FLASH_MAP.get(createflash) ?? null) : null;
+      const flashEntry = createflash
+        ? (CREATE_FLASH_MAP.get(createflash) ?? null)
+        : null;
+      // Plan 8e Task 6: resolve flash messageKey via req.t at render-time.
+      const flash = flashEntry
+        ? {
+            level: flashEntry.level,
+            message: req.t(flashEntry.messageKey, undefined, 'profile'),
+          }
+        : null;
       return reply.view('api-key-form', {
-        title: 'Create API key',
+        title: req.t('page_title_api_key_create', undefined, 'profile'),
         _csrfField: reply.renderCsrfField(),
         flash,
       });
@@ -80,9 +88,13 @@ export const apiKeyCreateRoutePlugin: FastifyPluginAsync = async (app) => {
     async (req, reply) => {
       const parsed = CreateForm.safeParse(req.body);
       if (!parsed.success) {
+        // Plan 8e Task 6: i18n flash message + page title via req.t.
         return reply.code(400).view('api-key-form', {
-          title: 'Create API key',
-          flash: { level: 'error', message: 'Name is required (1–64 chars).' },
+          title: req.t('page_title_api_key_create', undefined, 'profile'),
+          flash: {
+            level: 'error',
+            message: req.t('flash_apikey_name_required', undefined, 'profile'),
+          },
           _csrfField: reply.renderCsrfField(),
         });
       }
@@ -120,9 +132,13 @@ export const apiKeyCreateRoutePlugin: FastifyPluginAsync = async (app) => {
           .send();
       }
       if (inner.statusCode !== 201) {
+        // Plan 8e Task 6: i18n flash message + page title via req.t.
         return reply.code(inner.statusCode).view('api-key-form', {
-          title: 'Create API key',
-          flash: { level: 'error', message: 'Could not create key. Try again.' },
+          title: req.t('page_title_api_key_create', undefined, 'profile'),
+          flash: {
+            level: 'error',
+            message: req.t('flash_apikey_create_failed', undefined, 'profile'),
+          },
           _csrfField: reply.renderCsrfField(),
         });
       }
@@ -145,8 +161,10 @@ export const apiKeyCreateRoutePlugin: FastifyPluginAsync = async (app) => {
       // proxy cache. C9-PR Round-2: Pragma:no-cache deliberately NOT set
       // (HTTP/1.0 Request-only, ignored on responses).
       reply.header('cache-control', 'no-store, max-age=0');
+      // Plan 8e Task 6: i18n page title via req.t. The raw `key` is the
+      // one-time-reveal value (canonical, never translated — it's a secret).
       return reply.view('api-key-created', {
-        title: 'API key created',
+        title: req.t('page_title_api_key_created', undefined, 'profile'),
         key: created.key,
         keyName: created.name,
         keyPrefix: created.keyPrefix,

@@ -24,6 +24,7 @@ const TEST_EMAILS = [
   'apikey-create-toolong@test.invalid',
   'apikey-create-c5@test.invalid',
   'apikey-create-wcpr3@test.invalid',
+  'apikey-create-de@test.invalid',
 ];
 
 const config: Config = {
@@ -555,6 +556,41 @@ describe('web/api-key-create-route', () => {
       expect(res.body).toMatch(
         /<code class="api-key-secret">[A-Za-z0-9_-]{30,}<\/code>/,
       );
+    } finally {
+      await app.close();
+    }
+  });
+
+  // 14. Plan 8e Task 6 Step 1: DE-render PFLICHT — POST with mc_locale=de
+  // renders the api-key-created (one-time-reveal) page in German. Asserts
+  // the full create-flow respects the locale cookie end-to-end (template
+  // migration + req.t in the handler must both be wired up).
+  it('POST /profile/api-keys with mc_locale=de renders DE one-time-reveal page', async () => {
+    const app = await buildServer(config);
+    try {
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
+        app,
+        'apikey-create-de@test.invalid',
+      );
+      // Append mc_locale=de to the cookie header — detectLocale() reads the
+      // mc_locale cookie before falling back to Accept-Language.
+      const cookieWithLocale = `${cookieHeader}; mc_locale=de`;
+      const res = await app.inject({
+        method: 'POST',
+        url: '/profile/api-keys',
+        headers: {
+          cookie: cookieWithLocale,
+          'content-type': 'application/x-www-form-urlencoded',
+          'x-csrf-token': csrf,
+        },
+        payload: `name=de-test-key&_csrf=${encodeURIComponent(csrf)}`,
+      });
+      expect(res.statusCode).toBe(200);
+      // DE strings from apps/api/locales/de/profile.json: heading
+      // "API-Schlüssel erstellt" and warning "Schlüssel jetzt kopieren".
+      expect(res.body).toMatch(/API-Schlüssel erstellt|Schlüssel jetzt kopieren/);
+      // Sanity: the EN heading must NOT appear (would mean locale-fallback to EN).
+      expect(res.body).not.toMatch(/<h1>API key created<\/h1>/);
     } finally {
       await app.close();
     }

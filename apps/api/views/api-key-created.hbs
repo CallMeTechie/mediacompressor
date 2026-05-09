@@ -1,16 +1,16 @@
 <header class="page-header">
-  <h1>API key created</h1>
-  <nav class="page-nav"><a href="/profile/api-keys">Back to API keys</a></nav>
+  <h1>{{t 'page_title_api_key_created' ns='profile'}}</h1>
+  <nav class="page-nav"><a href="/profile/api-keys">{{t 'nav_back_to_api_keys' ns='profile'}}</a></nav>
 </header>
 
 <div class="flash flash-info">
-  <p><strong>Copy your key NOW. It will not be shown again.</strong></p>
+  <p><strong>{{t 'apikey_created_warning' ns='profile'}}</strong></p>
 </div>
 
 <dl class="api-key-detail">
-  <dt>Name</dt><dd>{{keyName}}</dd>
-  <dt>Prefix</dt><dd><code>{{keyPrefix}}</code></dd>
-  <dt>Key</dt><dd><code class="api-key-secret">{{key}}</code></dd>
+  <dt>{{t 'label_apikey_name' ns='profile'}}</dt><dd>{{keyName}}</dd>
+  <dt>{{t 'label_apikey_prefix' ns='profile'}}</dt><dd><code>{{keyPrefix}}</code></dd>
+  <dt>{{t 'apikey_created_label_key' ns='profile'}}</dt><dd><code class="api-key-secret">{{key}}</code></dd>
 </dl>
 
-<p>Use this key in the <code>Authorization: Bearer &lt;key&gt;</code> header of every request.</p>
+<p>{{t 'apikey_created_usage_hint_prefix' ns='profile'}} <code>Authorization: Bearer &lt;key&gt;</code> {{t 'apikey_created_usage_hint_suffix' ns='profile'}}</p>

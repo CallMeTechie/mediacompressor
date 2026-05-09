@@ -1,8 +1,8 @@
 <header class="page-header">
-  <h1>API Keys</h1>
+  <h1>{{t 'page_title_api_keys' ns='profile'}}</h1>
   <nav class="page-nav">
-    <a href="/profile">Profile</a>
-    <a href="/profile/api-keys/new" class="btn">Create API key</a>
+    <a href="/profile">{{t 'nav_profile' ns='profile'}}</a>
+    <a href="/profile/api-keys/new" class="btn">{{t 'button_apikey_create' ns='profile'}}</a>
   </nav>
 </header>
 
@@ -10,7 +10,7 @@
 
 {{#if keys.length}}
 <table class="profile-table">
-  <thead><tr><th>Name</th><th>Prefix</th><th>Scopes</th><th>Created</th><th>Last used</th><th></th></tr></thead>
+  <thead><tr><th>{{t 'label_apikey_name' ns='profile'}}</th><th>{{t 'label_apikey_prefix' ns='profile'}}</th><th>{{t 'label_apikey_scopes' ns='profile'}}</th><th>{{t 'label_apikey_created' ns='profile'}}</th><th>{{t 'label_apikey_last_used' ns='profile'}}</th><th></th></tr></thead>
   <tbody>
     {{#each keys}}
       <tr>
@@ -19,16 +19,18 @@
         <td><code>{{#each scopes}}{{this}} {{/each}}</code></td>
         <td><time datetime="{{createdAt}}">{{createdAt}}</time></td>
         <td>
-          {{#if lastUsedAt}}<time datetime="{{lastUsedAt}}">{{lastUsedAt}}</time>{{else}}<span class="muted">never</span>{{/if}}
+          {{#if lastUsedAt}}<time datetime="{{lastUsedAt}}">{{lastUsedAt}}</time>{{else}}<span class="muted">{{t 'label_apikey_never_used' ns='profile'}}</span>{{/if}}
         </td>
         <td>
           <form method="POST" action="/profile/api-keys/{{id}}/revoke" class="inline-form">
             {{!-- Inside {{#each keys}} the partial sees the row as its own
                  context. Pass @root so {{> csrf}} resolves _csrfField
                  against the parent view-context (Plan-8d Task 7 regression
-                 fix; same pattern as admin-invites-list.hbs). --}}
+                 fix; same pattern as admin-invites-list.hbs). MUST stay
+                 `@root` after the Plan-8e i18n migration — see WC-i18n-5
+                 PFLICHT in api-keys-list-page.test.ts. --}}
             {{> csrf @root}}
-            <button type="submit" class="btn-link">Revoke</button>
+            <button type="submit" class="btn-link">{{t 'button_apikey_revoke' ns='profile'}}</button>
           </form>
         </td>
       </tr>
@@ -36,5 +38,5 @@
   </tbody>
 </table>
 {{else}}
-<p class="muted">No API keys yet. <a href="/profile/api-keys/new">Create your first one</a>.</p>
+<p class="muted">{{t 'apikey_empty_list' ns='profile'}} <a href="/profile/api-keys/new">{{t 'apikey_empty_link' ns='profile'}}</a>.</p>
 {{/if}}

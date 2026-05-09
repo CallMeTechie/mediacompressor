@@ -331,6 +331,64 @@ describe('web/api-keys-list-page', () => {
     }
   });
 
+  // Plan 8e Task 6 Step 3 — WC-i18n-5 PFLICHT: post-i18n-migration regression
+  // target. The Plan 8d Task 7 fix (commit c835163) wired `{{> csrf @root}}`
+  // inside `{{#each keys}}` so each per-row revoke-form ships a populated
+  // `_csrf` input. The Plan 8e i18n template-migration MUST NOT regress this
+  // (a subagent re-writing the template could accidentally drop `@root` or
+  // restructure the `{{#each}}` block in a way that loses the parent context
+  // when the partial is invoked). This test extracts EVERY revoke-form action
+  // URL on the rendered page and asserts each one carries a non-empty
+  // _csrf input.
+  it('PFLICHT WC-i18n-5: api-key revoke form inside {{#each keys}} carries _csrf even after i18n migration', async () => {
+    const app = await buildServer(config);
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: 'apikeys-list-many@test.invalid' },
+      });
+      // Seed 2 active keys so the loop renders >= 2 revoke-forms. The
+      // beforeEach hook auto-cleans these afterwards.
+      const seed = [
+        { name: 'wci18n5-key-alpha', keyPrefix: 'aaaa1111', keyHash: 'a'.repeat(64) },
+        { name: 'wci18n5-key-beta', keyPrefix: 'bbbb2222', keyHash: 'b'.repeat(64) },
+      ];
+      for (const k of seed) {
+        await prisma.apiKey.create({
+          data: {
+            userId: user!.id,
+            name: k.name,
+            keyHash: k.keyHash,
+            keyPrefix: k.keyPrefix,
+            scopes: ['jobs:read'],
+          },
+        });
+      }
+
+      const cookie = await loginAndCookies(app, 'apikeys-list-many@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: '/profile/api-keys',
+        headers: { cookie, accept: 'text/html' },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.body as string;
+
+      // Greedy form-extraction over EVERY api-key revoke form on the page.
+      const apiKeyRevokeMatches = body.match(
+        /<form[^>]*action="\/profile\/api-keys\/[a-f0-9-]+\/revoke"[\s\S]*?<\/form>/g,
+      );
+      expect(apiKeyRevokeMatches?.length ?? 0).toBeGreaterThanOrEqual(2);
+      for (const formHtml of apiKeyRevokeMatches!) {
+        expect(
+          formHtml,
+          `WC-i18n-5 regression: form ${formHtml.slice(0, 80)} missing _csrf input`,
+        ).toMatch(/<input[^>]*name="_csrf"[^>]*value="[^"]+"/);
+      }
+    } finally {
+      await app.close();
+    }
+  });
+
   // 6. C3-PR PFLICHT — revokeflash allowlist gate.
   it('C3-PR: GET /profile/api-keys?revokeflash=evil-marker-list does NOT render the marker', async () => {
     const app = await buildServer(config);

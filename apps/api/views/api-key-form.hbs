@@ -1,6 +1,6 @@
 <header class="page-header">
-  <h1>Create API key</h1>
-  <nav class="page-nav"><a href="/profile/api-keys">Cancel</a></nav>
+  <h1>{{t 'page_title_api_key_create' ns='profile'}}</h1>
+  <nav class="page-nav"><a href="/profile/api-keys">{{t 'nav_cancel' ns='profile'}}</a></nav>
 </header>
 
 {{> flash}}
@@ -8,9 +8,9 @@
 <form method="POST" action="/profile/api-keys" class="api-key-form">
   {{> csrf}}
   <div class="form-field">
-    <label for="name">Name</label>
+    <label for="name">{{t 'apikey_form_label_name' ns='profile'}}</label>
     <input id="name" name="name" type="text" required maxlength="64" autofocus>
   </div>
-  <p class="muted">Scopes: <code>jobs:read jobs:write</code></p>
-  <button type="submit" class="btn">Create</button>
+  <p class="muted">{{t 'apikey_form_hint_scopes' ns='profile'}} <code>jobs:read jobs:write</code></p>
+  <button type="submit" class="btn">{{t 'apikey_form_button_submit' ns='profile'}}</button>
 </form>

@@ -1,8 +1,8 @@
 <header class="page-header">
-  <h1>Profile</h1>
+  <h1>{{t 'page_title_profile' ns='profile'}}</h1>
   <nav class="page-nav">
-    <a href="/">Dashboard</a>
-    <a href="/profile/api-keys">API Keys</a>
+    <a href="/">{{t 'nav_dashboard' ns='profile'}}</a>
+    <a href="/profile/api-keys">{{t 'nav_api_keys' ns='profile'}}</a>
   </nav>
 </header>
 
@@ -10,13 +10,13 @@
 
 <section class="profile-summary">
   <p><strong>{{user.email}}</strong> &middot; {{user.role}} &middot; {{user.status}}</p>
-  <p class="muted">Quota: {{user.storageQuota}} bytes storage &middot; {{user.parallelQuota}} parallel &middot; {{user.hourlyQuota}}/h</p>
+  <p class="muted">{{t 'label_quota_summary' ns='profile' storage=user.storageQuota parallel=user.parallelQuota hourly=user.hourlyQuota}}</p>
 </section>
 
 <section>
-  <h2>Active sessions ({{sessions.length}})</h2>
+  <h2>{{t 'section_sessions' ns='profile' count=sessions.length}}</h2>
   <table class="profile-table">
-    <thead><tr><th>User-Agent</th><th>IP</th><th>Last used</th><th>Expires</th><th></th></tr></thead>
+    <thead><tr><th>{{t 'label_session_user_agent' ns='profile'}}</th><th>{{t 'label_session_ip' ns='profile'}}</th><th>{{t 'label_session_last_used' ns='profile'}}</th><th>{{t 'label_session_expires' ns='profile'}}</th><th></th></tr></thead>
     <tbody>
       {{#each sessions}}
         <tr class="session-row{{#if isCurrent}} current{{/if}}">
@@ -26,16 +26,18 @@
           <td><time datetime="{{expiresAt}}">{{expiresAt}}</time></td>
           <td>
             {{#if isCurrent}}
-              <span class="muted">(this device)</span>
+              <span class="muted">{{t 'label_session_current' ns='profile'}}</span>
             {{else}}
               <form method="POST" action="/profile/sessions/{{id}}/revoke" class="inline-form">
                 {{!-- Inside {{#each sessions}} the partial sees the row as
                      its own context. Pass @root so {{> csrf}} resolves
                      _csrfField against the parent view-context (Plan-8d
                      Task 7 regression fix; same pattern as
-                     admin-invites-list.hbs). --}}
+                     admin-invites-list.hbs). MUST stay `@root` after the
+                     Plan-8e i18n migration — see WC-i18n-5 PFLICHT in
+                     profile-page.test.ts. --}}
                 {{> csrf @root}}
-                <button type="submit" class="btn-link">Sign out</button>
+                <button type="submit" class="btn-link">{{t 'button_revoke_session' ns='profile'}}</button>
               </form>
             {{/if}}
           </td>

@@ -20,20 +20,18 @@ const Query = z.object({
   revokeflash: z.string().optional(),
 });
 
-// Allowlist for revokeflash query param. Map (not Record) to avoid
-// security/detect-object-injection lint warning. Mirrors the FLASH_MAP
-// pattern used in profile-page.ts (Plan 8c Task 1) and Plan-8b's
-// job-detail-page.ts (C6-LI). Any value outside the map → flash null
-// (C3-PR allowlist gate, prevents URL-injection of arbitrary flash text).
-const REVOKE_FLASH_MAP = new Map<string, { level: 'error' | 'info'; message: string }>([
-  ['revoked', { level: 'info', message: 'API key revoked.' }],
-  [
-    'csrf-stale',
-    {
-      level: 'error',
-      message: 'Your session token had to be refreshed. Please try again.',
-    },
-  ],
+// Plan 8e Task 6: revokeflash allowlist now maps to i18n message-keys
+// (resolved via req.t(... 'profile') at render-time). EN/DE flash texts
+// live in apps/api/locales/<lng>/profile.json. Map (not Record) to avoid
+// security/detect-object-injection lint warning. Any value outside the
+// map → flash null (C3-PR allowlist gate, prevents URL-injection of
+// arbitrary flash text).
+const REVOKE_FLASH_MAP = new Map<
+  string,
+  { level: 'error' | 'info'; messageKey: string }
+>([
+  ['revoked', { level: 'info', messageKey: 'flash_apikey_revoked' }],
+  ['csrf-stale', { level: 'error', messageKey: 'flash_csrf_stale' }],
 ]);
 
 export const apiKeysListPagePlugin: FastifyPluginAsync = async (app) => {
@@ -67,10 +65,17 @@ export const apiKeysListPagePlugin: FastifyPluginAsync = async (app) => {
       });
 
       const { revokeflash } = req.query as z.infer<typeof Query>;
-      const flash = revokeflash ? (REVOKE_FLASH_MAP.get(revokeflash) ?? null) : null;
+      const flashEntry = revokeflash ? (REVOKE_FLASH_MAP.get(revokeflash) ?? null) : null;
+      // Plan 8e Task 6: resolve flash messageKey via req.t at render-time.
+      const flash = flashEntry
+        ? {
+            level: flashEntry.level,
+            message: req.t(flashEntry.messageKey, undefined, 'profile'),
+          }
+        : null;
 
       return reply.view('api-keys-list', {
-        title: 'API Keys',
+        title: req.t('page_title_api_keys', undefined, 'profile'),
         keys: keys.map((k) => ({
           id: k.id,
           name: k.name,

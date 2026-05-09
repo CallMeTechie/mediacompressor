@@ -22,22 +22,22 @@ const Query = z.object({
   revokeflash: z.string().optional(),
 });
 
-// Allowlist of accepted revokeflash values. Any other query string → flash
-// is null, preventing URL-injection of arbitrary flash text (C3-PR).
+// Plan 8e Task 6: revokeflash allowlist now maps to i18n message-keys
+// instead of hardcoded English strings. The handler resolves the key via
+// req.t(... 'profile') at render-time, so DE users see DE flash text and
+// the URL-injection allowlist (C3-PR) is preserved (unknown ?revokeflash
+// values still drop to null → no flash banner rendered).
 //
 // Implemented as a Map so eslint's `security/detect-object-injection` rule
 // doesn't flag the lookup (Map.get() doesn't expose prototype properties to
 // arbitrary string keys the way bracket-indexing a plain object does).
 // Mirrors the FLASH_MAP pattern in job-detail-page.ts (Plan 8b C6-LI).
-const REVOKE_FLASH_MAP = new Map<string, { level: 'error' | 'info'; message: string }>([
-  [
-    'current-session',
-    {
-      level: 'error',
-      message: 'Cannot revoke the current device. Use Sign out instead.',
-    },
-  ],
-  ['revoked', { level: 'info', message: 'Session revoked.' }],
+const REVOKE_FLASH_MAP = new Map<
+  string,
+  { level: 'error' | 'info'; messageKey: string }
+>([
+  ['current-session', { level: 'error', messageKey: 'flash_session_current_blocked' }],
+  ['revoked', { level: 'info', messageKey: 'flash_session_revoked' }],
 ]);
 
 export const profilePagePlugin: FastifyPluginAsync = async (app) => {
@@ -92,10 +92,18 @@ export const profilePagePlugin: FastifyPluginAsync = async (app) => {
         : '';
 
       const { revokeflash } = req.query as z.infer<typeof Query>;
-      const flash = revokeflash ? (REVOKE_FLASH_MAP.get(revokeflash) ?? null) : null;
+      const flashEntry = revokeflash ? (REVOKE_FLASH_MAP.get(revokeflash) ?? null) : null;
+      // Plan 8e Task 6: resolve the flash messageKey via req.t at render-time
+      // so DE users see DE flash text. EN remains the default-locale fallback.
+      const flash = flashEntry
+        ? {
+            level: flashEntry.level,
+            message: req.t(flashEntry.messageKey, undefined, 'profile'),
+          }
+        : null;
 
       return reply.view('profile', {
-        title: 'Profile',
+        title: req.t('page_title_profile', undefined, 'profile'),
         user: {
           email: user.email,
           role: user.role,

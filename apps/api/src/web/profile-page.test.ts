@@ -317,6 +317,77 @@ describe('web/profile-page', () => {
     }
   });
 
+  // Plan 8e Task 6 Step 3 — WC-i18n-5 PFLICHT: post-i18n-migration regression
+  // target. The Plan 8d Task 7 fix (commit c835163) wired `{{> csrf @root}}`
+  // inside `{{#each sessions}}` so each per-row revoke-form ships a populated
+  // `_csrf` input. The Plan 8e i18n template-migration MUST NOT regress this
+  // (a subagent re-writing the template could accidentally drop `@root` or
+  // restructure the `{{#each}}` block in a way that loses the parent context
+  // when the partial is invoked). This test extracts EVERY revoke-form action
+  // URL on the rendered page and asserts each one carries a non-empty
+  // _csrf input — catches the regression even on a single-session render.
+  it('PFLICHT WC-i18n-5: session-revoke form inside {{#each sessions}} carries _csrf even after i18n migration', async () => {
+    const app = await buildServer(config);
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: 'profile-multi@test.invalid' },
+      });
+      // Seed two extra non-current sessions so the loop renders >= 2 forms
+      // — multi-form is the harder case (one row's CSRF could still be there
+      // while the next row's silently empties out under context-rebind bugs).
+      const seedTokens = ['wci18n5-token-aaaaaaaaaaaaaaaa', 'wci18n5-token-bbbbbbbbbbbbbbbb'];
+      const seededIds: string[] = [];
+      for (const tok of seedTokens) {
+        const hash = hashSessionToken(tok, Buffer.from(config.SESSION_SECRET));
+        const s = await prisma.session.create({
+          data: {
+            userId: user!.id,
+            tokenHash: hash,
+            userAgent: `WCi18n5Browser/${tok.slice(-4)}`,
+            ip: '10.0.0.1',
+            expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          },
+        });
+        seededIds.push(s.id);
+      }
+
+      try {
+        const cookie = await loginAndCookies(app, 'profile-multi@test.invalid');
+        const res = await app.inject({
+          method: 'GET',
+          url: '/profile',
+          headers: { cookie, accept: 'text/html' },
+        });
+        expect(res.statusCode).toBe(200);
+        const body = res.body as string;
+
+        // Greedy form-extraction over EVERY session-revoke form on the page.
+        // The `[\s\S]*?` makes the match non-greedy so each `<form>...</form>`
+        // pair is captured separately.
+        const sessionsRevokeMatches = body.match(
+          /<form[^>]*action="\/profile\/sessions\/[a-f0-9-]+\/revoke"[\s\S]*?<\/form>/g,
+        );
+        expect(sessionsRevokeMatches?.length ?? 0).toBeGreaterThanOrEqual(1);
+        for (const formHtml of sessionsRevokeMatches!) {
+          // Each form MUST carry a populated `_csrf` input. The i18n migration
+          // re-writes the template; this test is the Plan 8d -> 8e bridge
+          // regression-guard.
+          expect(
+            formHtml,
+            `WC-i18n-5 regression: form ${formHtml.slice(0, 80)} missing _csrf input`,
+          ).toMatch(/<input[^>]*name="_csrf"[^>]*value="[^"]+"/);
+        }
+      } finally {
+        // Cleanup the seeded sessions so subsequent tests start clean.
+        for (const sid of seededIds) {
+          await prisma.session.delete({ where: { id: sid } }).catch(() => undefined);
+        }
+      }
+    } finally {
+      await app.close();
+    }
+  });
+
   // C3-PR PFLICHT — revokeflash allowlist gate: arbitrary query values must
   // NOT be rendered as flash text (URL-injection phishing vector).
   it('C3-PR: GET /profile?revokeflash=evil-marker-profile does NOT render the marker', async () => {
