@@ -33,22 +33,25 @@ export const inviteRedeemPagePlugin: FastifyPluginAsync = async (app) => {
     const tokenHash = hashInviteToken(token, invitePepper);
     const invite = await prisma.invite.findUnique({ where: { token: tokenHash } });
     if (!invite) {
+      // 404 stays in the `common` namespace — the 404 template (Task 2) renders
+      // its own title/body via i18n; the title prop is overridden by the
+      // template if absent, but we keep an EN fallback for layout consistency.
       return reply.code(404).view('404', { title: 'Not found', path: req.url });
     }
     if (invite.consumedAt) {
       return reply.code(410).view('invite-redeem', {
-        title: 'Invite already used',
+        title: req.t('invite_redeem_title', undefined, 'auth'),
         consumed: true,
       });
     }
     if (invite.expiresAt < new Date()) {
       return reply.code(410).view('invite-redeem', {
-        title: 'Invite expired',
+        title: req.t('invite_redeem_title', undefined, 'auth'),
         expired: true,
       });
     }
     return reply.view('invite-redeem', {
-      title: 'Create your account',
+      title: req.t('invite_redeem_title', undefined, 'auth'),
       token,
       email: invite.email ?? '',
       _csrfField: reply.renderCsrfField(),
@@ -63,9 +66,12 @@ export const inviteRedeemPagePlugin: FastifyPluginAsync = async (app) => {
       const parsed = InviteForm.safeParse(req.body);
       if (!parsed.success) {
         return reply.code(400).view('invite-redeem', {
-          title: 'Create your account',
+          title: req.t('invite_redeem_title', undefined, 'auth'),
           token,
-          flash: { level: 'error', message: 'Email and password (12+ chars) required' },
+          flash: {
+            level: 'error',
+            message: req.t('invite_redeem_flash_password_too_short', undefined, 'auth'),
+          },
           _csrfField: reply.renderCsrfField(),
           email:
             typeof (req.body as Record<string, unknown> | undefined)?.email === 'string'
@@ -99,7 +105,7 @@ export const inviteRedeemPagePlugin: FastifyPluginAsync = async (app) => {
           return reply.code(404).view('404', { title: 'Not found', path: req.url });
         }
         return reply.code(410).view('invite-redeem', {
-          title: 'Invite no longer valid',
+          title: req.t('invite_redeem_title', undefined, 'auth'),
           consumed: probe.consumedAt != null,
           expired: probe.consumedAt == null && probe.expiresAt < new Date(),
         });
@@ -118,8 +124,11 @@ export const inviteRedeemPagePlugin: FastifyPluginAsync = async (app) => {
           where: { id: invite.id },
           data: { consumedAt: null },
         });
+        // Email-mismatch flash is OUTSIDE the plan's 16-key list; per WC-i18n-19
+        // (Plan 8e Rev. 2.1) only listed keys are migrated this task. The
+        // English literal stays — Plan-8f follow-up will add this key.
         return reply.code(400).view('invite-redeem', {
-          title: 'Create your account',
+          title: req.t('invite_redeem_title', undefined, 'auth'),
           token,
           flash: { level: 'error', message: 'This invite is bound to a different email' },
           _csrfField: reply.renderCsrfField(),
@@ -170,8 +179,11 @@ export const inviteRedeemPagePlugin: FastifyPluginAsync = async (app) => {
             );
           });
         if ((err as { code?: string }).code === 'P2002') {
+          // Email-already-registered flash is OUTSIDE the plan's 16-key list;
+          // per WC-i18n-19 only listed keys are migrated this task. EN literal
+          // stays — Plan-8f follow-up will add this key.
           return reply.code(409).view('invite-redeem', {
-            title: 'Create your account',
+            title: req.t('invite_redeem_title', undefined, 'auth'),
             token,
             flash: { level: 'error', message: 'Email is already registered' },
             _csrfField: reply.renderCsrfField(),

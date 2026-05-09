@@ -14,7 +14,7 @@ import IORedis from 'ioredis';
 import { buildServer } from '../server.js';
 import type { Config } from '../config.js';
 
-const TEST_EMAILS = ['login-page@test.invalid'];
+const TEST_EMAILS = ['login-page@test.invalid', 'auth-de@test.invalid'];
 const config: Config = {
   DATABASE_URL: testDatabaseUrl(),
   REDIS_URL: testRedisUrl(),
@@ -48,11 +48,15 @@ describe('web/login-page', () => {
       email: 'login-page@test.invalid',
       password: 'hunter22hunter22',
     });
+    await createTestUser(prisma, {
+      email: 'auth-de@test.invalid',
+      password: 'hunter22hunter22',
+    });
   });
 
   beforeEach(async () => {
     // Drain rate-limit keys so re-runs don't 429.
-    await resetLoginRateLimits(redis, ['login-page@test.invalid']);
+    await resetLoginRateLimits(redis, ['login-page@test.invalid', 'auth-de@test.invalid']);
   });
 
   afterAll(async () => {
@@ -129,6 +133,34 @@ describe('web/login-page', () => {
       const setCookie = post.headers['set-cookie'];
       const cookies = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
       expect(cookies.some((c) => c?.startsWith('mc_session='))).toBe(false);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // Plan 8e Task 3 (Step 1) — DE-flash on wrong-password login.
+  // Asserts that with `mc_locale=de`, the wrong-password flash renders the
+  // German translation, proving the route-handler resolves flash messages via
+  // i18n instead of a hardcoded English literal.
+  it('login with wrong password renders flash-error in DE when mc_locale=de', async () => {
+    const app = await buildServer(config);
+    try {
+      // Reuse getLoginForm to capture mc_csrf cookie + form-token, then
+      // append mc_locale=de so the i18n onRequest hook flips req.locale.
+      const { cookieHeader, csrf } = await getLoginForm(app);
+      const localeCookie = `${cookieHeader}; mc_locale=de`;
+      const post = await app.inject({
+        method: 'POST',
+        url: '/login',
+        headers: {
+          cookie: localeCookie,
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+        payload: `email=auth-de%40test.invalid&password=wrong&_csrf=${encodeURIComponent(csrf)}`,
+      });
+      expect(post.statusCode).toBe(200);
+      expect(post.body).toContain('flash-error');
+      expect(post.body).toMatch(/Ungültige E-Mail oder Passwort|Ungültige Anmeldedaten/);
     } finally {
       await app.close();
     }

@@ -8,12 +8,12 @@ const LoginForm = z.object({
 });
 
 export const loginPagePlugin: FastifyPluginAsync = async (app) => {
-  app.get('/login', async (_req, reply) => {
+  app.get('/login', async (req, reply) => {
     // WC7: form pages must not be cached — stale CSRF token would 403 on submit
     // after browser-back, and CSRF tokens shouldn't persist on shared workstations.
     reply.header('cache-control', 'no-store, max-age=0');
     return reply.view('login', {
-      title: 'Sign in',
+      title: req.t('login_title', undefined, 'auth'),
       _csrfField: reply.renderCsrfField(),
       email: '',
     });
@@ -29,10 +29,16 @@ export const loginPagePlugin: FastifyPluginAsync = async (app) => {
     async (req, reply) => {
       const parsed = LoginForm.safeParse(req.body);
       if (!parsed.success) {
+        // Plan 8e Task 3: invalid-input branch reuses the credentials flash so
+        // we don't leak zod-validation vs wrong-password — both surface the
+        // same locale-aware "Invalid email or password" message.
         return reply.view('login', {
-          title: 'Sign in',
+          title: req.t('login_title', undefined, 'auth'),
           _csrfField: reply.renderCsrfField(),
-          flash: { level: 'error', message: 'Email and password required' },
+          flash: {
+            level: 'error',
+            message: req.t('login_flash_invalid_credentials', undefined, 'auth'),
+          },
           email:
             typeof (req.body as Record<string, unknown> | undefined)?.email === 'string'
               ? (req.body as Record<string, string>).email
@@ -58,20 +64,22 @@ export const loginPagePlugin: FastifyPluginAsync = async (app) => {
       if (inner.statusCode !== 200) {
         // 401, 429 etc. Render the form again with a generic error to avoid
         // leaking the failure mode (e.g. distinguishing "no such user" from
-        // "wrong password"). Existing JSON envelope: { error: { code, message } }.
-        const body = (() => {
-          try {
-            return inner.json() as { error?: { message?: string } };
-          } catch {
-            return { error: { message: 'Login failed' } };
-          }
-        })();
+        // "wrong password").
+        //
+        // Plan 8e Task 3: previously we surfaced the inner JSON `error.message`
+        // verbatim, which was always English ("Invalid credentials" / "Too
+        // many login attempts"). Now we always render the locale-aware
+        // `login_flash_invalid_credentials` so DE users see DE strings. The
+        // 429-rate-limit branch is folded into the generic flash for the same
+        // info-leak reason — distinguishing 429 from 401 helps an attacker
+        // probe the rate-limit, so we already wanted them to render the same
+        // way to the user.
         return reply.code(200).view('login', {
-          title: 'Sign in',
+          title: req.t('login_title', undefined, 'auth'),
           _csrfField: reply.renderCsrfField(),
           flash: {
             level: 'error',
-            message: body.error?.message ?? 'Invalid email or password',
+            message: req.t('login_flash_invalid_credentials', undefined, 'auth'),
           },
           email,
         });

@@ -126,7 +126,12 @@ describe('web/invite-redeem-page', () => {
       const { token } = await seedInvite({ consumedAt: new Date() });
       const res = await app.inject({ method: 'GET', url: `/invites/${token}` });
       expect(res.statusCode).toBe(410);
-      expect(res.body).toMatch(/already (used|consumed)/i);
+      // Plan 8e Task 3: page-title is now the generic "Complete your account"
+      // (i18n'd) for all invite-redeem branches; the consumed-state explanation
+      // now lives in the flash-error paragraph rendered by the consumed-branch
+      // of the template. Match on the full sentence so a future copy-edit that
+      // says "already used" or "already been used" both pass.
+      expect(res.body).toMatch(/already (been )?used/i);
     } finally {
       await app.close();
     }
@@ -212,6 +217,37 @@ describe('web/invite-redeem-page', () => {
       // Second GET → 410.
       const res2 = await app.inject({ method: 'GET', url: `/invites/${token}` });
       expect(res2.statusCode).toBe(410);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // Plan 8e Task 3 — DE-flash + DE-labels on invite-redeem 400 branch.
+  // Asserts that with `mc_locale=de`, the page-title + visible labels flip
+  // to German. The email-mismatch flash itself is outside the plan's 16-key
+  // list (per WC-i18n-19 only listed keys are migrated this task), so we
+  // assert on the DE title + DE form-labels, which prove i18n is wired into
+  // the handler's reply.view() call.
+  it('POST /invites/:token email-mismatch renders DE title + labels when mc_locale=de', async () => {
+    const app = await buildServer(config);
+    try {
+      const { token } = await seedInvite({ email: 'inv-redeem-new@test.invalid' });
+      const { cookieHeader, csrf } = await getInviteForm(app, token);
+      const localeCookie = `${cookieHeader}; mc_locale=de`;
+      const post = await app.inject({
+        method: 'POST',
+        url: `/invites/${token}`,
+        headers: {
+          cookie: localeCookie,
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+        payload: `email=different%40test.invalid&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf)}`,
+      });
+      expect(post.statusCode).toBe(400);
+      // DE title from auth.json (`invite_redeem_title` = "Konto fertig einrichten").
+      expect(post.body).toMatch(/Konto fertig einrichten/);
+      // DE labels from the migrated invite-redeem.hbs.
+      expect(post.body).toMatch(/Passwort/);
     } finally {
       await app.close();
     }
