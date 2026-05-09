@@ -1,18 +1,18 @@
 <header class="page-header">
-  <h1>Dashboard</h1>
+  <h1>{{t 'page_title' ns='dashboard'}}</h1>
   <nav class="page-nav">
-    <a href="/jobs">All jobs</a>
-    <a href="/upload">Upload</a>
+    <a href="/jobs">{{t 'nav_link_all_jobs' ns='dashboard'}}</a>
+    <a href="/upload">{{t 'nav_link_upload' ns='dashboard'}}</a>
   </nav>
 </header>
 
 <section class="dashboard-summary">
-  <p>Welcome back, <strong>{{user.email}}</strong></p>
-  <p class="muted">{{inFlightCount}} job(s) in flight. <a href="/jobs">View all</a>.</p>
+  <p>{{t 'welcome_heading' ns='dashboard' email=user.email}}</p>
+  <p class="muted">{{t 'summary_in_flight' ns='dashboard' count=inFlightCount}} <a href="/jobs">{{t 'link_view_all_jobs' ns='dashboard'}}</a></p>
 </section>
 
 <section class="recent-jobs">
-  <h2>Recent jobs</h2>
+  <h2>{{t 'section_recent_jobs' ns='dashboard'}}</h2>
   {{#if recentJobs.length}}
   <ul class="job-list">
     {{#each recentJobs}}
@@ -24,6 +24,6 @@
     {{/each}}
   </ul>
   {{else}}
-  <p class="muted">No jobs yet. <a href="/upload">Upload your first file</a>.</p>
+  <p class="muted">{{t 'empty_no_jobs' ns='dashboard'}} <a href="/upload">{{t 'button_new_upload' ns='dashboard'}}</a>.</p>
   {{/if}}
 </section>

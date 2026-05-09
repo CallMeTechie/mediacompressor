@@ -54,7 +54,10 @@ export const dashboardPagePlugin: FastifyPluginAsync = async (app) => {
     ]);
 
     return reply.view('dashboard', {
-      title: 'Dashboard',
+      // Plan 8e Task 4: page-title resolved via req.t with explicit
+      // `ns: 'dashboard'` (typed Namespace). defaultNS is still `'admin'`
+      // (Task 7 cleanup), so the namespace MUST be passed explicitly here.
+      title: req.t('page_title', undefined, 'dashboard'),
       user: {
         email: user?.email ?? '',
         storageQuota: String(user?.storageQuota ?? 0n),

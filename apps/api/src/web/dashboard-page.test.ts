@@ -18,6 +18,7 @@ const TEST_EMAILS = [
   'dashboard-empty@test.invalid',
   'dashboard-jobs@test.invalid',
   'dashboard-xss@test.invalid',
+  'dashboard-de@test.invalid',
 ];
 const config: Config = {
   DATABASE_URL: testDatabaseUrl(),
@@ -58,6 +59,10 @@ describe('web/dashboard-page', () => {
     });
     await createTestUser(prisma, {
       email: 'dashboard-xss@test.invalid',
+      password: 'hunter22hunter22',
+    });
+    await createTestUser(prisma, {
+      email: 'dashboard-de@test.invalid',
       password: 'hunter22hunter22',
     });
   });
@@ -146,7 +151,11 @@ describe('web/dashboard-page', () => {
       });
       expect(res.statusCode).toBe(200);
       expect(res.headers['content-type']).toMatch(/text\/html/);
-      expect(res.body).toMatch(/No jobs yet/i);
+      // Plan 8e Task 4: empty-state copy migrated to i18n key
+      // `dashboard.empty_no_jobs` ("You haven't uploaded any media yet.").
+      // Handlebars HTML-escapes the apostrophe to `&#x27;`, so the regex
+      // tolerates either the literal `'` or the entity form.
+      expect(res.body).toMatch(/haven(?:'|&#x27;)t uploaded any media yet/i);
       expect(res.body).toContain('dashboard-empty@test.invalid');
     } finally {
       await app.close();
@@ -233,6 +242,40 @@ describe('web/dashboard-page', () => {
       // base.hbs (e.g. /static/vendor/htmx.min.js) are fine because they
       // don't include the alert(1) payload.
       expect(res.body).not.toContain(evilName);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // Plan 8e Task 4 (Step 1) — DE-render on dashboard.
+  // Asserts that with `mc_locale=de`, the dashboard page renders German
+  // strings from the `dashboard` namespace, proving the template + handler
+  // resolve labels via i18n with `ns: 'dashboard'` instead of hardcoded
+  // English literals. The assertions target body-level dashboard strings
+  // (welcome heading + empty-state body) — NOT chrome strings like the
+  // base-layout's "Aufgaben" nav-link, which is already DE since Task 2
+  // migrated `common.nav_jobs`. Without this scope, the test would pass
+  // even if dashboard.hbs itself were never migrated.
+  it('GET / renders dashboard with DE strings when mc_locale=de', async () => {
+    const app = await buildServer(config);
+    try {
+      const cookie = await login(app, 'dashboard-de@test.invalid');
+      const localeCookie = `${cookie}; mc_locale=de`;
+      const res = await app.inject({
+        method: 'GET',
+        url: '/',
+        headers: { accept: 'text/html', cookie: localeCookie },
+      });
+      expect(res.statusCode).toBe(200);
+      // Dashboard-namespace markers — present only after dashboard.hbs is
+      // migrated to {{t '...' ns='dashboard'}}. "Willkommen zurück" is the
+      // DE welcome heading; "noch keine Medien" is the DE empty-state body.
+      expect(res.body).toMatch(/Willkommen zurück/);
+      expect(res.body).toMatch(/noch keine Medien hochgeladen/);
+      // English source-strings from dashboard.hbs MUST NOT leak through
+      // when the locale is DE — guards against partial migration.
+      expect(res.body).not.toMatch(/Welcome back/);
+      expect(res.body).not.toMatch(/Recent jobs/);
     } finally {
       await app.close();
     }

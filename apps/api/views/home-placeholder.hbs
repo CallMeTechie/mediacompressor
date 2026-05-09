@@ -1,6 +1,6 @@
 <h1>{{title}}</h1>
-<p>You are signed in. The dashboard ships in Plan 8b.</p>
+<p>{{t 'home_tagline' ns='dashboard'}}</p>
 <form method="POST" action="/logout" style="margin-top: 1rem;">
   {{> csrf}}
-  <button type="submit" class="btn">Sign out</button>
+  <button type="submit" class="btn">{{t 'nav_logout' ns='common'}}</button>
 </form>

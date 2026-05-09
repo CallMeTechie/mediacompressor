@@ -1,3 +1,13 @@
 {
-  "_namespace": "dashboard"
+  "_namespace": "dashboard",
+  "page_title": "Dashboard",
+  "welcome_heading": "Welcome back, {{email}}",
+  "section_recent_jobs": "Recent jobs",
+  "empty_no_jobs": "You haven't uploaded any media yet.",
+  "button_new_upload": "New upload",
+  "link_view_all_jobs": "View all jobs",
+  "nav_link_all_jobs": "All jobs",
+  "nav_link_upload": "Upload",
+  "summary_in_flight": "{{count}} job(s) in flight.",
+  "home_tagline": "You are signed in. The dashboard ships in Plan 8b."
 }

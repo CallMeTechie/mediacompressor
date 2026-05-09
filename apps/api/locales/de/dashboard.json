@@ -1,3 +1,13 @@
 {
-  "_namespace": "dashboard"
+  "_namespace": "dashboard",
+  "page_title": "Übersicht",
+  "welcome_heading": "Willkommen zurück, {{email}}",
+  "section_recent_jobs": "Letzte Aufgaben",
+  "empty_no_jobs": "Du hast noch keine Medien hochgeladen.",
+  "button_new_upload": "Neue Datei hochladen",
+  "link_view_all_jobs": "Alle Aufgaben anzeigen",
+  "nav_link_all_jobs": "Alle Aufgaben",
+  "nav_link_upload": "Hochladen",
+  "summary_in_flight": "{{count}} Aufgabe(n) in Bearbeitung.",
+  "home_tagline": "Du bist angemeldet. Die Übersicht erscheint mit Plan 8b."
 }
