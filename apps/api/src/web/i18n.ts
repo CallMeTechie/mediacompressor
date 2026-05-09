@@ -192,6 +192,74 @@ export function registerTStatusHelper(i18n: i18n): void {
 }
 
 /**
+ * Plan 8e Task 5 (review concern #1, WC-i18n-task5-C1): `{{tKind kind}}` and
+ * `{{tProfile profile}}` Handlebars helpers — translate the `Job.kind`
+ * (`image`|`video`) and `Job.profile` (`web-optimized`|`mobile-low`|
+ * `archive-medium`) DB-values into locale-specific labels for display.
+ *
+ * Mirror of `registerTStatusHelper` (Task 2) — same `_locale` 3-tier priority
+ * (`@root._locale` -> `this._locale` -> DEFAULT_LOCALE) so the helpers Just
+ * Work inside `{{#each jobs}}` rows AND outside loops on plain top-level
+ * renders (e.g. job-detail.hbs).
+ *
+ * Translation Discipline (Plan 8e Sektion "Translation Discipline"): the
+ * helpers ONLY translate the visible LABEL — the canonical enum-string itself
+ * never reaches a DB-write or form-VALUE through this path. Form-radio /
+ * `<option>` values keep canonical English (see WC-i18n-8 PFLICHT in
+ * upload-wizard-page.test.ts).
+ *
+ * `tProfile`: profile-keys in jobs.json use underscores (`profile_web_optimized`)
+ * because the DB-canonical `web-optimized` contains a dash that is not a
+ * legal i18next key character; the helper normalizes via
+ * `replaceAll('-', '_')`. This mirrors the existing transformation in
+ * `upload-wizard-page.ts` and is guarded by the enum-cross-link test
+ * (concern #2).
+ *
+ * If the (kind|profile) value is unknown to the resource bundle, i18next's
+ * default missing-key handler returns the raw key string (e.g.
+ * `kind_zzzunknown`) — loud-broken, visible to QA, NOT silent-empty. This
+ * contract is asserted by the unit-tests in i18n.test.ts.
+ *
+ * Idempotent — Handlebars overwrites the previous registration.
+ */
+export function registerTKindHelper(i18n: i18n): void {
+  handlebars.registerHelper(
+    'tKind',
+    function (
+      this: { _locale?: SupportedLocale } | null,
+      kind: string,
+      opts: handlebars.HelperOptions,
+    ) {
+      const root = (opts?.data?.root ?? {}) as { _locale?: SupportedLocale };
+      const thisLocale = this?._locale;
+      const locale: SupportedLocale = root._locale ?? thisLocale ?? DEFAULT_LOCALE;
+      const out = i18n.t(`kind_${kind}`, { lng: locale, ns: 'jobs' });
+      return new handlebars.SafeString(out as string);
+    },
+  );
+}
+
+export function registerTProfileHelper(i18n: i18n): void {
+  handlebars.registerHelper(
+    'tProfile',
+    function (
+      this: { _locale?: SupportedLocale } | null,
+      profile: string,
+      opts: handlebars.HelperOptions,
+    ) {
+      const root = (opts?.data?.root ?? {}) as { _locale?: SupportedLocale };
+      const thisLocale = this?._locale;
+      const locale: SupportedLocale = root._locale ?? thisLocale ?? DEFAULT_LOCALE;
+      // Normalize `web-optimized` -> `web_optimized` so it composes with
+      // `profile_` to form a valid i18next JSON key.
+      const key = `profile_${String(profile).replaceAll('-', '_')}`;
+      const out = i18n.t(key, { lng: locale, ns: 'jobs' });
+      return new handlebars.SafeString(out as string);
+    },
+  );
+}
+
+/**
  * Registers the `{{t 'key'}}` Handlebars helper. Lookup of `_locale`:
  *   1. `@root._locale` (priority -- see C1-AD-PR below)
  *   2. `this._locale` (fallback for plain top-level renders)
@@ -228,6 +296,12 @@ const i18nFastifyPluginImpl = async (app: FastifyInstance) => {
   registerIfEqHelper();
   // Plan 8e Task 2: tStatus helper for job-status labels.
   registerTStatusHelper(i18n);
+  // Plan 8e Task 5 (review concern #1): tKind + tProfile helpers translate
+  // Job.kind / Job.profile DB-values to locale-specific labels for display.
+  // Wired alongside tStatus so all three job-enum helpers are registered in
+  // the same plugin scope.
+  registerTKindHelper(i18n);
+  registerTProfileHelper(i18n);
 
   app.addHook('onRequest', async (req) => {
     req.locale = detectLocale(req);

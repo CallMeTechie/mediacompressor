@@ -19,7 +19,7 @@
        hx-swap="innerHTML">
     {{> job-detail-status job}}
   </div>
-  <p>{{t 'detail_label_kind_profile' ns='jobs' kind=job.kind profile=job.profile}}</p>
+  <p>{{t 'detail_label_kind_profile' ns='jobs' kind=(tKind job.kind) profile=(tProfile job.profile)}}</p>
   {{#if job.inputBytes}}<p>{{t 'detail_label_input_size' ns='jobs' bytes=job.inputBytes}}</p>{{/if}}
 
   {{#if canCancel}}

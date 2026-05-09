@@ -173,7 +173,13 @@ describe('web/job-detail-page', () => {
       expect(res.headers['content-type']).toMatch(/text\/html/);
       expect(res.body).toContain('mine-queued.png');
       expect(res.body).toMatch(/status-queued/);
-      expect(res.body).toContain('web-optimized');
+      // Plan 8e Task 5 (review concern #1): the profile label is now
+      // translated via the {{tProfile}} helper, so the canonical DB-string
+      // `web-optimized` (with dash) is replaced by the locale-specific
+      // label. Default locale === 'en', so en.jobs.profile_web_optimized
+      // === "Web optimized" (with space, no dash). The test asserts the
+      // translated label, NOT the raw enum-string.
+      expect(res.body).toContain('Web optimized');
       // Cancel form present (job is not terminal).
       expect(res.body).toContain(`action="/jobs/${job.id}/cancel"`);
       expect(res.body).toContain('<form method="POST"');

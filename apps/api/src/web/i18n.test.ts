@@ -11,6 +11,8 @@ import {
   initI18n,
   registerI18nHelper,
   registerIfEqHelper,
+  registerTKindHelper,
+  registerTProfileHelper,
   resetI18n,
   type SupportedLocale,
 } from './i18n.js';
@@ -147,6 +149,59 @@ describe('web/i18n', () => {
         expect(i18n.hasResourceBundle('en', ns), `en/${ns}`).toBe(true);
         expect(i18n.hasResourceBundle('de', ns), `de/${ns}`).toBe(true);
       }
+    });
+
+    // Plan 8e Task 5 (review concern #1, WC-i18n-task5-C1): tKind helper
+    // unit tests — verify locale-resolution + missing-key-fallback contract
+    // for the `{{tKind kind}}` Handlebars helper used in job-list-rows.hbs
+    // and job-detail.hbs (via `kind=(tKind job.kind)` subexpression).
+    it('PFLICHT WC-i18n-task5-C1 (helper): tKind resolves known kind to DE-label inside @root._locale=de scope', async () => {
+      resetI18n();
+      const i18n = await initI18n();
+      registerTKindHelper(i18n);
+      const tmpl = handlebars.compile(`{{tKind kind}}`);
+      // de.jobs.kind_image === "Bild"; en.jobs.kind_image === "Image".
+      expect(tmpl({ _locale: 'de' as SupportedLocale, kind: 'image' })).toBe('Bild');
+      expect(tmpl({ _locale: 'en' as SupportedLocale, kind: 'image' })).toBe('Image');
+    });
+
+    it('PFLICHT WC-i18n-task5-C1 (helper): tKind on unknown kind returns the bare key (loud-broken, not silent-empty)', async () => {
+      resetI18n();
+      const i18n = await initI18n();
+      registerTKindHelper(i18n);
+      const tmpl = handlebars.compile(`{{tKind kind}}`);
+      // i18next default missing-key handler returns the key string.
+      expect(tmpl({ _locale: 'de' as SupportedLocale, kind: 'zzzunknown' })).toBe(
+        'kind_zzzunknown',
+      );
+    });
+
+    it('PFLICHT WC-i18n-task5-C1 (helper): tProfile resolves "web-optimized" via dash->underscore normalization in DE scope', async () => {
+      resetI18n();
+      const i18n = await initI18n();
+      registerTProfileHelper(i18n);
+      const tmpl = handlebars.compile(`{{tProfile profile}}`);
+      // The DB-canonical value contains a dash; the helper normalizes to
+      // `profile_web_optimized` (underscore) for the i18next lookup.
+      // de.jobs.profile_web_optimized === "Web-optimiert".
+      expect(
+        tmpl({ _locale: 'de' as SupportedLocale, profile: 'web-optimized' }),
+      ).toBe('Web-optimiert');
+      expect(
+        tmpl({ _locale: 'en' as SupportedLocale, profile: 'web-optimized' }),
+      ).toBe('Web optimized');
+    });
+
+    it('PFLICHT WC-i18n-task5-C1 (helper): tProfile on unknown profile returns the normalized bare key', async () => {
+      resetI18n();
+      const i18n = await initI18n();
+      registerTProfileHelper(i18n);
+      const tmpl = handlebars.compile(`{{tProfile profile}}`);
+      // Unknown profile-strings still get dash->underscore normalized in
+      // the lookup; the resulting bare key is what i18next emits on miss.
+      expect(
+        tmpl({ _locale: 'de' as SupportedLocale, profile: 'zzz-unknown' }),
+      ).toBe('profile_zzz_unknown');
     });
 
     it('Plan 8e Task 1 PFLICHT: unknown key falls back to the key itself (i18next default)', async () => {

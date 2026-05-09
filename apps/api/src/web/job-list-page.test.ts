@@ -25,6 +25,7 @@ const TEST_EMAILS = [
   'job-list-inflight@test.invalid',
   'job-list-terminal@test.invalid',
   'job-list-de-fragment@test.invalid',
+  'job-list-de-kindprof@test.invalid',
 ];
 
 const config: Config = {
@@ -404,8 +405,71 @@ describe('web/job-list-page', () => {
       expect(res.body).not.toMatch(/<html\b/i);
       // DE-translated status label (de.common.job_status_succeeded ===
       // "Erfolgreich"; en.common.job_status_succeeded === "Succeeded").
-      expect(res.body).toMatch(/Erfolgreich/);
-      expect(res.body).not.toMatch(/Succeeded/);
+      // Concern #4 (Plan 8e Task 5 review): tag-scope the regex to the actual
+      // status-rendering position (`<span class="status status-succeeded">`
+      // inside `<td>`) so an unrelated occurrence of the word "Succeeded" /
+      // "Erfolgreich" elsewhere in the response (e.g. a future error message
+      // or accessibility caption) cannot satisfy the assertion or
+      // false-positive the negative-assert. The status badge always emits
+      // its label inside a `<span>`; the kind/profile cell uses `<td>`.
+      expect(res.body).toMatch(/<(span|td)[^>]*>[^<]*Erfolgreich/);
+      expect(res.body).not.toMatch(/<(span|td)[^>]*>[^<]*Succeeded/);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // PFLICHT WC-i18n-task5-C1 (Plan 8e Task 5 review concern #1, Important):
+  // GET /jobs with mc_locale=de MUST render translated kind+profile labels
+  // (not the raw enum-strings `image` / `web-optimized`). Before the
+  // tKind/tProfile helpers were added, the DE-UI showed half-translated
+  // rows like "image · web-optimized" because job-list-rows.hbs interpolated
+  // the canonical DB-values directly. This test pins the contract — a future
+  // refactor that drops a helper or reverts to `{{kind}} · {{profile}}` fails
+  // loud at CI-time, never reaching DE users.
+  //
+  // Asserts:
+  //   - DE-label "Bild" appears for `kind=image`
+  //   - DE-label "Web-optimiert" appears for `profile=web-optimized`
+  //   - The canonical English LABEL "web-optimized" does NOT leak into the
+  //     visible cell-text. (We can't negative-assert "image" because it
+  //     legitimately appears as `value="image"` in radio inputs on other
+  //     pages — but `/jobs` doesn't have such inputs, so a tag-scoped check
+  //     keeps the test robust against future template additions.)
+  //   - The cell containing kind+profile uses `<td>` and renders only DE
+  //     content (tag-scoped check, mirroring concern #4).
+  it('PFLICHT WC-i18n-task5-C1: GET /jobs with mc_locale=de renders translated kind+profile labels (not raw enum)', async () => {
+    const app = await buildServer(config);
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: 'job-list-de-kindprof@test.invalid' },
+      });
+      await seedJob({
+        userId: user!.id,
+        inputFilename: 'kindprof-de.png',
+        status: 'succeeded',
+      });
+      const sessionCookie = await login(app, 'job-list-de-kindprof@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: '/jobs',
+        headers: {
+          accept: 'text/html',
+          cookie: `${sessionCookie}; mc_locale=de`,
+        },
+      });
+      expect(res.statusCode).toBe(200);
+      // DE-translated labels MUST appear (de.jobs.kind_image === "Bild";
+      // de.jobs.profile_web_optimized === "Web-optimiert").
+      expect(res.body).toMatch(/Bild/);
+      expect(res.body).toMatch(/Web-optimiert/);
+      // Negative-assert: the canonical EN profile-string "web-optimized"
+      // (with the dash, distinct from any DE word) MUST NOT appear inside
+      // the kind+profile <td> cell as a visible label. Tag-scoping prevents
+      // false-positives if a future template hyperlink uses `data-profile=...`.
+      expect(res.body).not.toMatch(/<td[^>]*>[^<]*web-optimized/);
+      // Sanity: the row IS being rendered — its filename appears in the body.
+      expect(res.body).toContain('kindprof-de.png');
     } finally {
       await app.close();
     }
