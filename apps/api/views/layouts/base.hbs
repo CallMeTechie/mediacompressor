@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{#if _locale}}{{_locale}}{{else}}en{{/if}}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -11,6 +11,18 @@
   <script src="/static/js/htmx-session-redirect.js" defer></script>
 </head>
 <body>
+  {{#if currentUser}}
+  <nav class="site-nav">
+    <a href="/" class="brand">{{t 'nav_brand' ns='common'}}</a>
+    <a href="/jobs">{{t 'nav_jobs' ns='common'}}</a>
+    <a href="/profile">{{t 'nav_profile' ns='common'}}</a>
+    {{#ifEq currentUser.role 'admin'}}<a href="/admin">{{t 'nav_admin' ns='common'}}</a>{{/ifEq}}
+    <form method="POST" action="/logout" class="inline-form">
+      {{> csrf}}
+      <button type="submit" class="btn-link">{{t 'nav_logout' ns='common'}}</button>
+    </form>
+  </nav>
+  {{/if}}
   <main class="page">
     {{{body}}}
   </main>

@@ -55,6 +55,13 @@ const IDENTICAL_BY_DESIGN = new Set<string>([
   'admin.locale_de', // "Deutsch" in both locales
   'admin.locale_en', // "English" in both locales
 
+  // -- Plan 8e Task 2 common namespace --
+  // "Admin" — same word in DE; standard term for the role, no German
+  // equivalent in common UI vocabulary.
+  'common.nav_admin',
+  // "MediaCompressor" — proper-noun product brand; never translated.
+  'common.nav_brand',
+
   // Add new entries here as deliberate exceptions, with a justifying comment.
 ]);
 

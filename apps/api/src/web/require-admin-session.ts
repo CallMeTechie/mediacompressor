@@ -41,9 +41,14 @@ const requireAdminSessionImpl = async (app: FastifyInstance) => {
         req.auth.status !== 'active'
       ) {
         reply.code(403).header('cache-control', 'no-store, max-age=0');
+        // Plan 8e Task 2: title + message both routed through i18n
+        // (`common.error_403_title`, `common.error_403_admin_body`). The
+        // admin-specific body key keeps the existing test-assertion
+        // (`/admin privileges/` in EN) and adds a DE equivalent
+        // (`/Admin-Rechte/`) without losing the role-context information.
         await reply.view('403', {
-          title: 'Forbidden',
-          message: 'You need admin privileges to access this page.',
+          title: req.t('error_403_title', undefined, 'common'),
+          message: req.t('error_403_admin_body', undefined, 'common'),
         });
         return undefined;
       }

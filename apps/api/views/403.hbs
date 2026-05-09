@@ -1,5 +1,5 @@
 <header class="page-header">
-  <h1>403 &mdash; {{title}}</h1>
-  <nav class="page-nav"><a href="/">Dashboard</a></nav>
+  <h1>{{t 'error_403_title' ns='common'}}</h1>
+  <nav class="page-nav"><a href="/">{{t 'nav_home' ns='common'}}</a></nav>
 </header>
-<p class="flash flash-error">{{message}}</p>
+<p class="flash flash-error">{{#if message}}{{message}}{{else}}{{t 'error_403_body' ns='common'}}{{/if}}</p>

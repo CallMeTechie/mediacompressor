@@ -5,7 +5,14 @@ import { wantsHtml } from './accept.js';
 const errorPagesPluginImpl: FastifyPluginAsync = async (app) => {
   app.setNotFoundHandler((req, reply) => {
     if (wantsHtml(req)) {
-      return reply.code(404).view('404', { title: 'Not found', path: req.url });
+      // Plan 8e Task 2: title comes from i18n (`common.error_404_title`) so
+      // the <title>-tag (rendered in layouts/base.hbs from `{{title}}`) is
+      // locale-aware in the same render-pass as the body. `path` is
+      // interpolated into the body string by the {{t}} helper.
+      return reply.code(404).view('404', {
+        title: req.t('error_404_title', undefined, 'common'),
+        path: req.url,
+      });
     }
     return reply.code(404).send({ error: { code: 'NOT_FOUND' } });
   });
@@ -13,7 +20,10 @@ const errorPagesPluginImpl: FastifyPluginAsync = async (app) => {
   app.setErrorHandler((err, req, reply) => {
     req.log.error({ err }, 'unhandled');
     if (wantsHtml(req)) {
-      return reply.code(500).view('500', { title: 'Server error' });
+      // Plan 8e Task 2: title comes from i18n (`common.error_500_title`).
+      return reply.code(500).view('500', {
+        title: req.t('error_500_title', undefined, 'common'),
+      });
     }
     return reply.code(500).send({ error: { code: 'INTERNAL', message: err.message } });
   });

@@ -146,17 +146,56 @@ const webViewPluginImpl: FastifyPluginAsync = async (app) => {
   // the lifecycle), so the wrap always sees a valid locale (cookie >
   // Accept-Language > 'en').
   //
+  // Plan 8e Task 2: also inject `currentUser` (derived from `req.auth`) and
+  // `_csrfField` (when authed) so the shared `layouts/base.hbs` nav can
+  // render the logged-in chrome (jobs/profile/admin links + logout button)
+  // without every page-handler having to thread these props manually. Both
+  // are injected with handler-data-wins semantics (spread `data` AFTER the
+  // defaults) so a handler that already passes `currentUser` / `_csrfField`
+  // overrides the defaults — no breakage of pre-existing call-sites.
+  //
+  // `req.auth` is populated by `requireSession` / `requireAuth` preHandlers
+  // that run AFTER this hook (preHandler order = registration order, and
+  // webViewPlugin registers BEFORE the auth plugins in server.ts). Reading
+  // `req.auth` lazily INSIDE the wrapped reply.view (not at preHandler-time)
+  // means the read happens at handler-render-time, by which point auth
+  // preHandlers have run for protected routes. For unauthenticated routes
+  // (404, /login), `req.auth` stays undefined and `currentUser` resolves to
+  // null — the layout's `{{#if currentUser}}` guard hides the nav.
+  //
   // Wrapping in a preHandler — rather than at decorateReply-time — means the
   // wrap is per-FastifyReply instance, not shared globally; concurrent
   // requests don't clobber each other's `_locale`.
   app.addHook('preHandler', async (req, reply) => {
     const origView = reply.view.bind(reply);
     reply.view = ((template: string, data?: Record<string, unknown>, opts?: object) => {
-      return origView(template, { ...(data ?? {}), _locale: req.locale }, opts);
+      const currentUser = req.auth
+        ? { role: req.auth.role, status: req.auth.status }
+        : null;
+      // Generate CSRF token only for authed pages — logged-out pages (404,
+      // 500, /login) don't render the layout's logout-form, so generating
+      // a token there would set an mc_csrf cookie unnecessarily on every
+      // error/login page-load.
+      const csrfDefault = req.auth ? reply.renderCsrfField() : '';
+      return origView(
+        template,
+        {
+          currentUser,
+          _csrfField: csrfDefault,
+          ...(data ?? {}),
+          // _locale is injected LAST so handler-passed _locale cannot
+          // override the canonical per-request locale (Plan 8d invariant).
+          _locale: req.locale,
+        },
+        opts,
+      );
     }) as typeof reply.view;
     if (typeof reply.viewFragment === 'function') {
       const origFragment = reply.viewFragment.bind(reply);
       reply.viewFragment = ((template: string, data?: Record<string, unknown>) => {
+        // Fragments are HTMX swap-targets that don't render the layout's
+        // nav, so currentUser/_csrfField aren't needed — keep the fragment
+        // wrap minimal to avoid generating CSRF cookies on every poll.
         return origFragment(template, { ...(data ?? {}), _locale: req.locale });
       }) as typeof reply.viewFragment;
     }

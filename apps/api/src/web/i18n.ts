@@ -152,6 +152,37 @@ export function registerIfEqHelper(): void {
 }
 
 /**
+ * Plan 8e Task 2: `{{tStatus status}}` Handlebars helper for job-status
+ * labels. Resolves `job_status_<status>` from the `common` namespace so
+ * templates render translated labels while the canonical English status
+ * value (e.g. `succeeded`) stays untouched in CSS classes and form values
+ * (Translation Discipline — value-attributes never translated).
+ *
+ * `_locale` lookup mirrors registerI18nHelper (C1-AD-PR): `@root._locale`
+ * first, fallback to DEFAULT_LOCALE. The status string itself is the
+ * canonical enum-value from `packages/db/prisma/schema.prisma::JobStatus`
+ * (`pending|uploading|queued|processing|succeeded|failed|canceled|expired`).
+ *
+ * Idempotent — Handlebars overwrites the previous registration.
+ */
+export function registerTStatusHelper(i18n: i18n): void {
+  handlebars.registerHelper(
+    'tStatus',
+    function (this: unknown, status: string, opts: handlebars.HelperOptions) {
+      const root = (opts?.data?.root ?? {}) as { _locale?: SupportedLocale };
+      const locale: SupportedLocale = root._locale ?? DEFAULT_LOCALE;
+      const out = i18n.t(`job_status_${status}`, { lng: locale, ns: 'common' });
+      // SafeString prevents Handlebars from re-escaping the (already-i18next-
+      // returned) string; values come from translator-controlled JSON not
+      // user input, so HTML-escape would just double-encode entities like
+      // "&" in DE strings such as "Wird hochgeladen & verarbeitet" if added
+      // in the future.
+      return new handlebars.SafeString(out as string);
+    },
+  );
+}
+
+/**
  * Registers the `{{t 'key'}}` Handlebars helper. Lookup of `_locale`:
  *   1. `@root._locale` (priority -- see C1-AD-PR below)
  *   2. `this._locale` (fallback for plain top-level renders)
@@ -186,6 +217,8 @@ const i18nFastifyPluginImpl = async (app: FastifyInstance) => {
   registerI18nHelper(i18n);
   // C7-AD-PR: ifEq block-helper for conditional rendering.
   registerIfEqHelper();
+  // Plan 8e Task 2: tStatus helper for job-status labels.
+  registerTStatusHelper(i18n);
 
   app.addHook('onRequest', async (req) => {
     req.locale = detectLocale(req);

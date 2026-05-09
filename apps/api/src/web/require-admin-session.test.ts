@@ -242,6 +242,28 @@ describe('web/require-admin-session', () => {
     }
   });
 
+  // Plan 8e Task 2: 403 page is locale-aware. Non-admin user with mc_locale=de
+  // sees German "Zugriff verweigert" + "keine Berechtigung" body, proving the
+  // require-admin-session handler now passes title via req.t(... 'common') and
+  // the migrated 403.hbs reads it through the shared layout.
+  it('renders 403 page in DE when mc_locale=de cookie is set (Plan 8e Task 2)', async () => {
+    const app = await appWithProbe();
+    try {
+      const baseCookie = await loginAndCookies(app, TEST_EMAIL_USER);
+      const res = await app.inject({
+        method: 'GET',
+        url: '/__test_admin',
+        headers: { cookie: `${baseCookie}; mc_locale=de` },
+      });
+      expect(res.statusCode).toBe(403);
+      const body = res.body as string;
+      expect(body).toMatch(/Zugriff verweigert/);
+      expect(body).toMatch(/keine Berechtigung/);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('WC-AD1 PFLICHT: non-admin gets identical 403 page-shell on /admin, /admin/users, /admin/nonexistent (no admin-existence-leak)', async () => {
     // Three inline probe-routes representing different admin sub-paths.
     // For a non-admin user, all three MUST return identical 403 HTML
@@ -282,9 +304,21 @@ describe('web/require-admin-session', () => {
       // regardless of which admin-path was probed. Without this guarantee, a
       // non-admin user could enumerate which admin-routes exist by diffing
       // page-content (e.g. a route-specific 404 vs the generic 403).
+      //
+      // Plan 8e Task 2: the layout-base nav includes a fresh CSRF token on
+      // every render (for the logout-form). Tokens are intentionally random
+      // and independent of the admin-route probe path, so they MUST be
+      // normalized out before the byte-equality check — otherwise this test
+      // would assert on a random byte-string instead of on the
+      // admin-existence-leak property the comment above describes.
+      const stripCsrf = (body: string): string =>
+        body.replace(
+          /name="_csrf" value="[^"]*"/g,
+          'name="_csrf" value="<NORMALIZED>"',
+        );
       const [r0, r1, r2] = responses;
-      expect(r1!.body).toBe(r0!.body);
-      expect(r2!.body).toBe(r0!.body);
+      expect(stripCsrf(r1!.body)).toBe(stripCsrf(r0!.body));
+      expect(stripCsrf(r2!.body)).toBe(stripCsrf(r0!.body));
 
       // Same Cache-Control header on all three.
       expect(r1!.headers['cache-control']).toBe(r0!.headers['cache-control']);

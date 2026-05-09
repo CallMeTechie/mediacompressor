@@ -86,4 +86,43 @@ describe('web/error-pages', () => {
   // dashboard-page.test.ts (test 5: 'GET / (HTML, valid session) has
   // Cache-Control: no-store') — the dashboard owns `/` and uses a real
   // session lookup instead of the Plan-8a placeholder cookie sniff.
+
+  // Plan 8e Task 2: locale-aware error pages. With `mc_locale=de` cookie set,
+  // 404/500 templates must render German strings — proving the i18n migration
+  // wired the templates + handler-passed titles through `req.t(... , 'common')`
+  // and didn't silently fall back to English on the chrome layer.
+  it('renders 404 page in DE when mc_locale=de cookie is set', async () => {
+    const app = await buildServer(config);
+    try {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/this-route-does-not-exist',
+        headers: { cookie: 'mc_locale=de', accept: 'text/html' },
+      });
+      expect(res.statusCode).toBe(404);
+      expect(res.headers['content-type']).toMatch(/text\/html/);
+      expect(res.body).toMatch(/Seite nicht gefunden/);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('renders 500 page in DE when mc_locale=de cookie is set', async () => {
+    const app = await buildServer(config);
+    app.get('/__test_throw_de', async () => {
+      throw new Error('boom');
+    });
+    try {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/__test_throw_de',
+        headers: { cookie: 'mc_locale=de', accept: 'text/html' },
+      });
+      expect(res.statusCode).toBe(500);
+      expect(res.headers['content-type']).toMatch(/text\/html/);
+      expect(res.body).toMatch(/Interner Server-Fehler/);
+    } finally {
+      await app.close();
+    }
+  });
 });
