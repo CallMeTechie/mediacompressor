@@ -130,8 +130,8 @@ describe('web/invite-redeem-page', () => {
       // (i18n'd) for all invite-redeem branches; the consumed-state explanation
       // now lives in the flash-error paragraph rendered by the consumed-branch
       // of the template. Match on the full sentence so a future copy-edit that
-      // says "already used" or "already been used" both pass.
-      expect(res.body).toMatch(/already (been )?used/i);
+      // says "already used", "already been used", or "already consumed" all pass.
+      expect(res.body).toMatch(/already (been )?(used|consumed)/i);
     } finally {
       await app.close();
     }
@@ -248,6 +248,32 @@ describe('web/invite-redeem-page', () => {
       expect(post.body).toMatch(/Konto fertig einrichten/);
       // DE labels from the migrated invite-redeem.hbs.
       expect(post.body).toMatch(/Passwort/);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // Plan 8e Task 3 follow-up — zod-fail flash is dispatched by issue path,
+  // so an invalid email format renders the email-specific message rather than
+  // the password-too-short message (which was the previous catch-all).
+  it('POST /invites/:token with invalid email shows email-specific flash, not password flash', async () => {
+    const app = await buildServer(config);
+    try {
+      const { token } = await seedInvite();
+      const { cookieHeader, csrf } = await getInviteForm(app, token);
+      const post = await app.inject({
+        method: 'POST',
+        url: `/invites/${token}`,
+        headers: {
+          cookie: cookieHeader,
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+        // password is valid (12+ chars) — the only failing field is email format.
+        payload: `email=not-an-email&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf)}`,
+      });
+      expect(post.statusCode).toBe(400);
+      expect(post.body).toMatch(/valid email address/i);
+      expect(post.body).not.toMatch(/at least 12 characters/i);
     } finally {
       await app.close();
     }

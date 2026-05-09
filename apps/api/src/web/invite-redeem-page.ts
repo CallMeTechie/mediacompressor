@@ -65,12 +65,25 @@ export const inviteRedeemPagePlugin: FastifyPluginAsync = async (app) => {
       const { token } = req.params as z.infer<typeof TokenParams>;
       const parsed = InviteForm.safeParse(req.body);
       if (!parsed.success) {
+        // Dispatch zod-fail flash by the first issue's path so the user sees a
+        // message that matches what they actually got wrong. Previously every
+        // validation failure rendered "password must be at least 12 chars",
+        // which was confusing for an invalid email-format submission.
+        const firstIssue = parsed.error.issues[0];
+        let messageKey: string;
+        if (firstIssue?.path?.[0] === 'password') {
+          messageKey = 'invite_redeem_flash_password_too_short';
+        } else if (firstIssue?.path?.[0] === 'email') {
+          messageKey = 'invite_redeem_flash_email_invalid';
+        } else {
+          messageKey = 'invite_redeem_flash_invalid_input';
+        }
         return reply.code(400).view('invite-redeem', {
           title: req.t('invite_redeem_title', undefined, 'auth'),
           token,
           flash: {
             level: 'error',
-            message: req.t('invite_redeem_flash_password_too_short', undefined, 'auth'),
+            message: req.t(messageKey, undefined, 'auth'),
           },
           _csrfField: reply.renderCsrfField(),
           email:
