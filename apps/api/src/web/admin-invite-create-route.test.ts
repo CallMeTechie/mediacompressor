@@ -24,6 +24,8 @@ const TEST_EMAIL_ADMIN_STDOUT = 'admin-invite-create-stdout@test.invalid';
 const TEST_EMAIL_ADMIN_INVALIDMAIL = 'admin-invite-create-invalidmail@test.invalid';
 const TEST_EMAIL_ADMIN_401 = 'admin-invite-create-401@test.invalid';
 const TEST_EMAIL_ADMIN_403 = 'admin-invite-create-403@test.invalid';
+const TEST_EMAIL_ADMIN_BOUNDS = 'admin-invite-create-bounds@test.invalid';
+const TEST_EMAIL_ADMIN_SHAPE = 'admin-invite-create-shape@test.invalid';
 const TEST_EMAILS = [
   TEST_EMAIL_USER,
   TEST_EMAIL_ADMIN,
@@ -35,6 +37,8 @@ const TEST_EMAILS = [
   TEST_EMAIL_ADMIN_INVALIDMAIL,
   TEST_EMAIL_ADMIN_401,
   TEST_EMAIL_ADMIN_403,
+  TEST_EMAIL_ADMIN_BOUNDS,
+  TEST_EMAIL_ADMIN_SHAPE,
 ];
 
 const config: Config = {
@@ -58,6 +62,18 @@ const config: Config = {
   ENABLE_LEGACY_JOB_STUB: false,
 };
 
+/**
+ * Anchored CSRF-token extractor — matches the `_csrf` hidden input directly
+ * rather than the first `value="..."` of length >= 16. Future templates may
+ * add other attributes that match a loose regex before the CSRF input;
+ * anchoring on `name="_csrf"` keeps the test deterministic.
+ */
+function extractCsrfToken(html: string): string {
+  const match = html.match(/<input\s+[^>]*name="_csrf"[^>]*value="([^"]+)"/);
+  if (!match) throw new Error('No CSRF token in HTML');
+  return match[1]!;
+}
+
 describe('web/admin-invite-create-route', () => {
   let prisma: PrismaClient;
   let redis: IORedis;
@@ -78,6 +94,8 @@ describe('web/admin-invite-create-route', () => {
       TEST_EMAIL_ADMIN_INVALIDMAIL,
       TEST_EMAIL_ADMIN_401,
       TEST_EMAIL_ADMIN_403,
+      TEST_EMAIL_ADMIN_BOUNDS,
+      TEST_EMAIL_ADMIN_SHAPE,
     ]) {
       await createTestUser(prisma, { email, password: 'hunter22hunter22' });
       await prisma.user.update({ where: { email }, data: { role: 'admin' } });
@@ -116,7 +134,7 @@ describe('web/admin-invite-create-route', () => {
     email: string,
   ): Promise<{ cookieHeader: string; csrf: string }> {
     const get = await app.inject({ method: 'GET', url: '/login' });
-    const csrf1 = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
+    const csrf1 = extractCsrfToken(get.body as string);
     const initialCookies = (Array.isArray(get.headers['set-cookie'])
       ? get.headers['set-cookie']
       : [get.headers['set-cookie'] ?? ''])
@@ -144,7 +162,7 @@ describe('web/admin-invite-create-route', () => {
       url: '/admin/invites',
       headers: { cookie: sessCookieHeader, accept: 'text/html' },
     });
-    const csrf2 = ((get2.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
+    const csrf2 = extractCsrfToken(get2.body as string);
     const get2Cookies = (Array.isArray(get2.headers['set-cookie'])
       ? get2.headers['set-cookie']
       : get2.headers['set-cookie']
@@ -163,7 +181,7 @@ describe('web/admin-invite-create-route', () => {
     email: string,
   ): Promise<string> {
     const get = await app.inject({ method: 'GET', url: '/login' });
-    const csrf = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
+    const csrf = extractCsrfToken(get.body as string);
     const initialCookies = (Array.isArray(get.headers['set-cookie'])
       ? get.headers['set-cookie']
       : [get.headers['set-cookie'] ?? ''])
@@ -420,9 +438,29 @@ describe('web/admin-invite-create-route', () => {
   });
 
   // 9. POST invalid email format -> 400 + list-page re-render with error flash.
-  it('POST invalid email format -> 400 + list re-render with error flash', async () => {
+  // Concern #6: rerendered list must NOT be empty (list is re-fetched via
+  // inner GET /api/v1/admin/invites). We seed an active invite first and
+  // assert it appears in the rerendered HTML — proving re-fetch happened.
+  it('POST invalid email format -> 400 + list re-render with error flash + re-fetched rows visible', async () => {
     const app = await buildServer(config);
     try {
+      // Seed an active invite under TEST_EMAIL_ADMIN_INVALIDMAIL so the
+      // rerendered list is not empty.
+      const adminUser = await prisma.user.findUnique({
+        where: { email: TEST_EMAIL_ADMIN_INVALIDMAIL },
+        select: { id: true },
+      });
+      const seededEmail = 'rerender-row@test.invalid';
+      const future = new Date(Date.now() + 24 * 3600_000);
+      await prisma.invite.create({
+        data: {
+          token: 'e'.repeat(64),
+          email: seededEmail,
+          createdById: adminUser!.id,
+          expiresAt: future,
+        },
+      });
+
       const { cookieHeader, csrf } = await loginAndPrepareCsrf(
         app,
         TEST_EMAIL_ADMIN_INVALIDMAIL,
@@ -441,6 +479,108 @@ describe('web/admin-invite-create-route', () => {
       expect(res.body).toMatch(/flash flash-error/);
       // Form is re-rendered in the list page.
       expect(res.body).toMatch(/<form[^>]+action="\/admin\/invites"/);
+      // Concern #6: seeded row appears in the rerendered list (not empty).
+      expect(res.body).toContain(seededEmail);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // Concern #1: BFF expiresInHours bounds match Plan-7 inner PostBody (drift
+  // detection). If Plan-7's inner schema changes, update both sides + this
+  // test. The BFF MUST NOT be more permissive than Plan-7's inner PostBody.
+  // BFF rejects with 400 BEFORE the inner is reached.
+  it('expiresInHours bounds match Plan-7 inner PostBody (drift detection)', async () => {
+    const app = await buildServer(config);
+    try {
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
+        app,
+        TEST_EMAIL_ADMIN_BOUNDS,
+      );
+      for (const bad of ['0', '169', '-1']) {
+        const res = await app.inject({
+          method: 'POST',
+          url: '/admin/invites',
+          headers: {
+            cookie: cookieHeader,
+            'content-type': 'application/x-www-form-urlencoded',
+            'x-csrf-token': csrf,
+          },
+          payload: `_csrf=${encodeURIComponent(csrf)}&expiresInHours=${bad}`,
+        });
+        expect(res.statusCode).toBe(400);
+      }
+    } finally {
+      await app.close();
+    }
+  });
+
+  // Concern #2: inner-201 response shape mismatch -> 500 + error log.
+  // Mocks app.inject to return a 201 WITHOUT the `token` field. The BFF must
+  // detect contract drift via Zod, log app.log.error, and return 500 rather
+  // than rendering an empty <code> element.
+  it('inner POST 201 with missing token -> 500 + error log (contract-drift detection)', async () => {
+    const app = await buildServer(config);
+    try {
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
+        app,
+        TEST_EMAIL_ADMIN_SHAPE,
+      );
+
+      const errorLogSpy = vi.spyOn(app.log, 'error');
+      const originalInject = app.inject.bind(app);
+      const fakeInject = ((opts: unknown) => {
+        const isInnerPost =
+          typeof opts === 'object' &&
+          opts !== null &&
+          'method' in opts &&
+          'url' in opts &&
+          (opts as { method?: string }).method === 'POST' &&
+          (opts as { url?: string }).url === '/api/v1/admin/invites';
+        if (isInnerPost) {
+          // 201 WITHOUT token field -- simulates contract drift.
+          return Promise.resolve({
+            statusCode: 201,
+            headers: {},
+            body: '',
+            payload: '',
+            rawPayload: Buffer.alloc(0),
+            cookies: [],
+            json: () => ({
+              id: '11111111-1111-4111-8111-111111111111',
+              email: null,
+              expiresAt: new Date().toISOString(),
+              // token: MISSING
+            }),
+            trailers: {},
+          });
+        }
+        return (originalInject as (o: unknown) => unknown)(opts);
+      }) as unknown as typeof app.inject;
+      const injectSpy = vi.spyOn(app, 'inject').mockImplementation(fakeInject);
+
+      const res = await originalInject({
+        method: 'POST',
+        url: '/admin/invites',
+        headers: {
+          cookie: cookieHeader,
+          'content-type': 'application/x-www-form-urlencoded',
+          'x-csrf-token': csrf,
+        },
+        payload: `_csrf=${encodeURIComponent(csrf)}`,
+      });
+      expect(res.statusCode).toBe(500);
+      // app.log.error called with action: 'invite_create' + innerError marker.
+      expect(errorLogSpy).toHaveBeenCalled();
+      const errorCalls = errorLogSpy.mock.calls;
+      const found = errorCalls.some((args) => {
+        const meta = args[0] as { action?: unknown; innerError?: unknown } | undefined;
+        return meta?.action === 'invite_create' && typeof meta?.innerError === 'string';
+      });
+      expect(found).toBe(true);
+
+      injectSpy.mockRestore();
+      errorLogSpy.mockRestore();
     } finally {
       await app.close();
     }

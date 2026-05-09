@@ -35,12 +35,52 @@ const Query = z.object({
   updateflash: z.enum(ADMIN_INVITE_FLASH_KEYS).optional(),
 });
 
-type InviteRowApi = {
+export type InviteRowApi = {
   id: string;
   email: string | null;
   expiresAt: string;
   consumedAt: string | null;
 };
+
+export type InviteRowView = InviteRowApi & {
+  statusKey:
+    | 'invites_status_consumed'
+    | 'invites_status_expired'
+    | 'invites_status_active';
+  canRevoke: boolean;
+};
+
+/**
+ * Single source of truth for the list-page row-view shape. Used by both the
+ * list-page handler AND the create-route's 400-rerender branches to keep the
+ * rendered HTML identical regardless of which handler emits the response.
+ *
+ * @param items raw items from inner GET /api/v1/admin/invites
+ * @param now `Date.now()` snapshot — pass-in for deterministic tests
+ */
+export function buildInvitesViewModel(
+  items: InviteRowApi[],
+  now: number,
+): InviteRowView[] {
+  return items.map((inv) => {
+    const expiresAtMs = new Date(inv.expiresAt).getTime();
+    const consumed = inv.consumedAt !== null;
+    const expired = !consumed && expiresAtMs < now;
+    const statusKey = consumed
+      ? ('invites_status_consumed' as const)
+      : expired
+        ? ('invites_status_expired' as const)
+        : ('invites_status_active' as const);
+    return {
+      id: inv.id,
+      email: inv.email,
+      expiresAt: inv.expiresAt,
+      consumedAt: inv.consumedAt,
+      statusKey,
+      canRevoke: !consumed && !expired,
+    };
+  });
+}
 
 export const adminInvitesListPagePlugin: FastifyPluginAsync = async (app) => {
   app.get(
@@ -77,25 +117,7 @@ export const adminInvitesListPagePlugin: FastifyPluginAsync = async (app) => {
           }
         : null;
 
-      const now = Date.now();
-      const invites = data.items.map((inv) => {
-        const expiresAtMs = new Date(inv.expiresAt).getTime();
-        const consumed = inv.consumedAt !== null;
-        const expired = !consumed && expiresAtMs < now;
-        const statusKey = consumed
-          ? 'invites_status_consumed'
-          : expired
-            ? 'invites_status_expired'
-            : 'invites_status_active';
-        return {
-          id: inv.id,
-          email: inv.email,
-          expiresAt: inv.expiresAt,
-          consumedAt: inv.consumedAt,
-          statusKey,
-          canRevoke: !consumed && !expired,
-        };
-      });
+      const invites = buildInvitesViewModel(data.items, Date.now());
 
       return reply.view('admin-invites-list', {
         title: app.i18n.t('page_title_invites', { lng: req.locale }),

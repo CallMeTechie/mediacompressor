@@ -74,6 +74,12 @@ export const adminInviteRevokeRoutePlugin: FastifyPluginAsync = async (app) => {
         method: 'DELETE',
         url: `/api/v1/admin/invites/${id}`,
         headers: {
+          // Concern #3: cosmetic content-type for symmetry with Task-4's
+          // update-route's `'application/json'` pattern. DELETE bodies are
+          // irrelevant to the inner /api/v1/admin/invites/:id route, but
+          // having a content-type header on every inner inject makes the
+          // BFF's outgoing-request shape uniform.
+          'content-type': 'application/x-www-form-urlencoded',
           cookie: req.headers.cookie ?? '',
           'x-csrf-token': csrfToken,
         },
@@ -112,9 +118,18 @@ export const adminInviteRevokeRoutePlugin: FastifyPluginAsync = async (app) => {
           .code(404)
           .view('404', { title: 'Not found', path: req.url });
       }
-      return reply
-        .code(inner.statusCode)
-        .view('500', { title: 'Revoke invite failed' });
+      // Concern #5: unexpected inner status — coerce to literal 500 + warn
+      // log. Avoids surfacing inner status codes (e.g. 502, 200) directly
+      // to the admin while showing the generic 500 view.
+      app.log.warn(
+        {
+          adminId: req.auth!.userId,
+          action: 'invite_revoke',
+          innerStatus: inner.statusCode,
+        },
+        'unexpected inner status from /api/v1/admin/invites',
+      );
+      return reply.code(500).view('500', { title: 'Revoke invite failed' });
     },
   );
 };

@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyInstance, FastifyPluginAsync, FastifyRequest } from 'fastify';
+import {
+  buildInvitesViewModel,
+  type InviteRowApi,
+  type InviteRowView,
+} from './admin-invites-list-page.js';
 
 /**
  * Plan 8d Task 5: POST /admin/invites -- HTML form-target that delegates to
@@ -56,6 +61,50 @@ const CreateForm = z.object({
   _csrf: z.string().min(1),
 });
 
+/**
+ * Concern #2: Zod-validate the inner 201 response shape rather than blindly
+ * casting. Detects contract drift early (e.g. Plan-7 silently renaming
+ * `token` → `inviteToken` would otherwise produce an empty `<code>` element
+ * with no error visible to the admin). On mismatch we log + 500.
+ *
+ * `token: z.string().min(20)` — Plan-7's invite tokens are 64-char hex; 20
+ * is a comfortable lower bound. `email: z.string().nullable()` covers the
+ * Concern #4 cast (subsumed here).
+ */
+const InnerCreateResponse = z.object({
+  id: z.string().uuid(),
+  email: z.string().nullable(),
+  expiresAt: z.string(),
+  token: z.string().min(20),
+});
+
+/**
+ * Concern #6: re-fetch invites for the 400-rerender branches so the list
+ * isn't replaced with an empty table. Mirrors Task-4's update-route pattern
+ * (which re-fetches the user). DRY shape via the shared `buildInvitesViewModel`
+ * exported from admin-invites-list-page.ts.
+ *
+ * If the inner GET fails, fall back to an empty list rather than masking the
+ * primary 400 error with a secondary 5xx.
+ */
+async function fetchInvitesForRerender(
+  app: FastifyInstance,
+  req: FastifyRequest,
+): Promise<InviteRowView[]> {
+  const inner = await app.inject({
+    method: 'GET',
+    url: '/api/v1/admin/invites',
+    headers: { cookie: req.headers.cookie ?? '' },
+  });
+  if (inner.statusCode !== 200) return [];
+  try {
+    const data = inner.json() as { items: InviteRowApi[] };
+    return buildInvitesViewModel(data.items, Date.now());
+  } catch {
+    return [];
+  }
+}
+
 export const adminInviteCreateRoutePlugin: FastifyPluginAsync = async (app) => {
   app.post(
     '/admin/invites',
@@ -71,9 +120,11 @@ export const adminInviteCreateRoutePlugin: FastifyPluginAsync = async (app) => {
 
       const parsed = CreateForm.safeParse(req.body);
       if (!parsed.success) {
+        // Concern #6: re-fetch invites so the rerendered list is not empty.
+        const invites = await fetchInvitesForRerender(app, req);
         return reply.code(400).view('admin-invites-list', {
           title: app.i18n.t('page_title_invites', { lng: req.locale }),
-          invites: [],
+          invites,
           flash: {
             level: 'error',
             message: app.i18n.t('flash_invalid_input', { lng: req.locale }),
@@ -101,12 +152,31 @@ export const adminInviteCreateRoutePlugin: FastifyPluginAsync = async (app) => {
       });
 
       if (inner.statusCode === 201) {
-        const body = inner.json() as {
-          id: string;
-          email: string | null;
-          expiresAt: string;
-          token: string;
-        };
+        // Concern #2 (subsumes #4): Zod-validate the inner 201 shape rather
+        // than blindly casting. Catches contract drift between Plan-7's
+        // /api/v1/admin/invites POST response and this BFF (e.g. silent
+        // rename of `token` -> `inviteToken`). On mismatch: 500 + error log.
+        let parsedJson: unknown;
+        try {
+          parsedJson = inner.json();
+        } catch {
+          parsedJson = null;
+        }
+        const inner201 = InnerCreateResponse.safeParse(parsedJson);
+        if (!inner201.success) {
+          app.log.error(
+            {
+              adminId: req.auth!.userId,
+              action: 'invite_create',
+              innerError: inner201.error.message,
+            },
+            'inner-201 response shape mismatch — possible contract drift',
+          );
+          return reply
+            .code(500)
+            .view('500', { title: 'Create invite failed' });
+        }
+        const body = inner201.data;
         // C5-PR audit-log scaffolding for admin state-changes. Whitelist
         // payload only -- NEVER include `body.token` (raw one-time secret).
         // The `expiresAt` field is non-secret. Plan 10 replaces this with
@@ -159,9 +229,11 @@ export const adminInviteCreateRoutePlugin: FastifyPluginAsync = async (app) => {
         } catch {
           // Inner body wasn't JSON; fall through to translated default.
         }
+        // Concern #6: re-fetch invites so the rerendered list is not empty.
+        const invites = await fetchInvitesForRerender(app, req);
         return reply.code(400).view('admin-invites-list', {
           title: app.i18n.t('page_title_invites', { lng: req.locale }),
-          invites: [],
+          invites,
           flash: {
             level: 'error',
             message:
@@ -171,9 +243,18 @@ export const adminInviteCreateRoutePlugin: FastifyPluginAsync = async (app) => {
           _csrfField: reply.renderCsrfField(),
         });
       }
-      return reply
-        .code(inner.statusCode)
-        .view('500', { title: 'Create invite failed' });
+      // Concern #5: unexpected inner status — coerce to literal 500 + warn
+      // log. Avoids surfacing inner status codes (e.g. 502, 200) directly
+      // to the admin while showing the generic 500 view.
+      app.log.warn(
+        {
+          adminId: req.auth!.userId,
+          action: 'invite_create',
+          innerStatus: inner.statusCode,
+        },
+        'unexpected inner status from /api/v1/admin/invites',
+      );
+      return reply.code(500).view('500', { title: 'Create invite failed' });
     },
   );
 };

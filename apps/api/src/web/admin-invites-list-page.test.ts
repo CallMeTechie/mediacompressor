@@ -46,6 +46,18 @@ const config: Config = {
   ENABLE_LEGACY_JOB_STUB: false,
 };
 
+/**
+ * Anchored CSRF-token extractor — matches the `_csrf` hidden input directly
+ * rather than the first `value="..."` of length >= 16. Future templates may
+ * add other attributes that match a loose regex before the CSRF input;
+ * anchoring on `name="_csrf"` keeps the test deterministic.
+ */
+function extractCsrfToken(html: string): string {
+  const match = html.match(/<input\s+[^>]*name="_csrf"[^>]*value="([^"]+)"/);
+  if (!match) throw new Error('No CSRF token in HTML');
+  return match[1]!;
+}
+
 describe('web/admin-invites-list-page', () => {
   let prisma: PrismaClient;
   let redis: IORedis;
@@ -113,7 +125,7 @@ describe('web/admin-invites-list-page', () => {
     email: string,
   ): Promise<string> {
     const get = await app.inject({ method: 'GET', url: '/login' });
-    const csrf = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
+    const csrf = extractCsrfToken(get.body as string);
     const initialCookies = (Array.isArray(get.headers['set-cookie'])
       ? get.headers['set-cookie']
       : [get.headers['set-cookie'] ?? ''])
