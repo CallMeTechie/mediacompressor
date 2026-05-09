@@ -81,10 +81,10 @@ export const adminUserUpdateRoutePlugin: FastifyPluginAsync = async (app) => {
           return reply.code(404).view('404', { title: 'Not found', path: req.url });
         }
         return reply.code(400).view('admin-user-edit', {
-          title: app.i18n.t('page_title_edit_user', { lng: req.locale }),
+          title: app.i18n.t('page_title_edit_user', { lng: req.locale, ns: 'admin' }),
           flash: {
             level: 'error',
-            message: app.i18n.t('flash_invalid_input', { lng: req.locale }),
+            message: app.i18n.t('flash_invalid_input', { lng: req.locale, ns: 'admin' }),
           },
           user: {
             ...user,
@@ -191,12 +191,12 @@ export const adminUserUpdateRoutePlugin: FastifyPluginAsync = async (app) => {
           return reply.code(404).view('404', { title: 'Not found', path: req.url });
         }
         return reply.code(400).view('admin-user-edit', {
-          title: app.i18n.t('page_title_edit_user', { lng: req.locale }),
+          title: app.i18n.t('page_title_edit_user', { lng: req.locale, ns: 'admin' }),
           flash: {
             level: 'error',
             message:
               innerErrorMessage ??
-              app.i18n.t('flash_invalid_input', { lng: req.locale }),
+              app.i18n.t('flash_invalid_input', { lng: req.locale, ns: 'admin' }),
           },
           user: {
             ...user,

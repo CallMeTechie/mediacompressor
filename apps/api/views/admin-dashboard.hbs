@@ -1,15 +1,15 @@
 <header class="page-header">
-  <h1>{{t 'page_title_dashboard'}}</h1>
+  <h1>{{t 'page_title_dashboard' ns='admin'}}</h1>
   <nav class="page-nav">
     <a href="/">Dashboard</a>
-    <a href="/admin/users">{{t 'nav_users'}}</a>
-    <a href="/admin/invites">{{t 'nav_invites'}}</a>
-    <a href="/admin/stats">{{t 'nav_stats'}}</a>
+    <a href="/admin/users">{{t 'nav_users' ns='admin'}}</a>
+    <a href="/admin/invites">{{t 'nav_invites' ns='admin'}}</a>
+    <a href="/admin/stats">{{t 'nav_stats' ns='admin'}}</a>
   </nav>
 </header>
 
 <section class="admin-summary">
-  <p>{{t 'welcome' email=adminEmail}}</p>
+  <p>{{t 'welcome' email=adminEmail ns='admin'}}</p>
 </section>
 
 {{!-- C3-AD-PR: locale-switcher UI. CSP-clean (no inline JS) -- uses submit-
@@ -21,12 +21,12 @@ sees which locale is currently set. --}}
   <form method="POST" action="/locale" class="inline-form">
     {{> csrf}}
     <input type="hidden" name="redirectTo" value="/admin">
-    <span class="muted">{{t 'locale_switcher_label'}}:</span>
+    <span class="muted">{{t 'locale_switcher_label' ns='admin'}}:</span>
     <button type="submit" name="locale" value="en"
             class="btn-link{{#ifEq _locale 'en'}} active{{/ifEq}}"
-            {{#ifEq _locale 'en'}}disabled{{/ifEq}}>{{t 'locale_en'}}</button>
+            {{#ifEq _locale 'en'}}disabled{{/ifEq}}>{{t 'locale_en' ns='admin'}}</button>
     <button type="submit" name="locale" value="de"
             class="btn-link{{#ifEq _locale 'de'}} active{{/ifEq}}"
-            {{#ifEq _locale 'de'}}disabled{{/ifEq}}>{{t 'locale_de'}}</button>
+            {{#ifEq _locale 'de'}}disabled{{/ifEq}}>{{t 'locale_de' ns='admin'}}</button>
   </form>
 </section>

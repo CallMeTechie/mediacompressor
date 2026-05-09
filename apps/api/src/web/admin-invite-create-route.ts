@@ -123,11 +123,11 @@ export const adminInviteCreateRoutePlugin: FastifyPluginAsync = async (app) => {
         // Concern #6: re-fetch invites so the rerendered list is not empty.
         const invites = await fetchInvitesForRerender(app, req);
         return reply.code(400).view('admin-invites-list', {
-          title: app.i18n.t('page_title_invites', { lng: req.locale }),
+          title: app.i18n.t('page_title_invites', { lng: req.locale, ns: 'admin' }),
           invites,
           flash: {
             level: 'error',
-            message: app.i18n.t('flash_invalid_input', { lng: req.locale }),
+            message: app.i18n.t('flash_invalid_input', { lng: req.locale, ns: 'admin' }),
           },
           _csrfField: reply.renderCsrfField(),
         });
@@ -193,7 +193,7 @@ export const adminInviteCreateRoutePlugin: FastifyPluginAsync = async (app) => {
         // C1-PR/C2-PR/C7-PR: render created-page DIRECTLY with the raw token
         // and Cache-Control: no-store. NO redirect (would drop the token).
         return reply.view('admin-invite-created', {
-          title: app.i18n.t('page_title_invite_created', { lng: req.locale }),
+          title: app.i18n.t('page_title_invite_created', { lng: req.locale, ns: 'admin' }),
           invite: {
             id: body.id,
             email: body.email,
@@ -232,13 +232,13 @@ export const adminInviteCreateRoutePlugin: FastifyPluginAsync = async (app) => {
         // Concern #6: re-fetch invites so the rerendered list is not empty.
         const invites = await fetchInvitesForRerender(app, req);
         return reply.code(400).view('admin-invites-list', {
-          title: app.i18n.t('page_title_invites', { lng: req.locale }),
+          title: app.i18n.t('page_title_invites', { lng: req.locale, ns: 'admin' }),
           invites,
           flash: {
             level: 'error',
             message:
               innerErrorMessage ??
-              app.i18n.t('flash_invalid_input', { lng: req.locale }),
+              app.i18n.t('flash_invalid_input', { lng: req.locale, ns: 'admin' }),
           },
           _csrfField: reply.renderCsrfField(),
         });

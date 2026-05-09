@@ -132,7 +132,7 @@ export const adminStatsPagePlugin: FastifyPluginAsync = async (app) => {
         .sort((a, b) => a.status.localeCompare(b.status));
 
       return reply.view('admin-stats', {
-        title: app.i18n.t('page_title_stats', { lng: req.locale }),
+        title: app.i18n.t('page_title_stats', { lng: req.locale, ns: 'admin' }),
         stats: {
           users: data.users,
           jobRows,

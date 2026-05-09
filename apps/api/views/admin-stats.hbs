@@ -1,60 +1,60 @@
 <header class="page-header">
-  <h1>{{t 'page_title_stats'}}</h1>
+  <h1>{{t 'page_title_stats' ns='admin'}}</h1>
   <nav class="page-nav">
-    <a href="/admin">{{t 'nav_dashboard'}}</a>
-    <a href="/admin/users">{{t 'nav_users'}}</a>
-    <a href="/admin/invites">{{t 'nav_invites'}}</a>
+    <a href="/admin">{{t 'nav_dashboard' ns='admin'}}</a>
+    <a href="/admin/users">{{t 'nav_users' ns='admin'}}</a>
+    <a href="/admin/invites">{{t 'nav_invites' ns='admin'}}</a>
   </nav>
 </header>
 
 <section class="stats-section">
-  <h2>{{t 'stats_section_users'}}</h2>
+  <h2>{{t 'stats_section_users' ns='admin'}}</h2>
   <dl>
-    <dt>{{t 'stats_users_total'}}</dt><dd>{{stats.users.total}}</dd>
+    <dt>{{t 'stats_users_total' ns='admin'}}</dt><dd>{{stats.users.total}}</dd>
   </dl>
 </section>
 
 <section class="stats-section">
-  <h2>{{t 'stats_section_jobs'}}</h2>
+  <h2>{{t 'stats_section_jobs' ns='admin'}}</h2>
   {{#if stats.jobRows.length}}
     <table class="admin-table">
       <thead>
         <tr>
-          <th>{{t 'stats_jobs_table_status'}}</th>
-          <th>{{t 'stats_jobs_table_count'}}</th>
+          <th>{{t 'stats_jobs_table_status' ns='admin'}}</th>
+          <th>{{t 'stats_jobs_table_count' ns='admin'}}</th>
         </tr>
       </thead>
       <tbody>
         {{#each stats.jobRows}}
           <tr>
-            <td>{{t labelKey status=status}}</td>
+            <td>{{t labelKey status=status ns='admin'}}</td>
             <td>{{count}}</td>
           </tr>
         {{/each}}
       </tbody>
     </table>
   {{else}}
-    <p class="muted">{{t 'stats_jobs_empty'}}</p>
+    <p class="muted">{{t 'stats_jobs_empty' ns='admin'}}</p>
   {{/if}}
 </section>
 
 <section class="stats-section">
-  <h2>{{t 'stats_section_storage'}}</h2>
+  <h2>{{t 'stats_section_storage' ns='admin'}}</h2>
   <dl>
-    <dt>{{t 'stats_storage_used'}}</dt><dd>{{stats.storage.usedBytes}}</dd>
+    <dt>{{t 'stats_storage_used' ns='admin'}}</dt><dd>{{stats.storage.usedBytes}}</dd>
     {{#if stats.storage.diskFree}}
-      <dt>{{t 'stats_storage_disk_available'}}</dt><dd>{{stats.storage.diskFree.available}}</dd>
-      <dt>{{t 'stats_storage_disk_total'}}</dt><dd>{{stats.storage.diskFree.total}}</dd>
+      <dt>{{t 'stats_storage_disk_available' ns='admin'}}</dt><dd>{{stats.storage.diskFree.available}}</dd>
+      <dt>{{t 'stats_storage_disk_total' ns='admin'}}</dt><dd>{{stats.storage.diskFree.total}}</dd>
     {{else}}
-      <dt><em>{{t 'stats_storage_disk_unavailable'}}</em></dt><dd>&mdash;</dd>
+      <dt><em>{{t 'stats_storage_disk_unavailable' ns='admin'}}</em></dt><dd>&mdash;</dd>
     {{/if}}
   </dl>
 </section>
 
 <section class="stats-section">
-  <h2>{{t 'stats_section_queue'}}</h2>
+  <h2>{{t 'stats_section_queue' ns='admin'}}</h2>
   <dl>
-    <dt>{{t 'stats_queue_waiting'}}</dt><dd>{{stats.queue.compressionWaiting}}</dd>
-    <dt>{{t 'stats_queue_active'}}</dt><dd>{{stats.queue.compressionActive}}</dd>
+    <dt>{{t 'stats_queue_waiting' ns='admin'}}</dt><dd>{{stats.queue.compressionWaiting}}</dd>
+    <dt>{{t 'stats_queue_active' ns='admin'}}</dt><dd>{{stats.queue.compressionActive}}</dd>
   </dl>
 </section>

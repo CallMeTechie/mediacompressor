@@ -39,10 +39,14 @@ test('user uploads a file, lands on /jobs/:id, sees status, cancels it', async (
   await page.check('input[name="kind"][value="image"]');
   await page.selectOption('select[name="profile"]', 'web-optimized');
 
-  // 4. Submit. Wait for redirect to /jobs/<id>.
+  // 4. Submit. Wait for redirect to /jobs/<id>. Plan 8e Task 2 added a
+  //    logout-form to the layout-nav on every authenticated page, so the
+  //    bare `button[type="submit"]` selector now matches the logout button
+  //    first. Scope to `form#upload-form` so the click hits the upload-
+  //    form's submit unambiguously.
   await Promise.all([
     page.waitForURL(/\/jobs\/[0-9a-f-]{36}$/, { timeout: 30_000 }),
-    page.click('button[type="submit"]'),
+    page.click('form#upload-form button[type="submit"]'),
   ]);
 
   // 5. Verify the SSE-target div is present and reflects a job status. The
@@ -53,8 +57,13 @@ test('user uploads a file, lands on /jobs/:id, sees status, cancels it', async (
   //    the target div's text, which is robust against the swap.
   const sseTarget = page.locator('#job-detail-sse-target');
   await expect(sseTarget).toBeVisible();
+  // Plan 8e Task 5 i18n migration: status labels are now locale-translated
+  // via the {{tStatus}} helper. EN labels are PascalCase ("Succeeded",
+  // "Failed", etc.). Match case-insensitively so the assertion works for
+  // both the canonical lowercase enum-string (when the SSE event is
+  // displayed raw as JSON) and the rendered localized label.
   await expect(sseTarget).toContainText(
-    /uploading|queued|processing|succeeded|failed|canceled/,
+    /uploading|queued|processing|succeeded|failed|canceled/i,
   );
 
   // 6. If a cancel button is rendered (server-side `canCancel` was true),
@@ -68,7 +77,7 @@ test('user uploads a file, lands on /jobs/:id, sees status, cancels it', async (
       cancelBtn.click(),
     ]);
     await expect(page.locator('#job-detail-sse-target')).toContainText(
-      /canceled|succeeded|failed/,
+      /canceled|succeeded|failed/i,
     );
   }
 });

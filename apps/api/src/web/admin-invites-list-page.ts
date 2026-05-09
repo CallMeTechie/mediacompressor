@@ -113,14 +113,14 @@ export const adminInvitesListPagePlugin: FastifyPluginAsync = async (app) => {
       const flash = flashEntry
         ? {
             level: flashEntry.level,
-            message: app.i18n.t(flashEntry.messageKey, { lng: req.locale }),
+            message: app.i18n.t(flashEntry.messageKey, { lng: req.locale, ns: 'admin' }),
           }
         : null;
 
       const invites = buildInvitesViewModel(data.items, Date.now());
 
       return reply.view('admin-invites-list', {
-        title: app.i18n.t('page_title_invites', { lng: req.locale }),
+        title: app.i18n.t('page_title_invites', { lng: req.locale, ns: 'admin' }),
         invites,
         flash,
         _csrfField: reply.renderCsrfField(),

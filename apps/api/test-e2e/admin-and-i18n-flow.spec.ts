@@ -122,9 +122,13 @@ test('admin happy-path: dashboard → edit user → invite create+reveal+revoke 
   await expect(page).toHaveURL(/\/admin\/users\/[0-9a-f-]{36}$/);
 
   await page.selectOption('select[name="status"]', 'disabled');
+  // Plan 8e Task 2 added a logout-form to the layout-nav on every
+  // authenticated page, so the bare `button[type="submit"]` selector
+  // matches the logout button first. Scope to the admin user-edit form so
+  // the click hits the save-button unambiguously.
   await Promise.all([
     page.waitForURL(/\/admin\/users(\?.*)?$/),
-    page.click('button[type="submit"]'),
+    page.click('form.admin-form button[type="submit"]'),
   ]);
   // Successful update redirects to /admin/users?updateflash=updated and the
   // shared partial renders <div class="flash flash-info">.

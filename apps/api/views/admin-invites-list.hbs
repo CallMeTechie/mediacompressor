@@ -1,9 +1,9 @@
 <header class="page-header">
-  <h1>{{t 'page_title_invites'}}</h1>
+  <h1>{{t 'page_title_invites' ns='admin'}}</h1>
   <nav class="page-nav">
-    <a href="/admin">{{t 'nav_dashboard'}}</a>
-    <a href="/admin/users">{{t 'nav_users'}}</a>
-    <a href="/admin/stats">{{t 'nav_stats'}}</a>
+    <a href="/admin">{{t 'nav_dashboard' ns='admin'}}</a>
+    <a href="/admin/users">{{t 'nav_users' ns='admin'}}</a>
+    <a href="/admin/stats">{{t 'nav_stats' ns='admin'}}</a>
   </nav>
 </header>
 
@@ -13,15 +13,15 @@
   <form method="POST" action="/admin/invites" class="admin-form">
     {{> csrf}}
     <p>
-      <label for="email">{{t 'invite_create_label_email'}}</label>
+      <label for="email">{{t 'invite_create_label_email' ns='admin'}}</label>
       <input id="email" name="email" type="email" autocomplete="off">
     </p>
     <p>
-      <label for="expiresInHours">{{t 'invite_create_label_expires_in_hours'}}</label>
+      <label for="expiresInHours">{{t 'invite_create_label_expires_in_hours' ns='admin'}}</label>
       <input id="expiresInHours" name="expiresInHours" type="number" min="1" max="168" value="24">
     </p>
     <p>
-      <button type="submit" class="btn">{{t 'invite_create_button_submit'}}</button>
+      <button type="submit" class="btn">{{t 'invite_create_button_submit' ns='admin'}}</button>
     </p>
   </form>
 </section>
@@ -30,10 +30,10 @@
 <table class="admin-table">
   <thead>
     <tr>
-      <th>{{t 'invites_table_email'}}</th>
-      <th>{{t 'invites_table_expires_at'}}</th>
-      <th>{{t 'invites_table_consumed'}}</th>
-      <th>{{t 'invites_table_actions'}}</th>
+      <th>{{t 'invites_table_email' ns='admin'}}</th>
+      <th>{{t 'invites_table_expires_at' ns='admin'}}</th>
+      <th>{{t 'invites_table_consumed' ns='admin'}}</th>
+      <th>{{t 'invites_table_actions' ns='admin'}}</th>
     </tr>
   </thead>
   <tbody>
@@ -45,7 +45,7 @@
         <td>
           <time datetime="{{expiresAt}}">{{expiresAt}}</time>
         </td>
-        <td>{{t statusKey}}</td>
+        <td>{{t statusKey ns='admin'}}</td>
         <td>
           {{#if canRevoke}}
             <form method="POST" action="/admin/invites/{{id}}/revoke" class="inline-form">
@@ -56,7 +56,7 @@
                    re-binds to the parent view-context where _csrfField was
                    set by the handler (Plan-8d Task 7 regression fix). --}}
               {{> csrf @root}}
-              <button type="submit" class="btn-link">{{t 'invites_button_revoke'}}</button>
+              <button type="submit" class="btn-link">{{t 'invites_button_revoke' ns='admin'}}</button>
             </form>
           {{/if}}
         </td>
@@ -65,5 +65,5 @@
   </tbody>
 </table>
 {{else}}
-<p class="muted">{{t 'invites_empty'}}</p>
+<p class="muted">{{t 'invites_empty' ns='admin'}}</p>
 {{/if}}

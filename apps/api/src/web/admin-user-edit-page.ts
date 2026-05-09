@@ -70,12 +70,12 @@ export const adminUserEditPagePlugin: FastifyPluginAsync = async (app) => {
       const flash = flashEntry
         ? {
             level: flashEntry.level,
-            message: app.i18n.t(flashEntry.messageKey, { lng: req.locale }),
+            message: app.i18n.t(flashEntry.messageKey, { lng: req.locale, ns: 'admin' }),
           }
         : null;
 
       return reply.view('admin-user-edit', {
-        title: app.i18n.t('page_title_edit_user', { lng: req.locale }),
+        title: app.i18n.t('page_title_edit_user', { lng: req.locale, ns: 'admin' }),
         flash,
         user: {
           ...user,

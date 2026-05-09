@@ -1,23 +1,23 @@
 <header class="page-header">
-  <h1>{{t 'invite_created_heading'}}</h1>
+  <h1>{{t 'invite_created_heading' ns='admin'}}</h1>
   <nav class="page-nav">
-    <a href="/admin/invites">{{t 'nav_invites'}}</a>
+    <a href="/admin/invites">{{t 'nav_invites' ns='admin'}}</a>
   </nav>
 </header>
 
 <div class="flash flash-info">
-  <p><strong>{{t 'invite_created_warning'}}</strong></p>
+  <p><strong>{{t 'invite_created_warning' ns='admin'}}</strong></p>
 </div>
 
 <dl class="api-key-detail">
-  <dt>{{t 'invite_created_label_token'}}</dt>
+  <dt>{{t 'invite_created_label_token' ns='admin'}}</dt>
   <dd><code class="invite-token-secret">{{invite.token}}</code></dd>
-  <dt>{{t 'invite_created_label_email'}}</dt>
+  <dt>{{t 'invite_created_label_email' ns='admin'}}</dt>
   <dd>{{#if invite.email}}{{invite.email}}{{else}}<span class="muted">&mdash;</span>{{/if}}</dd>
-  <dt>{{t 'invite_created_label_expires_at'}}</dt>
+  <dt>{{t 'invite_created_label_expires_at' ns='admin'}}</dt>
   <dd><time datetime="{{invite.expiresAt}}">{{invite.expiresAt}}</time></dd>
 </dl>
 
 <p>
-  <a href="/admin/invites" class="btn">{{t 'invite_created_button_done'}}</a>
+  <a href="/admin/invites" class="btn">{{t 'invite_created_button_done' ns='admin'}}</a>
 </p>

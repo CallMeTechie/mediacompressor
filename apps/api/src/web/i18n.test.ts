@@ -104,9 +104,14 @@ describe('web/i18n', () => {
       // fast with a clear message rather than production-boot-crash.
       resetI18n();
       const i18n = await initI18n();
-      expect(i18n.t('nav_users', { lng: 'en' })).toBe('Users');
-      expect(i18n.t('nav_users', { lng: 'de' })).toBe('Benutzer');
-      expect(i18n.t('flash_user_updated', { lng: 'de' })).toBe('Benutzer aktualisiert.');
+      // Plan 8e Task 7: defaultNS flipped from 'admin' to 'common', so admin-
+      // namespace lookups must pass `ns: 'admin'` explicitly. Without it,
+      // i18next would resolve from `common` and miss these admin-only keys.
+      expect(i18n.t('nav_users', { lng: 'en', ns: 'admin' })).toBe('Users');
+      expect(i18n.t('nav_users', { lng: 'de', ns: 'admin' })).toBe('Benutzer');
+      expect(i18n.t('flash_user_updated', { lng: 'de', ns: 'admin' })).toBe(
+        'Benutzer aktualisiert.',
+      );
     });
 
     it('C1-AD-PR PFLICHT: helper @root-fallback inside {{#each}} loop renders correct locale', async () => {
@@ -120,7 +125,12 @@ describe('web/i18n', () => {
       const i18n = await initI18n();
       registerI18nHelper(i18n);
 
-      const tmpl = handlebars.compile(`{{#each items}}{{t 'nav_users'}}|{{/each}}`);
+      // Plan 8e Task 7: defaultNS flipped to 'common', so admin-namespace
+      // keys need explicit `ns='admin'` in the {{t}}-helper invocation —
+      // mirrors the post-flip annotation pattern in admin-*.hbs templates.
+      const tmpl = handlebars.compile(
+        `{{#each items}}{{t 'nav_users' ns='admin'}}|{{/each}}`,
+      );
       const out = tmpl({ _locale: 'de' as SupportedLocale, items: [{}, {}] });
       // Two iterations, both must produce 'Benutzer' (de). Without the
       // @root-lookup, this would be 'Users|Users|' (en, the default).

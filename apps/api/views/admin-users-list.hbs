@@ -1,9 +1,9 @@
 <header class="page-header">
-  <h1>{{t 'page_title_users'}}</h1>
+  <h1>{{t 'page_title_users' ns='admin'}}</h1>
   <nav class="page-nav">
-    <a href="/admin">{{t 'nav_dashboard'}}</a>
-    <a href="/admin/invites">{{t 'nav_invites'}}</a>
-    <a href="/admin/stats">{{t 'nav_stats'}}</a>
+    <a href="/admin">{{t 'nav_dashboard' ns='admin'}}</a>
+    <a href="/admin/invites">{{t 'nav_invites' ns='admin'}}</a>
+    <a href="/admin/stats">{{t 'nav_stats' ns='admin'}}</a>
   </nav>
 </header>
 
@@ -13,11 +13,11 @@
 <table class="admin-table">
   <thead>
     <tr>
-      <th>{{t 'users_table_email'}}</th>
-      <th>{{t 'users_table_role'}}</th>
-      <th>{{t 'users_table_status'}}</th>
-      <th>{{t 'users_table_quotas'}}</th>
-      <th>{{t 'users_table_actions'}}</th>
+      <th>{{t 'users_table_email' ns='admin'}}</th>
+      <th>{{t 'users_table_role' ns='admin'}}</th>
+      <th>{{t 'users_table_status' ns='admin'}}</th>
+      <th>{{t 'users_table_quotas' ns='admin'}}</th>
+      <th>{{t 'users_table_actions' ns='admin'}}</th>
     </tr>
   </thead>
   <tbody>
@@ -30,7 +30,7 @@
           <span class="muted">{{storageQuota}} / {{parallelQuota}} / {{hourlyQuota}}</span>
         </td>
         <td>
-          <a href="/admin/users/{{id}}">{{t 'users_table_edit'}}</a>
+          <a href="/admin/users/{{id}}">{{t 'users_table_edit' ns='admin'}}</a>
         </td>
       </tr>
     {{/each}}
@@ -40,6 +40,6 @@
 
 {{#if nextCursor}}
   <p>
-    <a href="/admin/users?cursor={{nextCursor}}">{{t 'users_table_next_page'}}</a>
+    <a href="/admin/users?cursor={{nextCursor}}">{{t 'users_table_next_page' ns='admin'}}</a>
   </p>
 {{/if}}

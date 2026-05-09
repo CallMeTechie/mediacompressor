@@ -34,7 +34,7 @@ export const adminDashboardPagePlugin: FastifyPluginAsync = async (app) => {
       select: { email: true },
     });
     return reply.view('admin-dashboard', {
-      title: app.i18n.t('page_title_dashboard', { lng: req.locale }),
+      title: app.i18n.t('page_title_dashboard', { lng: req.locale, ns: 'admin' }),
       adminEmail: admin?.email ?? '',
       // The dashboard contains two state-changing forms (logout + locale-
       // switcher) that need a CSRF token. {{> csrf}} reads `_csrfField` from

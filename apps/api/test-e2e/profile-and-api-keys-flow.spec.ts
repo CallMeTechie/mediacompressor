@@ -35,11 +35,15 @@ test('user navigates Profile, creates an API key (sees one-time reveal), revokes
   await expect(page).toHaveURL(/\/profile\/api-keys$/);
   await expect(page.locator('h1')).toContainText(/API Keys/);
 
-  // 4. Create new key.
+  // 4. Create new key. Plan 8e Task 2 added a logout-form to the layout-nav
+  //    on every authenticated page, so the bare `button[type="submit"]`
+  //    selector now matches BOTH the logout button (DOM-first) and the
+  //    create-form button. Scope to `form.api-key-form` so the click
+  //    targets the create-form's submit unambiguously.
   await page.click('a[href="/profile/api-keys/new"]');
   await expect(page.locator('h1')).toContainText(/Create API key/);
   await page.fill('input[name="name"]', 'e2e-test-key');
-  await page.click('button[type="submit"]');
+  await page.click('form.api-key-form button[type="submit"]');
   await expect(page.locator('h1')).toContainText(/API key created/);
   // The raw key is visible exactly once. Format: `mc_<prefix-8>_<body-43>`,
   // where both segments are base64url (charset `[A-Za-z0-9_-]`). The body is

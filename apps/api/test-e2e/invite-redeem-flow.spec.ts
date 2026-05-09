@@ -66,7 +66,9 @@ test.afterAll(async () => {
 test('user can redeem an invite and reach the home placeholder', async ({ page }) => {
   const token = process.env.E2E_INVITE_TOKEN!;
   await page.goto(`/invites/${token}`);
-  await expect(page.locator('h1')).toContainText(/Create your account/);
+  // Plan 8e Task 3 i18n migration: "Create your account" was renamed to
+  // the i18n-keyed "Complete your account" (en/auth.json:invite_redeem_title).
+  await expect(page.locator('h1')).toContainText(/Complete your account/);
   await page.fill('input[name="email"]', NEW_EMAIL);
   await page.fill('input[name="password"]', PASSWORD);
   await Promise.all([

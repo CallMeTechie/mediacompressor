@@ -75,12 +75,12 @@ export const adminUsersListPagePlugin: FastifyPluginAsync = async (app) => {
       const flash = flashEntry
         ? {
             level: flashEntry.level,
-            message: app.i18n.t(flashEntry.messageKey, { lng: req.locale }),
+            message: app.i18n.t(flashEntry.messageKey, { lng: req.locale, ns: 'admin' }),
           }
         : null;
 
       return reply.view('admin-users-list', {
-        title: app.i18n.t('page_title_users', { lng: req.locale }),
+        title: app.i18n.t('page_title_users', { lng: req.locale, ns: 'admin' }),
         users: data.items,
         nextCursor: data.nextCursor,
         flash,

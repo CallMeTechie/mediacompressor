@@ -116,14 +116,15 @@ export async function initI18n(): Promise<i18n> {
     // bundle at boot. Tasks 2-6 fill in real translation keys; Task 1 creates
     // sentinel-only files (`{"_namespace": "<ns>"}`).
     //
-    // `defaultNS` stays at `'admin'` because the Pre-Task-1 audit (Plan 8e
-    // Step 0, Rev. 2.1) found Plan-8d admin handlers + admin-*.hbs templates
-    // that rely on the implicit default-namespace lookup. Switching the
-    // default before those sites are migrated would silently render raw key
-    // strings. The defaultNS flip to `'common'` is deferred to Task 7
-    // (cleanup), after Tasks 2-6 have made every admin call-site explicit.
+    // Plan 8e Task 7 (Rev. 2.1, WC-i18n-7): `defaultNS` flipped from
+    // `'admin'` to `'common'` after the Task-7 audit verified every admin
+    // handler + admin-*.hbs template carries an explicit `ns: 'admin'` /
+    // `ns='admin'` annotation. The flip moves the implicit-default to the
+    // namespace that holds shared layout/error/status strings, matching the
+    // post-Plan-8e majority call-site shape. `req.t(...)` (decorateRequest
+    // below) keeps `'common'` as its `ns?` default for the same reason.
     ns: [...NAMESPACES],
-    defaultNS: 'admin',
+    defaultNS: 'common',
     backend: {
       loadPath: path.join(LOCALES_ROOT, '{{lng}}/{{ns}}.json'),
     },
