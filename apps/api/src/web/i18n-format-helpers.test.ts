@@ -46,6 +46,35 @@ describe('formatDateTime helper', () => {
     const out = tmpl({ value: '2026-05-09T14:32:00Z' });
     expect(out).toMatch(/May 9, 2026/);
   });
+
+  // Concern 1 (Plan 8f Task 1 review): style-allowlist guard — typo in
+  // template hash-arg falls back to medium instead of crashing the render
+  // with `Intl.DateTimeFormat`'s `RangeError: Value bogus out of range for
+  // dateStyle`.
+  it('falls back to medium-style for invalid style hash-arg (no crash)', () => {
+    const tmpl = Handlebars.compile('{{formatDateTime value style="bogus"}}');
+    const out = tmpl({ value: '2026-05-09T14:32:00Z', _locale: 'en' });
+    expect(out).toMatch(/May 9, 2026/);
+    // Same shape as default (medium). No RangeError must be thrown.
+    expect(out).toMatch(/2:32|14:32/);
+  });
+
+  // Concern 2 (Plan 8f Task 1 review): exercise the previously-untested
+  // `style="long"` code path for both EN + DE — Tasks 2/5 will use this
+  // for detail-view renderings ("9. Mai 2026 um 14:32").
+  it('respects style="long" hash-arg (EN long-month)', () => {
+    const tmpl = Handlebars.compile('{{formatDateTime value style="long"}}');
+    const out = tmpl({ value: '2026-05-09T14:32:00Z', _locale: 'en' });
+    expect(out).toMatch(/May 9, 2026/);
+  });
+
+  it('respects style="long" hash-arg (DE long-month)', () => {
+    const tmpl = Handlebars.compile('{{formatDateTime value style="long"}}');
+    const out = tmpl({ value: '2026-05-09T14:32:00Z', _locale: 'de' });
+    // DE-long renders "9. Mai 2026 um 14:32" (full month-name + "um"-separator).
+    expect(out).toMatch(/9\. Mai 2026/);
+    expect(out).toMatch(/14:32/);
+  });
 });
 
 describe('formatDate helper (Rev. 2.1 WC-i18n-f18 split)', () => {
@@ -136,6 +165,29 @@ describe('formatBytes helper', () => {
     // Same byte-count expressed as bigint vs Number must produce identical output.
     expect(tmpl({ value: 1500000n, _locale: 'en' })).toBe('1.43 MB');
     expect(tmpl({ value: 1500000, _locale: 'en' })).toBe('1.43 MB');
+  });
+
+  // Concern 3 (Plan 8f Task 1 review): boundary-test that distinguishes
+  // round-half-up from truncation. 1054268 / 1048576 = 1.005427... — the
+  // half-up implementation produces 1.01, a truncating implementation
+  // would produce 1.00. The previous WC-i18n-f16 test (1500000 → 1.43)
+  // was not at a half-up boundary and would also pass for truncation.
+  it('PFLICHT WC-i18n-f16 boundary: rounds half-up at 1.005 MB-edge (vs truncation)', () => {
+    const tmpl = Handlebars.compile('{{formatBytes value}}');
+    expect(tmpl({ value: 1054268n, _locale: 'en' })).toBe('1.01 MB');
+    expect(tmpl({ value: 1054268, _locale: 'en' })).toBe('1.01 MB');
+  });
+
+  // Concern 2 (Plan 8f Task 1 review): cover the integer-string-encoded
+  // bigint code path — JSON-serialized BigInt-DB-fields arrive as
+  // "9223372036854775807"-style strings; must keep precision-parity with
+  // the bigint-input.
+  it('preserves precision for integer-string input larger than MAX_SAFE_INTEGER', () => {
+    const tmpl = Handlebars.compile('{{formatBytes value}}');
+    const stringResult = tmpl({ value: '9223372036854775807', _locale: 'en' });
+    expect(stringResult).toMatch(/^\d+\.\d{2}\s+EB$/);
+    const bigintResult = tmpl({ value: 9223372036854775807n, _locale: 'en' });
+    expect(stringResult).toBe(bigintResult);
   });
 });
 

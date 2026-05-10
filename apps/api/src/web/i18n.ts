@@ -287,10 +287,23 @@ export function registerTProfileHelper(i18n: i18n): void {
  * Idempotent — Handlebars overwrites the previous registration.
  */
 // Allowed `dateStyle` / inferred-style values for formatDateTime + formatDate.
-// Inlined as a type-union because the constant is purely a type-source — no
-// runtime use — and the eslint `no-unused-vars` rule (correctly) flags an
-// assigned-but-unused const even when consumed via `typeof`.
+// The runtime Set is the validation-allowlist (Concern 1: typo-resilience —
+// invalid `style="bogus"` from a template falls back to `'medium'` instead of
+// crashing the page-render with `Intl.DateTimeFormat`'s `RangeError`).
+// The type-alias is derived from the Set's element-type so the two stay in
+// sync — no drift possible.
 type DateTimeStyle = 'short' | 'medium' | 'long';
+const ALLOWED_DATETIME_STYLES: ReadonlySet<DateTimeStyle> = new Set<DateTimeStyle>([
+  'short',
+  'medium',
+  'long',
+]);
+
+function resolveDateTimeStyle(rawStyle: unknown): DateTimeStyle {
+  return typeof rawStyle === 'string' && ALLOWED_DATETIME_STYLES.has(rawStyle as DateTimeStyle)
+    ? (rawStyle as DateTimeStyle)
+    : 'medium';
+}
 
 export function registerFormatDateTimeHelper(): void {
   handlebars.registerHelper(
@@ -304,7 +317,7 @@ export function registerFormatDateTimeHelper(): void {
       const root = (options?.data?.root ?? {}) as { _locale?: SupportedLocale };
       const thisLocale = this?._locale;
       const locale: SupportedLocale = root._locale ?? thisLocale ?? DEFAULT_LOCALE;
-      const style = (options.hash?.style as DateTimeStyle | undefined) ?? 'medium';
+      const style = resolveDateTimeStyle(options.hash?.style);
       const date = value instanceof Date ? value : new Date(String(value));
       if (Number.isNaN(date.getTime())) return '';
       const formatter = new Intl.DateTimeFormat(locale, {
@@ -341,7 +354,7 @@ export function registerFormatDateHelper(): void {
       const root = (options?.data?.root ?? {}) as { _locale?: SupportedLocale };
       const thisLocale = this?._locale;
       const locale: SupportedLocale = root._locale ?? thisLocale ?? DEFAULT_LOCALE;
-      const style = (options.hash?.style as DateTimeStyle | undefined) ?? 'medium';
+      const style = resolveDateTimeStyle(options.hash?.style);
       const date = value instanceof Date ? value : new Date(String(value));
       if (Number.isNaN(date.getTime())) return '';
       const formatter = new Intl.DateTimeFormat(locale, {
