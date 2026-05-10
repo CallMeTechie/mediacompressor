@@ -26,6 +26,13 @@ pnpm lint
 pnpm typecheck
 ```
 
+## Production Deployment
+
+For production deployment with Caddy reverse-proxy + automatic Let's Encrypt TLS:
+
+- **[Deploy-Runbook](docs/operations/deploy.md)** — first-deploy + secret-rotation procedures
+- **[Incident-Runbook](docs/operations/runbook.md)** — common-issue resolution + backup/restore
+
 ## Repository-Struktur
 
 | Pfad | Inhalt |
