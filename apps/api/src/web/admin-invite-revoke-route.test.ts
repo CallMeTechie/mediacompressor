@@ -19,12 +19,14 @@ const TEST_EMAIL_ADMIN_NOCSRF = 'admin-invite-revoke-nocsrf@test.invalid';
 const TEST_EMAIL_ADMIN_OK = 'admin-invite-revoke-ok@test.invalid';
 const TEST_EMAIL_ADMIN_404 = 'admin-invite-revoke-404@test.invalid';
 const TEST_EMAIL_ADMIN_403 = 'admin-invite-revoke-403@test.invalid';
+const TEST_EMAIL_ADMIN_AUDIT = 'admin-invite-revoke-audit@test.invalid';
 const TEST_EMAILS = [
   TEST_EMAIL_USER,
   TEST_EMAIL_ADMIN_NOCSRF,
   TEST_EMAIL_ADMIN_OK,
   TEST_EMAIL_ADMIN_404,
   TEST_EMAIL_ADMIN_403,
+  TEST_EMAIL_ADMIN_AUDIT,
 ];
 
 const config: Config = {
@@ -75,6 +77,7 @@ describe('web/admin-invite-revoke-route', () => {
       TEST_EMAIL_ADMIN_OK,
       TEST_EMAIL_ADMIN_404,
       TEST_EMAIL_ADMIN_403,
+      TEST_EMAIL_ADMIN_AUDIT,
     ]) {
       await createTestUser(prisma, { email, password: 'hunter22hunter22' });
       await prisma.user.update({ where: { email }, data: { role: 'admin' } });
@@ -100,6 +103,13 @@ describe('web/admin-invite-revoke-route', () => {
   afterAll(async () => {
     const ids = await getAdminIds();
     if (ids.length > 0) {
+      // Plan 10 Task 3: delete AuditEvent rows for test-admin actors BEFORE
+      // cleanupTestUsers (FK onDelete: Restrict). cleanupTestUsers also
+      // deletes audit-events (WC-audit-7 fix); explicit deletion is
+      // defense-in-depth.
+      await prisma.auditEvent.deleteMany({
+        where: { actorUserId: { in: ids } },
+      });
       await prisma.invite.deleteMany({ where: { createdById: { in: ids } } });
     }
     await cleanupTestUsers(prisma, TEST_EMAILS);
@@ -374,6 +384,74 @@ describe('web/admin-invite-revoke-route', () => {
 
       injectSpy.mockRestore();
     } finally {
+      await app.close();
+    }
+  });
+
+  // PFLICHT Plan-10 Task-3: AuditEvent row written on successful invite_revoke.
+  // payload is null/undefined (the revoke action is fully identified by
+  // targetId; the route passes no payload to recordAuditEvent).
+  it('PFLICHT Plan-10 Task-3: writes AuditEvent row on successful invite_revoke (payload null)', async () => {
+    const app = await buildServer(config);
+    let adminId: string | undefined;
+    try {
+      const adminUser = await prisma.user.findUnique({
+        where: { email: TEST_EMAIL_ADMIN_AUDIT },
+        select: { id: true },
+      });
+      adminId = adminUser!.id;
+      const future = new Date(Date.now() + 24 * 3600_000);
+      const created = await prisma.invite.create({
+        data: {
+          token: 'c'.repeat(64),
+          email: 'invitee-revoke-audit@test.invalid',
+          createdById: adminId,
+          expiresAt: future,
+        },
+      });
+
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
+        app,
+        TEST_EMAIL_ADMIN_AUDIT,
+      );
+      const res = await app.inject({
+        method: 'POST',
+        url: `/admin/invites/${created.id}/revoke`,
+        headers: {
+          cookie: cookieHeader,
+          'content-type': 'application/x-www-form-urlencoded',
+          'x-csrf-token': csrf,
+        },
+        payload: `_csrf=${encodeURIComponent(csrf)}`,
+      });
+      expect([302, 303]).toContain(res.statusCode);
+      expect(res.headers.location).toBe('/admin/invites?updateflash=revoked');
+
+      const events = await prisma.auditEvent.findMany({
+        where: {
+          actorUserId: adminId,
+          action: 'invite_revoke',
+          targetId: created.id,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+      });
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        action: 'invite_revoke',
+        targetType: 'invite',
+        targetId: created.id,
+      });
+      // Revoke passes no payload; Prisma's Json? column stores Prisma.DbNull
+      // which surfaces as JS `null` on read.
+      expect(events[0]!.payload).toBeNull();
+    } finally {
+      if (adminId) {
+        await prisma.auditEvent.deleteMany({
+          where: { actorUserId: adminId },
+        });
+        await prisma.invite.deleteMany({ where: { createdById: adminId } });
+      }
       await app.close();
     }
   });

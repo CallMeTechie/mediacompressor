@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { FastifyPluginAsync } from 'fastify';
+import { recordAuditEvent } from '@mediacompressor/audit';
 import type { AdminInviteFlashKey } from './admin-invite-flash-keys.js';
 
 /**
@@ -42,6 +43,8 @@ const Params = z.object({ id: z.string().uuid() });
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const adminInviteRevokeRoutePlugin: FastifyPluginAsync = async (app) => {
+  const { prisma } = app.deps;
+
   app.post(
     '/admin/invites/:id/revoke',
     {
@@ -86,13 +89,24 @@ export const adminInviteRevokeRoutePlugin: FastifyPluginAsync = async (app) => {
       });
 
       if (inner.statusCode === 204) {
-        // C5-PR audit-log scaffolding (admin state-change). Whitelist fields
-        // only -- no secrets.
+        // Plan 10 Task 3: dual-write -- persist to AuditEvent table THEN log.
+        // No payload: revoke is fully identified by targetId. auditEventId in
+        // the log-line correlates Loki/Grafana log-entries to the AuditEvent
+        // DB-row. NOTE: not in a transaction with the inner business-action;
+        // if recordAuditEvent throws (FK-violation), this route returns 500 --
+        // fail-loud is preferable to a missing audit-trail for v0.1.0.
+        const audit = await recordAuditEvent(prisma, {
+          actorUserId: req.auth!.userId,
+          action: 'invite_revoke',
+          targetType: 'invite',
+          targetId: id,
+        });
         app.log.info(
           {
             adminId: req.auth!.userId,
             action: 'invite_revoke',
             inviteId: id,
+            auditEventId: audit.id,
           },
           'admin action',
         );

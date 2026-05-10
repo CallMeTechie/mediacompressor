@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { FastifyInstance, FastifyPluginAsync, FastifyRequest } from 'fastify';
+import { recordAuditEvent } from '@mediacompressor/audit';
 import {
   buildInvitesViewModel,
   type InviteRowApi,
@@ -106,6 +107,8 @@ async function fetchInvitesForRerender(
 }
 
 export const adminInviteCreateRoutePlugin: FastifyPluginAsync = async (app) => {
+  const { prisma } = app.deps;
+
   app.post(
     '/admin/invites',
     {
@@ -177,16 +180,29 @@ export const adminInviteCreateRoutePlugin: FastifyPluginAsync = async (app) => {
             .view('500', { title: 'Create invite failed' });
         }
         const body = inner201.data;
-        // C5-PR audit-log scaffolding for admin state-changes. Whitelist
-        // payload only -- NEVER include `body.token` (raw one-time secret).
-        // The `expiresAt` field is non-secret. Plan 10 replaces this with
-        // a dedicated AuditEvent table.
+        // Plan 10 Task 3: dual-write -- persist to AuditEvent table THEN log.
+        // Whitelist payload to `{ expiresAt }` only -- NEVER include
+        // `body.token` (raw one-time secret); FORBIDDEN_PAYLOAD_KEYS would
+        // reject `token` anyway, but the whitelist is the primary defense.
+        // auditEventId in the log-line correlates Loki/Grafana log-entries to
+        // the AuditEvent DB-row. NOTE: not in a transaction with the inner
+        // business-action; if recordAuditEvent throws (FK-violation,
+        // payload-too-large), this route returns 500 -- fail-loud is
+        // preferable to a missing audit-trail for v0.1.0.
+        const audit = await recordAuditEvent(prisma, {
+          actorUserId: req.auth!.userId,
+          action: 'invite_create',
+          targetType: 'invite',
+          targetId: body.id,
+          payload: { expiresAt: body.expiresAt },
+        });
         app.log.info(
           {
             adminId: req.auth!.userId,
             action: 'invite_create',
             inviteId: body.id,
             expiresAt: body.expiresAt,
+            auditEventId: audit.id,
           },
           'admin action',
         );

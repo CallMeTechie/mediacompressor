@@ -21,6 +21,7 @@ const TEST_EMAIL_ADMIN_BIG = 'admin-user-update-big@test.invalid';
 const TEST_EMAIL_ADMIN_401 = 'admin-user-update-401@test.invalid';
 const TEST_EMAIL_ADMIN_403 = 'admin-user-update-403@test.invalid';
 const TEST_EMAIL_ADMIN_400 = 'admin-user-update-400@test.invalid';
+const TEST_EMAIL_ADMIN_AUDIT = 'admin-user-update-audit@test.invalid';
 const TEST_EMAIL_TARGET = 'admin-user-update-target@test.invalid';
 
 const TEST_EMAILS = [
@@ -31,6 +32,7 @@ const TEST_EMAILS = [
   TEST_EMAIL_ADMIN_401,
   TEST_EMAIL_ADMIN_403,
   TEST_EMAIL_ADMIN_400,
+  TEST_EMAIL_ADMIN_AUDIT,
   TEST_EMAIL_TARGET,
 ];
 
@@ -78,6 +80,7 @@ describe('web/admin-user-update-route', () => {
       TEST_EMAIL_ADMIN_401,
       TEST_EMAIL_ADMIN_403,
       TEST_EMAIL_ADMIN_400,
+      TEST_EMAIL_ADMIN_AUDIT,
     ]) {
       await createTestUser(prisma, { email, password: 'hunter22hunter22' });
       await prisma.user.update({ where: { email }, data: { role: 'admin' } });
@@ -115,6 +118,21 @@ describe('web/admin-user-update-route', () => {
   });
 
   afterAll(async () => {
+    // Plan 10 Task 3 cleanup: delete AuditEvent rows for any test-admin
+    // actor BEFORE cleanupTestUsers (FK onDelete: Restrict). cleanupTestUsers
+    // also deletes audit-events (WC-audit-7 fix); explicit deletion here is
+    // defense-in-depth + makes test-data-leakage visible if the helper drifts.
+    const actorIds = (
+      await prisma.user.findMany({
+        where: { email: { in: TEST_EMAILS } },
+        select: { id: true },
+      })
+    ).map((u) => u.id);
+    if (actorIds.length > 0) {
+      await prisma.auditEvent.deleteMany({
+        where: { actorUserId: { in: actorIds } },
+      });
+    }
     await cleanupTestUsers(prisma, TEST_EMAILS);
     await prisma.$disconnect();
     await redis.quit();
@@ -550,6 +568,65 @@ describe('web/admin-user-update-route', () => {
 
       injectSpy.mockRestore();
     } finally {
+      await app.close();
+    }
+  });
+
+  // 8. PFLICHT Plan-10 Task-3: AuditEvent row written on successful
+  // user_update. Mirrors the C5/C6-AD-PR log-shape assertion but instead of
+  // grepping stdout we read the persisted DB row.
+  it('PFLICHT Plan-10 Task-3: writes AuditEvent row on successful user_update', async () => {
+    const app = await buildServer(config);
+    let adminId: string | undefined;
+    try {
+      const adminUser = await prisma.user.findUnique({
+        where: { email: TEST_EMAIL_ADMIN_AUDIT },
+        select: { id: true },
+      });
+      adminId = adminUser!.id;
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
+        app,
+        TEST_EMAIL_ADMIN_AUDIT,
+        targetUserId,
+      );
+      const res = await app.inject({
+        method: 'POST',
+        url: `/admin/users/${targetUserId}`,
+        headers: {
+          cookie: cookieHeader,
+          'content-type': 'application/x-www-form-urlencoded',
+          'x-csrf-token': csrf,
+        },
+        payload: `status=disabled&_csrf=${encodeURIComponent(csrf)}`,
+      });
+      expect([302, 303]).toContain(res.statusCode);
+      expect(res.headers.location).toBe('/admin/users?updateflash=updated');
+
+      const events = await prisma.auditEvent.findMany({
+        where: {
+          actorUserId: adminId,
+          action: 'user_update',
+          targetId: targetUserId,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+      });
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        action: 'user_update',
+        targetType: 'user',
+        targetId: targetUserId,
+      });
+      // payload reflects the patch (status=disabled). The route forwards
+      // patchForJson which is already BigInt-coerced; recordAuditEvent
+      // re-validates.
+      expect(events[0]!.payload).toMatchObject({ status: 'disabled' });
+    } finally {
+      if (adminId) {
+        await prisma.auditEvent.deleteMany({
+          where: { actorUserId: adminId },
+        });
+      }
       await app.close();
     }
   });

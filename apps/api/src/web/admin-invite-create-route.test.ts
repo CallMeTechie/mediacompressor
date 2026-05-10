@@ -26,6 +26,7 @@ const TEST_EMAIL_ADMIN_401 = 'admin-invite-create-401@test.invalid';
 const TEST_EMAIL_ADMIN_403 = 'admin-invite-create-403@test.invalid';
 const TEST_EMAIL_ADMIN_BOUNDS = 'admin-invite-create-bounds@test.invalid';
 const TEST_EMAIL_ADMIN_SHAPE = 'admin-invite-create-shape@test.invalid';
+const TEST_EMAIL_ADMIN_AUDIT = 'admin-invite-create-audit@test.invalid';
 const TEST_EMAILS = [
   TEST_EMAIL_USER,
   TEST_EMAIL_ADMIN,
@@ -39,6 +40,7 @@ const TEST_EMAILS = [
   TEST_EMAIL_ADMIN_403,
   TEST_EMAIL_ADMIN_BOUNDS,
   TEST_EMAIL_ADMIN_SHAPE,
+  TEST_EMAIL_ADMIN_AUDIT,
 ];
 
 const config: Config = {
@@ -96,6 +98,7 @@ describe('web/admin-invite-create-route', () => {
       TEST_EMAIL_ADMIN_403,
       TEST_EMAIL_ADMIN_BOUNDS,
       TEST_EMAIL_ADMIN_SHAPE,
+      TEST_EMAIL_ADMIN_AUDIT,
     ]) {
       await createTestUser(prisma, { email, password: 'hunter22hunter22' });
       await prisma.user.update({ where: { email }, data: { role: 'admin' } });
@@ -121,6 +124,13 @@ describe('web/admin-invite-create-route', () => {
   afterAll(async () => {
     const ids = await getAdminIds();
     if (ids.length > 0) {
+      // Plan 10 Task 3: delete AuditEvent rows for test-admin actors BEFORE
+      // cleanupTestUsers (FK onDelete: Restrict). cleanupTestUsers also
+      // deletes audit-events (WC-audit-7 fix); explicit deletion is
+      // defense-in-depth.
+      await prisma.auditEvent.deleteMany({
+        where: { actorUserId: { in: ids } },
+      });
       await prisma.invite.deleteMany({ where: { createdById: { in: ids } } });
     }
     await cleanupTestUsers(prisma, TEST_EMAILS);
@@ -754,6 +764,76 @@ describe('web/admin-invite-create-route', () => {
       // Canonical ISO MUST remain in the <time datetime="..."> attribute.
       expect(body).toMatch(/<time[^>]+datetime="[0-9T:.\-Z]+">/);
     } finally {
+      await app.close();
+    }
+  });
+
+  // PFLICHT Plan-10 Task-3: AuditEvent row written on successful invite_create.
+  // Defense-in-depth: assert payload contains expiresAt AND lacks `token`
+  // (FORBIDDEN_PAYLOAD_KEYS would already throw, but the route's whitelist
+  // payload (`{ expiresAt }`) is the primary defense — proven here).
+  it('PFLICHT Plan-10 Task-3: writes AuditEvent row on successful invite_create with whitelisted payload (no token)', async () => {
+    const app = await buildServer(config);
+    let adminId: string | undefined;
+    try {
+      const adminUser = await prisma.user.findUnique({
+        where: { email: TEST_EMAIL_ADMIN_AUDIT },
+        select: { id: true },
+      });
+      adminId = adminUser!.id;
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
+        app,
+        TEST_EMAIL_ADMIN_AUDIT,
+      );
+      const post = await app.inject({
+        method: 'POST',
+        url: '/admin/invites',
+        headers: {
+          cookie: cookieHeader,
+          'content-type': 'application/x-www-form-urlencoded',
+          'x-csrf-token': csrf,
+        },
+        payload: `_csrf=${encodeURIComponent(csrf)}`,
+      });
+      expect(post.statusCode).toBe(200);
+      // Extract the created invite-id from the rendered created-page; the
+      // route renders `data-invite-id` or the token alongside id. Easier:
+      // query the DB for the newest invite under this admin.
+      // Invite has no createdAt column; find any invite under this admin.
+      // beforeEach deletes prior invites so this should be the single new row.
+      const newest = await prisma.invite.findFirst({
+        where: { createdById: adminId },
+        select: { id: true },
+      });
+      expect(newest).not.toBeNull();
+
+      const events = await prisma.auditEvent.findMany({
+        where: {
+          actorUserId: adminId,
+          action: 'invite_create',
+          targetId: newest!.id,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+      });
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        action: 'invite_create',
+        targetType: 'invite',
+        targetId: newest!.id,
+      });
+      // Whitelist enforcement: payload has `expiresAt`, NO `token`.
+      expect(events[0]!.payload).not.toHaveProperty('token');
+      expect(events[0]!.payload).toMatchObject({
+        expiresAt: expect.any(String),
+      });
+    } finally {
+      if (adminId) {
+        await prisma.auditEvent.deleteMany({
+          where: { actorUserId: adminId },
+        });
+        await prisma.invite.deleteMany({ where: { createdById: adminId } });
+      }
       await app.close();
     }
   });

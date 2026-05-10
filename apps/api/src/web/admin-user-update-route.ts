@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { FastifyPluginAsync } from 'fastify';
+import { recordAuditEvent } from '@mediacompressor/audit';
 import type { AdminUserFlashKey } from './admin-user-flash-keys.js';
 
 /**
@@ -139,17 +140,30 @@ export const adminUserUpdateRoutePlugin: FastifyPluginAsync = async (app) => {
       });
 
       if (inner.statusCode === 200 || inner.statusCode === 204) {
-        // C5-AD-PR: audit-log scaffolding for admin state-changes. Plan 10
-        // replaces this with a dedicated AuditEvent table. Until then, Pino
-        // stdout-line is the source of truth for who-changed-what.
+        // Plan 10 Task 3: dual-write -- persist to AuditEvent table THEN log.
+        // The auditEventId in the log-line correlates Loki/Grafana log-entries
+        // to the AuditEvent DB-row. recordAuditEvent re-validates payload
+        // (BigInt-safe, FORBIDDEN_PAYLOAD_KEYS, size-cap). NOTE: not in a
+        // transaction with the inner business-action; if recordAuditEvent
+        // throws (FK-violation, payload-too-large), this route returns 500 --
+        // fail-loud is preferable to a missing audit-trail for v0.1.0.
+        // Plan 11+ can add fallback (write-to-log + retry-queue).
         // C6-AD-PR: log patchForJson (string-converted), NOT patch (BigInt) --
         // Pino v8 throws on BigInt, mirrors Plan-8b jobs-events-route fix.
+        const audit = await recordAuditEvent(prisma, {
+          actorUserId: req.auth!.userId,
+          action: 'user_update',
+          targetType: 'user',
+          targetId: id,
+          payload: patchForJson,
+        });
         app.log.info(
           {
             adminId: req.auth!.userId,
             action: 'user_update',
             targetUserId: id,
             patch: patchForJson,
+            auditEventId: audit.id,
           },
           'admin action',
         );
