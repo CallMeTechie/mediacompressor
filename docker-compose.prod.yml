@@ -45,6 +45,12 @@ services:
   api:
     ports: !reset []
     restart: unless-stopped
+    environment:
+      # Plan 9 Rev. 2 WC-prod-14: in production, the api MUST reject hook calls
+      # that lack X-Tusd-Shared-Secret (Caddy injects it for legitimate tusd ->
+      # api hops). Default is `false` for dev (network-trust); the prod overlay
+      # turns it on. Caught by `prod-smoke-flow.spec.ts` PFLICHT WC-prod-14.
+      TUSD_REQUIRE_SHARED_SECRET: 'true'
     deploy:
       resources:
         limits:
