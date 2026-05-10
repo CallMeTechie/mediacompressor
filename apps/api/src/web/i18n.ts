@@ -261,6 +261,199 @@ export function registerTProfileHelper(i18n: i18n): void {
 }
 
 /**
+ * Plan 8f Task 1 (Rev. 2.1, WC-i18n-f1 + WC-i18n-f12 + WC-i18n-f18):
+ * `{{formatDateTime value [style="short|medium|long"]}}` Handlebars helper —
+ * locale-aware date+time rendering for detail-view contexts (`<dl>/<dd>` or
+ * top-level page-content). Sibling `{{formatDate}}` (below) is the date-only
+ * variant for table-row contexts (Rev. 2.1 WC-i18n-f18 split).
+ *
+ * Locale resolution mirrors registerTStatusHelper (3-tier, C1-AD-PR):
+ *   1. `@root._locale` (priority — survives `{{#each}}` / partial scope rebind)
+ *   2. `this._locale` (plain top-level renders outside loops)
+ *   3. DEFAULT_LOCALE
+ *
+ * `style` defaults to `'medium'` (e.g. EN: "May 9, 2026, 2:32 PM" /
+ * DE: "9. Mai 2026, 14:32"). Caller can pass `style="short"` (numeric date)
+ * or `style="long"` (full month-name) via the Handlebars hash-arg.
+ *
+ * **Timezone (WC-i18n-f1):** hardcoded UTC. Server stores DB-timestamps as
+ * UTC-ISO; rendering them in server-local TZ (host `TZ` env, Docker default
+ * is UTC anyway) creates "Why is the time wrong?" confusion when the host TZ
+ * shifts. UTC is unambiguous and DB-aligned.
+ *
+ * Returns empty string for null/undefined/empty-string/invalid-date inputs
+ * — templates render an empty `<td>` rather than "Invalid Date" garbage.
+ *
+ * Idempotent — Handlebars overwrites the previous registration.
+ */
+// Allowed `dateStyle` / inferred-style values for formatDateTime + formatDate.
+// Inlined as a type-union because the constant is purely a type-source — no
+// runtime use — and the eslint `no-unused-vars` rule (correctly) flags an
+// assigned-but-unused const even when consumed via `typeof`.
+type DateTimeStyle = 'short' | 'medium' | 'long';
+
+export function registerFormatDateTimeHelper(): void {
+  handlebars.registerHelper(
+    'formatDateTime',
+    function (
+      this: { _locale?: SupportedLocale } | null,
+      value: unknown,
+      options: handlebars.HelperOptions,
+    ) {
+      if (value === null || value === undefined || value === '') return '';
+      const root = (options?.data?.root ?? {}) as { _locale?: SupportedLocale };
+      const thisLocale = this?._locale;
+      const locale: SupportedLocale = root._locale ?? thisLocale ?? DEFAULT_LOCALE;
+      const style = (options.hash?.style as DateTimeStyle | undefined) ?? 'medium';
+      const date = value instanceof Date ? value : new Date(String(value));
+      if (Number.isNaN(date.getTime())) return '';
+      const formatter = new Intl.DateTimeFormat(locale, {
+        dateStyle: style,
+        timeStyle: 'short',
+        timeZone: 'UTC',
+      });
+      return new handlebars.SafeString(formatter.format(date));
+    },
+  );
+}
+
+/**
+ * Plan 8f Task 1 (Rev. 2.1, WC-i18n-f18 split):
+ * `{{formatDate value [style="short|medium|long"]}}` Handlebars helper —
+ * date-only locale-aware rendering for table-row contexts (`<td>`). Sibling
+ * `{{formatDateTime}}` (above) is the date+time variant for detail-views.
+ *
+ * Same locale-resolution + UTC-timezone + invalid-input contract as
+ * `formatDateTime`. Difference: `Intl.DateTimeFormat` is constructed with
+ * `dateStyle` only, NO `timeStyle` — output omits the time-component.
+ *
+ * Idempotent — Handlebars overwrites the previous registration.
+ */
+export function registerFormatDateHelper(): void {
+  handlebars.registerHelper(
+    'formatDate',
+    function (
+      this: { _locale?: SupportedLocale } | null,
+      value: unknown,
+      options: handlebars.HelperOptions,
+    ) {
+      if (value === null || value === undefined || value === '') return '';
+      const root = (options?.data?.root ?? {}) as { _locale?: SupportedLocale };
+      const thisLocale = this?._locale;
+      const locale: SupportedLocale = root._locale ?? thisLocale ?? DEFAULT_LOCALE;
+      const style = (options.hash?.style as DateTimeStyle | undefined) ?? 'medium';
+      const date = value instanceof Date ? value : new Date(String(value));
+      if (Number.isNaN(date.getTime())) return '';
+      const formatter = new Intl.DateTimeFormat(locale, {
+        dateStyle: style,
+        // No timeStyle — date-only rendering for compact table-row cells.
+        timeZone: 'UTC',
+      });
+      return new handlebars.SafeString(formatter.format(date));
+    },
+  );
+}
+
+/**
+ * Plan 8f Task 1 (Rev. 2.1, WC-i18n-f2 + WC-i18n-f10 + WC-i18n-f16):
+ * `{{formatBytes value}}` Handlebars helper — locale-aware binary-byte
+ * formatting (1024-base, B/KB/MB/GB/TB/PB/EB).
+ *
+ * **Binary (WC-i18n-f2):** 1024-base. Storage-quotas in DB are byte-counts;
+ * binary aligns with how OS file-managers display sizes. Decimal SI-prefixes
+ * (1000-base) would mismatch the canonical OS-displayed file-size and confuse
+ * the user when comparing dashboard-numbers against `ls -lh` / Finder output.
+ *
+ * **Bigint-aware (WC-i18n-f10):** unit-step performed in bigint-space so
+ * `Job.inputBytes` / admin "unlimited"-sentinel (`2n ** 63n - 1n`) values
+ * larger than 2^53 don't lose precision via Number-coercion. Number / string
+ * inputs are normalized to bigint via `BigInt(Math.floor(n))` (numbers) or
+ * `BigInt(s)` for integer-strings; decimal/scientific-notation strings fall
+ * back to Number-coercion + floor.
+ *
+ * **Round-half-up (WC-i18n-f16):** the 2-decimal fractional value is
+ * computed via integer-bigint-math `(big * 100n + unitDivisor / 2n) /
+ * unitDivisor`. Adding `unitDivisor/2n` before the integer-divide rounds
+ * half-up rather than truncating, matching the Number-version's
+ * `Intl.NumberFormat` rounding for unit-boundary edge-cases. Without this
+ * patch, bigint `1500000n` and Number `1500000` would render different
+ * output ("1.42 MB" vs "1.43 MB") at certain magnitudes.
+ *
+ * Locale-resolution: same 3-tier as registerTStatusHelper (C1-AD-PR).
+ *
+ * Returns empty string for null/undefined/empty-string/negative/non-finite
+ * inputs — templates render an empty cell rather than "NaN B" garbage.
+ *
+ * Idempotent — Handlebars overwrites the previous registration.
+ */
+const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB'] as const;
+
+export function registerFormatBytesHelper(): void {
+  handlebars.registerHelper(
+    'formatBytes',
+    function (
+      this: { _locale?: SupportedLocale } | null,
+      value: unknown,
+      options: handlebars.HelperOptions,
+    ) {
+      if (value === null || value === undefined || value === '') return '';
+      const root = (options?.data?.root ?? {}) as { _locale?: SupportedLocale };
+      const thisLocale = this?._locale;
+      const locale: SupportedLocale = root._locale ?? thisLocale ?? DEFAULT_LOCALE;
+
+      // Bigint-space normalization (WC-i18n-f10): preserves precision for
+      // values > 2^53 (admin-set "unlimited" sentinel `2n**63n - 1n`).
+      let big: bigint;
+      if (typeof value === 'bigint') {
+        big = value;
+      } else if (typeof value === 'number') {
+        if (!Number.isFinite(value) || value < 0) return '';
+        big = BigInt(Math.floor(value));
+      } else {
+        const s = String(value).trim();
+        if (s === '') return '';
+        // Integer-string fast-path keeps full precision; decimal/scientific
+        // fall back to Number-coercion (precision-loss is acceptable here
+        // because the caller chose a Number-shaped serialization).
+        if (/^\d+$/.test(s)) {
+          big = BigInt(s);
+        } else {
+          const n = Number(s);
+          if (!Number.isFinite(n) || n < 0) return '';
+          big = BigInt(Math.floor(n));
+        }
+      }
+      if (big < 0n) return '';
+      if (big < 1024n) {
+        return new handlebars.SafeString(
+          `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(Number(big))} B`,
+        );
+      }
+      // Find unit-index via repeated bigint-division. Cap at length-2 so the
+      // top-loop-exit lands on EB (index = BYTE_UNITS.length - 1). After the
+      // loop, `unitDivisor` corresponds to index `u + 1` (B = 1n is the
+      // implicit u=-1).
+      let u = 0;
+      let unitDivisor = 1024n;
+      while (big >= unitDivisor * 1024n && u < BYTE_UNITS.length - 2) {
+        unitDivisor *= 1024n;
+        u += 1;
+      }
+      // Round-half-up (WC-i18n-f16): add half-divisor before integer-divide
+      // so bigint-math rounds rather than truncates, matching Number-version.
+      const scaledHundredths = (big * 100n + unitDivisor / 2n) / unitDivisor;
+      const fractional = Number(scaledHundredths) / 100;
+      return new handlebars.SafeString(
+        `${new Intl.NumberFormat(locale, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(fractional)} ${BYTE_UNITS[u + 1]}`,
+      );
+    },
+  );
+}
+
+/**
  * Registers the `{{t 'key'}}` Handlebars helper. Lookup of `_locale`:
  *   1. `@root._locale` (priority -- see C1-AD-PR below)
  *   2. `this._locale` (fallback for plain top-level renders)
@@ -303,6 +496,14 @@ const i18nFastifyPluginImpl = async (app: FastifyInstance) => {
   // the same plugin scope.
   registerTKindHelper(i18n);
   registerTProfileHelper(i18n);
+  // Plan 8f Task 1 (Rev. 2.1): format-helpers for dynamic values —
+  // formatDateTime (detail-views), formatDate (table-rows, WC-i18n-f18 split),
+  // formatBytes (binary 1024-base, bigint-aware per WC-i18n-f10 + round-half-up
+  // per WC-i18n-f16). All three resolve `_locale` via the same 3-tier
+  // priority as registerTStatusHelper (C1-AD-PR).
+  registerFormatDateTimeHelper();
+  registerFormatDateHelper();
+  registerFormatBytesHelper();
 
   app.addHook('onRequest', async (req) => {
     req.locale = detectLocale(req);
