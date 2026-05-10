@@ -1,5 +1,5 @@
 import argon2 from 'argon2';
-import type { PrismaClient } from '@mediacompressor/db';
+import { Prisma, type PrismaClient } from '@mediacompressor/db';
 
 export interface TestUserOptions {
   email: string;
@@ -61,7 +61,11 @@ export async function cleanupTestUsers(
   try {
     await prisma.auditEvent.deleteMany({ where: { actorUserId: { in: userIds } } });
   } catch (e: unknown) {
-    if (!(e instanceof Error) || (e as { code?: string }).code !== 'P2021') {
+    // P2021 = "table does not exist" — pre-Plan-10 environment.
+    // Narrow to Prisma's typed error class so unrelated `Error` subclasses
+    // with a `code === 'P2021'` field (extremely unlikely but possible)
+    // can't accidentally match.
+    if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== 'P2021') {
       throw e;
     }
   }

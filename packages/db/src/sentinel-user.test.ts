@@ -40,6 +40,10 @@ describe('PFLICHT WC-audit-15: GDPR sentinel-user', () => {
       where: { id: SENTINEL_ID },
     });
     expect(sentinel).toBeTruthy();
+    // User.email is @db.Citext — Postgres stores literal-case but compares
+    // case-insensitively. The migration inserts lowercase; this assertion
+    // uses literal-case match for now. If the migration ever changes the
+    // literal case, update this assertion.
     expect(sentinel?.email).toBe('anonymized@deleted.invalid');
     expect(sentinel?.status).toBe('disabled');
   });

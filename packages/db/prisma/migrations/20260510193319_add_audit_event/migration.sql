@@ -37,11 +37,14 @@ ALTER TABLE "AuditEvent" ADD CONSTRAINT "AuditEvent_actorUserId_fkey" FOREIGN KE
 -- Used by docs/operations/runbook.md DSGVO-procedure to redirect FK on
 -- audit-events when the original actor's User-row must be erased.
 -- Idempotent: ON CONFLICT DO NOTHING — safe for repeated migration-runs.
--- The `passwordHash` is a fixed argon2id-shaped string that NEVER verifies
--- (the salt-portion is all-x); login-attempts against this user will fail.
--- Plus `status='disabled'`, so even if hash-verify ever changed, login
--- would still reject. The User schema has NO `updatedAt` column (verified
--- against schema.prisma); only `createdAt` is set.
+-- The User schema has NO `updatedAt` column (verified against schema.prisma);
+-- only `createdAt` is set.
+--
+-- The passwordHash is intentionally non-verifying:
+--   1. Malformed salt: 30 'x' chars is not a base64 byte-aligned length, so
+--      argon2.verify rejects with parse-error (caught by auth-package, returns false).
+--   2. Defense-in-depth: status='disabled' rejects login regardless of hash-verify.
+-- Both paths must change for this account to ever authenticate.
 INSERT INTO "User" (
   id,
   email,
