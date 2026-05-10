@@ -8,11 +8,17 @@
 # so that Rev. 2.1 WC-prod-16 holds: SSE + tusd + headers tested in dev MUST
 # match production.
 {
+	# `auto_https disable_redirects` keeps Caddy from auto-issuing real certs
+	# AND from forcing 80->443 redirects. Combined with `tls internal` (issues
+	# local self-signed certs from Caddy's internal CA), this gives a fully
+	# offline-capable HTTPS-on-localhost setup for E2E tests.
 	auto_https disable_redirects
 	local_certs
 }
 
 localhost {
+	# max-age=0: HSTS disabled -- self-signed certs MUST NOT trust-pin.
+	# Defensive even when running behind a real mkcert-rooted cert in dev.
 	tls internal
 
 	log {
@@ -25,33 +31,37 @@ localhost {
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(), camera=(), microphone=(), interest-cohort=()"
 		-Server
 	}
 
-	@static path /static/*
-	header @static Cache-Control "public, max-age=3600"
+	# encode applies to ALL responses regardless of file-order -- Caddy v2 uses
+	# directive-order, not file-order. Placing here for visual flow only.
+	encode gzip zstd
 
-	@sse path_regexp ^/jobs/[a-f0-9-]+/events$
+	@static path /static/*
+	header @static {
+		Cache-Control "public, max-age=3600"
+	}
+
+	# SSE-matcher tightened to full UUID-shape (defense-in-depth): rejects
+	# non-UUID-shaped paths from accidentally entering the unbuffered code-path.
+	@sse path_regexp ^/jobs/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/events$
 	reverse_proxy @sse api:3000 {
 		flush_interval -1
-		header_up X-Forwarded-Proto {scheme}
-		header_up X-Forwarded-Host {host}
+		# X-Forwarded-Proto/Host are set by Caddy v2 reverse_proxy by default --
+		# no explicit header_up needed.
 	}
 
 	@tus path /uploads/*
 	reverse_proxy @tus tusd:1080 {
 		header_up X-Tusd-Shared-Secret {$TUSD_SHARED_SECRET}
-		header_up X-Forwarded-Proto {scheme}
-		header_up X-Forwarded-Host {host}
+		# X-Forwarded-Proto/Host are set by Caddy v2 reverse_proxy by default.
 		transport http {
 			versions 1.1
 		}
 	}
 
-	reverse_proxy api:3000 {
-		header_up X-Forwarded-Proto {scheme}
-		header_up X-Forwarded-Host {host}
-	}
-
-	encode gzip zstd
+	# X-Forwarded-Proto/Host are set by Caddy v2 reverse_proxy by default.
+	reverse_proxy api:3000
 }
