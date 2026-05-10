@@ -11,6 +11,10 @@
 #
 # Switch to production-cutover by removing this overlay-file from the
 # command (Caddy then mounts the production Caddyfile via docker-compose.prod.yml).
+#
+# NOTE: Compose REPLACES (not merges) the volumes-list under a service when
+# overlaying. Therefore caddy-data + caddy-config MUST be re-declared here,
+# or staging-mode would lose cert-persistence between restarts.
 
 services:
   caddy:
