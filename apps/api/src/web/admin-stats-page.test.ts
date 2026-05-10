@@ -263,11 +263,18 @@ describe('web/admin-stats-page', () => {
       // "Succeeded" in English.
       expect(body).toMatch(/Succeeded/);
 
-      // storage.usedBytes -- 1024 bytes rendered via {{formatBytes ...}}
+      // Storage section now renders formatted bytes via formatBytes helper
       // (Plan 8f Task 3 migration from raw `{{stats.storage.usedBytes}}`).
-      // Default-locale EN -> "1.00 KB". The raw "1024" string MUST NOT appear
-      // in the storage section anymore — that would be a regression.
-      expect(body).toContain('1.00 KB');
+      // Positive assertion below verifies the EN default-locale output
+      // ("1.00 KB" for 1024 bytes), scoped to the storage <dd>-element so
+      // any future regression that leaks raw bytes back into the storage
+      // section fails LOUD — without the scoped regex a substring like
+      // "1024" appears in many unrelated contexts (CSS, JS, ids), which
+      // would make a negative-assertion brittle. Form-VALUE-canonicality
+      // + DE-format coverage live in admin-user-edit-page.test.ts (PFLICHT
+      // WC-i18n-f3) and admin-users-list-page.test.ts (PFLICHT WC-i18n-
+      // f-task3), so this test only needs the positive scoped check.
+      expect(body).toMatch(/<dd>1\.00\s+KB<\/dd>/);
 
       // Queue heading rendered.
       expect(body).toMatch(/Compression waiting/);

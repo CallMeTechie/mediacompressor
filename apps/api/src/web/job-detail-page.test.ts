@@ -29,6 +29,7 @@ const TEST_EMAILS = [
   'job-detail-fragment@test.invalid',
   'job-detail-fragment-foreign@test.invalid',
   'job-detail-fragment-other@test.invalid',
+  'job-detail-i18n-bytes@test.invalid',
 ];
 
 const config: Config = {
@@ -632,5 +633,79 @@ describe('web/job-detail-page', () => {
     expect(watchdogJs).toMatch(
       /querySelectorAll\(['"]\[data-sse-target\]['"]\)/,
     );
+  });
+
+  // Plan 8f Task 3 review (Concern #1) PFLICHT — SafeString → i18next-
+  // interpolation regression-protection. Task 3 introduced the
+  // `bytes=(formatBytes job.inputBytes)` subexpression-pattern in
+  // job-detail.hbs / job-detail-status.hbs. The `formatBytes` helper returns
+  // a `Handlebars.SafeString` instance. The `{{t ... bytes=...}}` helper
+  // forwards that SafeString into i18next's interpolator (`i18n.t(key,
+  // {bytes: <SafeString>})`), which calls `String(value)` / `.toString()` to
+  // render the `{{bytes}}` placeholder in the locale-string. If a future
+  // i18next bump or refactor breaks SafeString-coercion, the placeholder
+  // would render as the literal `[object Object]` instead of the formatted
+  // bytes — visually broken but no exception thrown, so silent. This test
+  // pins the integration end-to-end (helper → subexpression → i18next →
+  // rendered HTML) for both EN and DE locales, fires LOUD on regression.
+  it('PFLICHT WC-i18n-f-task3-job-detail: GET /jobs/:id renders SafeString-formatted bytes via i18next interpolation (no [object Object])', async () => {
+    const app = await buildServer(config);
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: 'job-detail-i18n-bytes@test.invalid' },
+      });
+      // 1500000 bytes -> EN "1.43 MB", DE "1,43 MB" (binary 1024-base via
+      // formatBytes helper; covers both decimal-separator + unit-suffix).
+      const job = await prisma.job.create({
+        data: {
+          userId: user!.id,
+          status: 'succeeded',
+          kind: 'image',
+          profile: 'web-optimized',
+          overrides: {},
+          inputFilename: 'i18n-bytes-test.png',
+          uploadId: `jobdet-i18n-${Math.random().toString(36).slice(2)}-${Date.now()}`,
+          reservedBytes: 1500000n,
+          inputBytes: 1500000n,
+          outputBytes: 1500000n,
+        },
+      });
+      try {
+        const cookie = await login(app, 'job-detail-i18n-bytes@test.invalid');
+
+        // EN-locale render (default).
+        const resEn = await app.inject({
+          method: 'GET',
+          url: `/jobs/${job.id}`,
+          headers: { accept: 'text/html', cookie },
+        });
+        expect(resEn.statusCode).toBe(200);
+        // CRITICAL: must NOT contain '[object Object]' — would indicate that
+        // SafeString failed to coerce to string in i18next interpolation.
+        expect(resEn.body).not.toContain('[object Object]');
+        // Positive: the EN-formatted byte-value renders inside the
+        // interpolated translation strings (input + output sections).
+        expect(resEn.body).toMatch(/1\.43\s+MB/);
+
+        // DE-locale render (mc_locale=de cookie).
+        const resDe = await app.inject({
+          method: 'GET',
+          url: `/jobs/${job.id}`,
+          headers: { accept: 'text/html', cookie: `${cookie}; mc_locale=de` },
+        });
+        expect(resDe.statusCode).toBe(200);
+        expect(resDe.body).not.toContain('[object Object]');
+        // DE locale uses comma as decimal-separator.
+        expect(resDe.body).toMatch(/1,43\s+MB/);
+      } finally {
+        await prisma.job
+          .deleteMany({ where: { id: job.id } })
+          .catch((e: { code?: string }) => {
+            if (e?.code !== 'P2025') throw e;
+          });
+      }
+    } finally {
+      await app.close();
+    }
   });
 });

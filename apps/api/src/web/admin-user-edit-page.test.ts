@@ -258,16 +258,26 @@ describe('web/admin-user-edit-page', () => {
   // attribute with formatBytes.
   it('PFLICHT WC-i18n-f3: GET /admin/users/:id with mc_locale=de keeps form-input value as raw bytes (canonical)', async () => {
     const app = await buildServer(config);
+    // Plan 8f Task 3 review (Concern #2): capture the original quota BEFORE
+    // the try-block so the `finally` reset always runs even if assertions
+    // throw mid-test. Otherwise a failed assertion would leave the target
+    // user at the test-quota (1500000n) and pollute downstream tests that
+    // assume the seeded 1 GiB pre-fill (test 3 above).
+    const originalUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { storageQuota: true },
+    });
+    const originalQuota = originalUser!.storageQuota;
+    // Reseed the target user to a fresh quota that, when formatted with
+    // the binary 1024-base helper, yields a value containing both a
+    // decimal-separator AND a unit suffix — so the negative-assertions
+    // below catch any accidental formatBytes-wrap of the input value.
+    // 1500000 bytes -> "1,43 MB" (DE) / "1.43 MB" (EN).
+    await prisma.user.update({
+      where: { id: targetUserId },
+      data: { storageQuota: 1500000n },
+    });
     try {
-      // Reseed the target user to a fresh quota that, when formatted with
-      // the binary 1024-base helper, yields a value containing both a
-      // decimal-separator AND a unit suffix — so the negative-assertions
-      // below catch any accidental formatBytes-wrap of the input value.
-      // 1500000 bytes -> "1,43 MB" (DE) / "1.43 MB" (EN).
-      await prisma.user.update({
-        where: { id: targetUserId },
-        data: { storageQuota: 1500000n },
-      });
       const sessionCookie = await loginAndCookies(app, TEST_EMAIL_ADMIN);
       const res = await app.inject({
         method: 'GET',
@@ -284,15 +294,17 @@ describe('web/admin-user-edit-page', () => {
       // Must NOT contain DE/EN formatBytes output in the value-attribute.
       expect(body).not.toMatch(/<input[^>]*name="storageQuota"[^>]*value="1,43 MB"/);
       expect(body).not.toMatch(/<input[^>]*name="storageQuota"[^>]*value="1\.43 MB"/);
-      // Reset quota for downstream tests' deterministic state (test 3 above
-      // asserts the original 1 GiB pre-fill — restore so re-runs stay green
-      // regardless of which order Vitest schedules these tests within the
-      // same process / DB snapshot).
-      await prisma.user.update({
-        where: { id: targetUserId },
-        data: { storageQuota: 1073741824n },
-      });
     } finally {
+      // Always reset the quota, even on assertion failure, so downstream
+      // tests stay deterministic across re-runs / interleaved execution.
+      await prisma.user
+        .update({
+          where: { id: targetUserId },
+          data: { storageQuota: originalQuota },
+        })
+        .catch((e: { code?: string }) => {
+          if (e?.code !== 'P2025') throw e;
+        });
       await app.close();
     }
   });
