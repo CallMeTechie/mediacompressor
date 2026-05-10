@@ -224,4 +224,48 @@ describe('web/admin-users-list-page', () => {
       await app.close();
     }
   });
+
+  // 6. Plan 8f Task 3 PFLICHT (WC-i18n-f-task3 — DE-format-render):
+  // The admin-users-list table renders storageQuota via {{formatBytes ...}}
+  // (migrated in Task 3 Step 3). With `mc_locale=de` the cell MUST contain
+  // the DE comma-decimal binary-format ("1,43 MB" for 1500000 bytes). The raw
+  // byte-count MUST NOT leak into the visible display — that would mean the
+  // template still renders `{{storageQuota}}` unwrapped (regression).
+  // Mirrors WC-i18n-f-task2 from Plan 8f Task 2 (date-format-render PFLICHT).
+  // Locale-resolution flows through @root._locale (formatBytes' 3-tier
+  // C1-AD-PR fallback) so the helper picks up the cookie-set locale even
+  // inside the {{#each users}} block where Handlebars rebinds `this` per row.
+  it('PFLICHT WC-i18n-f-task3: GET /admin/users with mc_locale=de renders storageQuota in DE binary format (formatBytes)', async () => {
+    const app = await buildServer(config);
+    try {
+      // Seed a deterministic quota on TARGET_A. 1500000 -> "1,43 MB" (DE) /
+      // "1.43 MB" (EN) via the binary 1024-base helper.
+      await prisma.user.update({
+        where: { email: TEST_EMAIL_TARGET_A },
+        data: { storageQuota: 1500000n },
+      });
+
+      const sessionCookie = await loginAndCookies(app, TEST_EMAIL_ADMIN);
+      const res = await app.inject({
+        method: 'GET',
+        url: '/admin/users?limit=100',
+        headers: {
+          accept: 'text/html',
+          cookie: `${sessionCookie}; mc_locale=de`,
+        },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.body as string;
+      // DE comma-decimal binary format must be present (Intl.NumberFormat
+      // 'de' + 1024-base helper output).
+      expect(body).toMatch(/1,43 MB/);
+      // Raw byte-count MUST NOT appear in display (regression-guard against
+      // `{{storageQuota}}` unwrapped). Word-boundaries pin against any
+      // plumbing such as `<a href="/admin/users/<uuid>?cursor=...">` in case
+      // the cursor is ever derived from the seeded quota.
+      expect(body).not.toMatch(/\b1500000\b/);
+    } finally {
+      await app.close();
+    }
+  });
 });

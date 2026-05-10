@@ -20,7 +20,7 @@
     {{> job-detail-status job}}
   </div>
   <p>{{t 'detail_label_kind_profile' ns='jobs' kind=(tKind job.kind) profile=(tProfile job.profile)}}</p>
-  {{#if job.inputBytes}}<p>{{t 'detail_label_input_size' ns='jobs' bytes=job.inputBytes}}</p>{{/if}}
+  {{#if job.inputBytes}}<p>{{t 'detail_label_input_size' ns='jobs' bytes=(formatBytes job.inputBytes)}}</p>{{/if}}
 
   {{#if canCancel}}
   <form method="POST" action="/jobs/{{job.id}}/cancel">

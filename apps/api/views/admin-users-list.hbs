@@ -27,7 +27,7 @@
         <td>{{role}}</td>
         <td>{{status}}</td>
         <td>
-          <span class="muted">{{storageQuota}} / {{parallelQuota}} / {{hourlyQuota}}</span>
+          <span class="muted">{{formatBytes storageQuota}} / {{parallelQuota}} / {{hourlyQuota}}</span>
         </td>
         <td>
           <a href="/admin/users/{{id}}">{{t 'users_table_edit' ns='admin'}}</a>

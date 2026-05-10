@@ -41,10 +41,10 @@
 <section class="stats-section">
   <h2>{{t 'stats_section_storage' ns='admin'}}</h2>
   <dl>
-    <dt>{{t 'stats_storage_used' ns='admin'}}</dt><dd>{{stats.storage.usedBytes}}</dd>
+    <dt>{{t 'stats_storage_used' ns='admin'}}</dt><dd>{{formatBytes stats.storage.usedBytes}}</dd>
     {{#if stats.storage.diskFree}}
-      <dt>{{t 'stats_storage_disk_available' ns='admin'}}</dt><dd>{{stats.storage.diskFree.available}}</dd>
-      <dt>{{t 'stats_storage_disk_total' ns='admin'}}</dt><dd>{{stats.storage.diskFree.total}}</dd>
+      <dt>{{t 'stats_storage_disk_available' ns='admin'}}</dt><dd>{{formatBytes stats.storage.diskFree.available}}</dd>
+      <dt>{{t 'stats_storage_disk_total' ns='admin'}}</dt><dd>{{formatBytes stats.storage.diskFree.total}}</dd>
     {{else}}
       <dt><em>{{t 'stats_storage_disk_unavailable' ns='admin'}}</em></dt><dd>&mdash;</dd>
     {{/if}}

@@ -242,4 +242,58 @@ describe('web/admin-user-edit-page', () => {
       await app.close();
     }
   });
+
+  // 7. Plan 8f Task 3 PFLICHT (WC-i18n-f3 — form-VALUE-leak prevention):
+  // The storage-quota INPUT field is a backend form-VALUE (POST /admin/users/:id
+  // re-validates against the canonical allowlist of integer byte-counts).
+  // Translation Discipline (Plan 8e Sektion "Translation Discipline" carry-
+  // forward via Plan 8f Task 3) requires that user-facing DISPLAY strings
+  // ({{formatBytes ...}}) NEVER leak into <input value="..."> attributes —
+  // backend would 400-reject "1,43 MB" / "1.43 MB" since those are not
+  // integer byte-counts. This regression-protection test asserts the form-
+  // value stays canonical raw bytes EVEN when the user has `mc_locale=de`
+  // active (i.e. the locale-switch ONLY affects display labels in
+  // admin-users-list.hbs / admin-stats.hbs etc., not form-input values).
+  // Fires LOUD if anyone wraps {{user.storageQuota}} inside a `value="..."`
+  // attribute with formatBytes.
+  it('PFLICHT WC-i18n-f3: GET /admin/users/:id with mc_locale=de keeps form-input value as raw bytes (canonical)', async () => {
+    const app = await buildServer(config);
+    try {
+      // Reseed the target user to a fresh quota that, when formatted with
+      // the binary 1024-base helper, yields a value containing both a
+      // decimal-separator AND a unit suffix — so the negative-assertions
+      // below catch any accidental formatBytes-wrap of the input value.
+      // 1500000 bytes -> "1,43 MB" (DE) / "1.43 MB" (EN).
+      await prisma.user.update({
+        where: { id: targetUserId },
+        data: { storageQuota: 1500000n },
+      });
+      const sessionCookie = await loginAndCookies(app, TEST_EMAIL_ADMIN);
+      const res = await app.inject({
+        method: 'GET',
+        url: `/admin/users/${targetUserId}`,
+        headers: {
+          accept: 'text/html',
+          cookie: `${sessionCookie}; mc_locale=de`,
+        },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.body as string;
+      // Form-input MUST contain raw byte-count (canonical value-attribute).
+      expect(body).toMatch(/<input[^>]*name="storageQuota"[^>]*value="1500000"/);
+      // Must NOT contain DE/EN formatBytes output in the value-attribute.
+      expect(body).not.toMatch(/<input[^>]*name="storageQuota"[^>]*value="1,43 MB"/);
+      expect(body).not.toMatch(/<input[^>]*name="storageQuota"[^>]*value="1\.43 MB"/);
+      // Reset quota for downstream tests' deterministic state (test 3 above
+      // asserts the original 1 GiB pre-fill — restore so re-runs stay green
+      // regardless of which order Vitest schedules these tests within the
+      // same process / DB snapshot).
+      await prisma.user.update({
+        where: { id: targetUserId },
+        data: { storageQuota: 1073741824n },
+      });
+    } finally {
+      await app.close();
+    }
+  });
 });

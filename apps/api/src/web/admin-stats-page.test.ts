@@ -263,8 +263,11 @@ describe('web/admin-stats-page', () => {
       // "Succeeded" in English.
       expect(body).toMatch(/Succeeded/);
 
-      // storage.usedBytes -- numeric value rendered as text.
-      expect(body).toContain('1024');
+      // storage.usedBytes -- 1024 bytes rendered via {{formatBytes ...}}
+      // (Plan 8f Task 3 migration from raw `{{stats.storage.usedBytes}}`).
+      // Default-locale EN -> "1.00 KB". The raw "1024" string MUST NOT appear
+      // in the storage section anymore — that would be a regression.
+      expect(body).toContain('1.00 KB');
 
       // Queue heading rendered.
       expect(body).toMatch(/Compression waiting/);

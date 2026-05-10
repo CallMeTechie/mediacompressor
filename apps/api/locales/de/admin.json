@@ -66,9 +66,9 @@
   "stats_jobs_canceled": "Abgebrochen",
   "stats_jobs_expired": "Abgelaufen",
   "stats_jobs_unknown": "Unbekannter Status ({{status}})",
-  "stats_storage_used": "Belegt (Bytes)",
-  "stats_storage_disk_available": "Festplatte verfügbar (Bytes)",
-  "stats_storage_disk_total": "Festplatte gesamt (Bytes)",
+  "stats_storage_used": "Belegt",
+  "stats_storage_disk_available": "Festplatte verfügbar",
+  "stats_storage_disk_total": "Festplatte gesamt",
   "stats_storage_disk_unavailable": "Festplatten-Stats nicht verfügbar",
   "stats_queue_waiting": "Komprimierung wartend",
   "stats_queue_active": "Komprimierung aktiv"

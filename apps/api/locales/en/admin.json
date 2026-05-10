@@ -66,9 +66,9 @@
   "stats_jobs_canceled": "Canceled",
   "stats_jobs_expired": "Expired",
   "stats_jobs_unknown": "Unknown status ({{status}})",
-  "stats_storage_used": "Used (bytes)",
-  "stats_storage_disk_available": "Disk available (bytes)",
-  "stats_storage_disk_total": "Disk total (bytes)",
+  "stats_storage_used": "Used",
+  "stats_storage_disk_available": "Disk available",
+  "stats_storage_disk_total": "Disk total",
   "stats_storage_disk_unavailable": "Disk stats unavailable",
   "stats_queue_waiting": "Compression waiting",
   "stats_queue_active": "Compression active"
