@@ -43,6 +43,7 @@ model User {
   sessions        Session[]
   apiKeys         ApiKey[]
   jobs            Job[]
+  auditEvents     AuditEvent[] @relation("AuditEventActor")
 
   @@index([email])
 }
@@ -178,4 +179,20 @@ model PepperCanary {
   createdAt     DateTime @default(now()) @db.Timestamptz(6)
 
   @@map("PepperCanary")
+}
+
+model AuditEvent {
+  id           String   @id @default(uuid()) @db.Uuid
+  actorUserId  String   @db.Uuid
+  actor        User     @relation("AuditEventActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  action       String   @db.VarChar(64)
+  targetType   String   @db.VarChar(32)
+  targetId     String   @db.Uuid
+  payload      Json?
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([actorUserId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@index([targetType, targetId, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
 }

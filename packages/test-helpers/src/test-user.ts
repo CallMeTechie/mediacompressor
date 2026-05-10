@@ -38,6 +38,15 @@ export async function createTestUser(
 /**
  * H2-Fix: Scoped cleanup. Order matters: foreign-key constraints require
  * sessions/apiKeys/jobs before users.
+ *
+ * Plan 10 Task 1 Rev. 2.1 WC-audit-7: AuditEvent FK uses ON DELETE RESTRICT,
+ * so events referencing these users must be deleted FIRST (before User row).
+ * Without this, ALL admin-tests that create AuditEvent rows would fail in
+ * afterAll once Plan 10 lands.
+ *
+ * WC-audit-18 defensive try/catch: pre-Plan-10 dev-environments don't have
+ * the AuditEvent table yet — Prisma raises P2021 ("table does not exist").
+ * Skip that error gracefully so cleanup keeps working across migration-states.
  */
 export async function cleanupTestUsers(
   prisma: PrismaClient,
@@ -49,6 +58,13 @@ export async function cleanupTestUsers(
   });
   if (users.length === 0) return;
   const userIds = users.map((u) => u.id);
+  try {
+    await prisma.auditEvent.deleteMany({ where: { actorUserId: { in: userIds } } });
+  } catch (e: unknown) {
+    if (!(e instanceof Error) || (e as { code?: string }).code !== 'P2021') {
+      throw e;
+    }
+  }
   await prisma.job.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.apiKey.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.session.deleteMany({ where: { userId: { in: userIds } } });

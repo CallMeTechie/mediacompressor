@@ -187,10 +187,12 @@ describe('web/admin-user-edit-page', () => {
     const app = await buildServer(config);
     try {
       const cookie = await loginAndCookies(app, TEST_EMAIL_ADMIN);
-      // Valid UUID-format but no row in DB.
+      // Valid UUID-format but no row in DB. Plan 10 Task 1 Rev. 2.1 WC-audit-15
+      // reserves '00000000-0000-0000-0000-000000000000' for the GDPR sentinel-
+      // user (anonymized@deleted.invalid). Use a different all-1s UUID instead.
       const res = await app.inject({
         method: 'GET',
-        url: '/admin/users/00000000-0000-0000-0000-000000000000',
+        url: '/admin/users/11111111-1111-1111-1111-111111111111',
         headers: { accept: 'text/html', cookie },
       });
       expect(res.statusCode).toBe(404);
