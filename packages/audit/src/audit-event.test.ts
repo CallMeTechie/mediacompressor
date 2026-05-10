@@ -158,6 +158,8 @@ describe('audit-event/recordAuditEvent', () => {
     // a.b -> b, b.a -> a: mutual cycle. With seen.add at coercePayload entry,
     // this triggers the explicit cyclic-reference error rather than only
     // failing via the depth-limit (which would mask the real cause).
+    // Concern 7: tightened from /cyclic reference|nesting depth/ to require
+    // the explicit cycle-detector to fire (not the depth-limit fallback).
     const a: Record<string, unknown> = {};
     const b: Record<string, unknown> = { a };
     a.b = b;
@@ -169,7 +171,104 @@ describe('audit-event/recordAuditEvent', () => {
         targetId,
         payload: a,
       }),
-    ).rejects.toThrow(/(cyclic reference|nesting depth)/);
+    ).rejects.toThrow(/cyclic reference/);
+  });
+
+  it('PFLICHT WC-audit-9 Concern 1: rejects self-referential arrays as cyclic, not depth-error', async () => {
+    // a[1] === a: cyclic array (no objects involved). Without array-tracking
+    // in `seen`, this would only fail via the depth-limit (masking root cause).
+    const a: unknown[] = [1];
+    a.push(a);
+    await expect(
+      recordAuditEvent(prisma, {
+        actorUserId: actorId,
+        action: 'user_update',
+        targetType: 'user',
+        targetId,
+        payload: { ids: a },
+      }),
+    ).rejects.toThrow(/cyclic reference/);
+  });
+
+  it('PFLICHT WC-audit-9 Concern 2-date: serializes Date to ISO-string', async () => {
+    const result = await recordAuditEvent(prisma, {
+      actorUserId: actorId,
+      action: 'invite_create',
+      targetType: 'invite',
+      targetId,
+      payload: { expiresAt: new Date('2026-12-31T00:00:00Z') },
+    });
+    const stored = await prisma.auditEvent.findUnique({ where: { id: result.id } });
+    expect(stored?.payload).toEqual({ expiresAt: '2026-12-31T00:00:00.000Z' });
+    await prisma.auditEvent.delete({ where: { id: result.id } });
+  });
+
+  it('PFLICHT WC-audit-9 Concern 2-class: rejects Map / Set / RegExp instances', async () => {
+    await expect(
+      recordAuditEvent(prisma, {
+        actorUserId: actorId,
+        action: 'user_update',
+        targetType: 'user',
+        targetId,
+        payload: { lookup: new Map() },
+      }),
+    ).rejects.toThrow(/unsupported payload value-type/);
+    await expect(
+      recordAuditEvent(prisma, {
+        actorUserId: actorId,
+        action: 'user_update',
+        targetType: 'user',
+        targetId,
+        payload: { unique: new Set() },
+      }),
+    ).rejects.toThrow(/unsupported payload value-type/);
+    await expect(
+      recordAuditEvent(prisma, {
+        actorUserId: actorId,
+        action: 'user_update',
+        targetType: 'user',
+        targetId,
+        payload: { pattern: /foo/ },
+      }),
+    ).rejects.toThrow(/unsupported payload value-type/);
+  });
+
+  it('PFLICHT WC-audit-9 Concern 3: rejects function / symbol values', async () => {
+    await expect(
+      recordAuditEvent(prisma, {
+        actorUserId: actorId,
+        action: 'user_update',
+        targetType: 'user',
+        targetId,
+        payload: { handler: () => 'leak' },
+      }),
+    ).rejects.toThrow(/unsupported payload value-type: function/);
+    await expect(
+      recordAuditEvent(prisma, {
+        actorUserId: actorId,
+        action: 'user_update',
+        targetType: 'user',
+        targetId,
+        payload: { marker: Symbol('leak') },
+      }),
+    ).rejects.toThrow(/unsupported payload value-type: symbol/);
+  });
+
+  it('PFLICHT WC-audit-1 Concern 6-case: rejects FORBIDDEN keys with mixed-case', async () => {
+    // Adversary-typo prevention: case-insensitive lookup against lowercase set.
+    // Note: snake_case/kebab-case variants (e.g. "api_key") are NOT covered by
+    // the lowercase-compare; they would need separate entries. v0.1.0 scope.
+    for (const key of ['Token', 'TOKEN', 'PassWord', 'apiKey', 'APIKEY', 'SessionToken']) {
+      await expect(
+        recordAuditEvent(prisma, {
+          actorUserId: actorId,
+          action: 'user_update',
+          targetType: 'user',
+          targetId,
+          payload: { [key]: 'should-leak' },
+        }),
+      ).rejects.toThrow(/disallowed payload key/);
+    }
   });
 
   it('PFLICHT WC-audit-11: rejects payload > 4096 bytes', async () => {
