@@ -194,6 +194,19 @@ importers:
         specifier: ~4.19.2
         version: 4.19.4
 
+  packages/audit:
+    dependencies:
+      '@mediacompressor/db':
+        specifier: workspace:*
+        version: link:../db
+    devDependencies:
+      '@mediacompressor/test-helpers':
+        specifier: workspace:*
+        version: link:../test-helpers
+      '@types/node':
+        specifier: ~22.7.0
+        version: 22.7.9
+
   packages/auth:
     dependencies:
       '@mediacompressor/db':
