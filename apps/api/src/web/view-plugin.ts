@@ -1,13 +1,20 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
+import type {
+  FastifyInstance,
+  FastifyPluginAsync,
+  FastifyReply,
+  FastifyRequest,
+} from 'fastify';
 import fp from 'fastify-plugin';
 import view from '@fastify/view';
 import staticPlugin from '@fastify/static';
 import formbody from '@fastify/formbody';
 import handlebars from 'handlebars';
 import { csrfHelperPlugin } from './csrf-helper.js';
+import { CLIENT_I18N_KEYS } from './i18n-client-keys.js';
+import { DEFAULT_LOCALE } from './i18n.js';
 
 /**
  * Plan 8e Task 2 (code-review concern #7): security-relevant projection of
@@ -26,6 +33,37 @@ type CurrentUserView = { role: 'user' | 'admin'; status: 'active' | 'disabled' }
 function safeCurrentUser(auth: FastifyRequest['auth']): CurrentUserView {
   if (!auth) return null;
   return { role: auth.role, status: auth.status };
+}
+
+/**
+ * Plan 8f Task 4 (Rev. 2 WC-i18n-f4 + Rev. 2 WC-i18n-f8 + Rev. 2.1 WC-i18n-f20):
+ * Resolve every entry in `CLIENT_I18N_KEYS` against the per-request locale
+ * and return a flat `{ key: translated-string }` map. The map is serialized
+ * via the `{{{json}}}` Handlebars-helper into the `<meta name="mc-i18n"
+ * content='...'>` attribute that `i18n-bridge.js` reads at page-load.
+ *
+ * Locale resolution: `req.locale` is set by the `i18nFastifyPlugin`
+ * onRequest-hook, which runs BEFORE this preHandler-wrap. If — through some
+ * future plugin-load-order regression — `req.locale` is undefined, fall
+ * back to `DEFAULT_LOCALE` rather than crash; matches the same defense in
+ * `req.t(...)` (i18n.ts).
+ *
+ * Only server-resolved translation strings flow through this map — no
+ * user-input ever reaches `_clientI18n`. The `json`-helper additionally
+ * HTML-attribute-encodes the payload (Rev. 2.1 WC-i18n-f15) so unusual
+ * locale-string content (apostrophe, ampersand, double-quote) survives
+ * `<meta content='...'>` round-tripping.
+ */
+function buildClientI18n(
+  req: FastifyRequest,
+  app: FastifyInstance,
+): Record<string, string> {
+  const lng = req.locale ?? DEFAULT_LOCALE;
+  const out: Record<string, string> = {};
+  for (const { ns, key } of CLIENT_I18N_KEYS) {
+    out[key] = app.i18n.t(key, { lng, ns }) as string;
+  }
+  return out;
 }
 
 declare module 'fastify' {
@@ -202,15 +240,25 @@ const webViewPluginImpl: FastifyPluginAsync = async (app) => {
       // Logged-out pages (404, 500, /login) skip generation so they don't set
       // an mc_csrf cookie unnecessarily on every error/login page-load.
       const csrfDefault = req.auth ? reply.renderCsrfField() : '';
+      // Plan 8f Task 4 (Rev. 2 WC-i18n-f8): per-render projection of the
+      // server-resolved client-i18n key-set. Computed lazily here (not at
+      // hook-time) so reads of `app.i18n` happen against the parent-scope
+      // FastifyInstance after every plugin has registered. Injected into
+      // every page-render so layouts/base.hbs's <meta name="mc-i18n"> tag
+      // always carries a valid JSON payload.
+      const clientI18n = buildClientI18n(req, app);
       return origView(
         template,
         {
           currentUser,
           _csrfField: csrfDefault,
           ...(data ?? {}),
-          // _locale is injected LAST so handler-passed _locale cannot
-          // override the canonical per-request locale (Plan 8d invariant).
+          // _locale and _clientI18n are injected LAST so handler-passed
+          // overrides cannot break the canonical per-request locale
+          // (Plan 8d invariant) or smuggle attacker-controlled JSON into
+          // the <meta name="mc-i18n"> bootstrap.
           _locale: req.locale,
+          _clientI18n: clientI18n,
         },
         opts,
       );

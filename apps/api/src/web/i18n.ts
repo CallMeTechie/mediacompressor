@@ -467,6 +467,50 @@ export function registerFormatBytesHelper(): void {
 }
 
 /**
+ * Plan 8f Task 4 (Rev. 2 WC-i18n-f4 + WC-i18n-f11 + Rev. 2.1 WC-i18n-f15):
+ * `{{{json value}}}` Handlebars helper — emits a JSON-encoded payload that
+ * is ALSO HTML-attribute-safe (for `<meta name="mc-i18n" content='{{{json
+ * _clientI18n}}}'>`).
+ *
+ * **CRITICAL: order matters.** `&` MUST be escaped FIRST so subsequent
+ * entity-replacements (`&quot;` / `&#39;`) don't double-encode the prefix.
+ * Reordering would produce e.g. `&amp;quot;` for a real `"` instead of
+ * `&quot;`. The escape-set is therefore:
+ *   1. `&`  → `&amp;`     (FIRST — prevents double-encoding of #2/#3)
+ *   2. `"`  → `&quot;`    (HTML-attribute double-quote-context)
+ *   3. `'`  → `&#39;`     (HTML-attribute single-quote-context — needed
+ *                          because the layout uses `content='...'`)
+ *   4. `<`  → `<`    (`</script>` defense; harmless in attr-context,
+ *                          required if a future Plan 9/10 migrates to a
+ *                          nonce-inline-script bootstrap)
+ *   5. ` ` / ` ` → JS-escape  (defense-in-depth for the same
+ *                                        future inline-script migration —
+ *                                        these chars are valid in JSON
+ *                                        but illegal in JS-string-literals)
+ *
+ * The `<meta>`-attribute strategy (Rev. 2 WC-i18n-f8) means the JSON lands
+ * in HTML-attribute-context, NOT JS-string-literal-context, so the U+2028
+ * /U+2029 escapes are not strictly necessary today — but cheap to keep, and
+ * they future-proof the helper if/when Plan 9/10 migrates to a CSP-nonce
+ * inline-script bootstrap.
+ *
+ * Idempotent — Handlebars overwrites the previous registration.
+ */
+export function registerJsonHelper(): void {
+  handlebars.registerHelper('json', function (value: unknown) {
+    return new handlebars.SafeString(
+      JSON.stringify(value)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '\\u003c')
+        .replace(/\u2028/g, '\\u2028')
+        .replace(/\u2029/g, '\\u2029'),
+    );
+  });
+}
+
+/**
  * Registers the `{{t 'key'}}` Handlebars helper. Lookup of `_locale`:
  *   1. `@root._locale` (priority -- see C1-AD-PR below)
  *   2. `this._locale` (fallback for plain top-level renders)
@@ -517,6 +561,11 @@ const i18nFastifyPluginImpl = async (app: FastifyInstance) => {
   registerFormatDateTimeHelper();
   registerFormatDateHelper();
   registerFormatBytesHelper();
+  // Plan 8f Task 4 (Rev. 2 WC-i18n-f4 + Rev. 2.1 WC-i18n-f15): `{{{json}}}`
+  // helper for the `<meta name="mc-i18n">` client-i18n bootstrap. Registered
+  // alongside the format-helpers so a single i18nFastifyPlugin load wires up
+  // every Handlebars helper this plan introduces.
+  registerJsonHelper();
 
   app.addHook('onRequest', async (req) => {
     req.locale = detectLocale(req);

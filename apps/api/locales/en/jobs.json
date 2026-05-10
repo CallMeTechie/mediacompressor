@@ -38,5 +38,7 @@
   "kind_video": "Video",
   "profile_web_optimized": "Web optimized",
   "profile_mobile_low": "Mobile (low)",
-  "profile_archive_medium": "Archive (medium)"
+  "profile_archive_medium": "Archive (medium)",
+  "upload_failed_prefix": "Upload failed: ",
+  "upload_failed_unknown_error": "Unknown error"
 }

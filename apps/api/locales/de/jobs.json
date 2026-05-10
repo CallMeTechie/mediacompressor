@@ -38,5 +38,7 @@
   "kind_video": "Video",
   "profile_web_optimized": "Web-optimiert",
   "profile_mobile_low": "Mobil (niedrig)",
-  "profile_archive_medium": "Archiv (mittel)"
+  "profile_archive_medium": "Archiv (mittel)",
+  "upload_failed_prefix": "Upload fehlgeschlagen: ",
+  "upload_failed_unknown_error": "Unbekannter Fehler"
 }

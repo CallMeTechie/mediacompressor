@@ -4,8 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
+  {{!-- Plan 8f Task 4 (Rev. 2 WC-i18n-f8 + Rev. 2.1 WC-i18n-f15):
+       client-i18n bootstrap. Server resolves CLIENT_I18N_KEYS against the
+       per-request locale (view-plugin.ts::buildClientI18n) and the json-helper
+       JSON-stringifies + HTML-attribute-encodes the result. The bridge-script
+       below reads this <meta> and exposes window.MC.t(key, vars?) — kept as a
+       <meta> data-attribute (not inline-<script>) so CSP `script-src 'self'`
+       stays clean (no `'unsafe-inline'` required). --}}
+  <meta name="mc-i18n" content='{{{json _clientI18n}}}'>
   <title>{{title}}</title>
   <link rel="stylesheet" href="/static/css/app.css">
+  {{!-- i18n-bridge MUST load before upload-wizard.js (which lives in
+       upload-wizard.hbs); both use `defer`, so DOM-parse-order determines
+       execution-order (layout-defers fire before page-template-defers). --}}
+  <script src="/static/js/i18n-bridge.js" defer></script>
   <script src="/static/vendor/htmx.min.js" defer></script>
   <script src="/static/vendor/htmx-ext-sse.min.js" defer></script>
   <script src="/static/js/htmx-session-redirect.js" defer></script>
