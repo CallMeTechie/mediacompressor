@@ -745,6 +745,9 @@ describe('web/admin-invite-create-route', () => {
         /\d{1,2}\. (Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember) \d{4} um \d{2}:\d{2}/,
       );
       // EN long format MUST NOT leak (would indicate locale-fallback bug).
+      // Note: \s also matches U+202F (NARROW NO-BREAK SPACE) used by
+      // Intl.DateTimeFormat for the AM/PM separator in Node 18+/ICU 73+.
+      // Don't replace \s with a literal space — newer Node would slip past.
       expect(body).not.toMatch(
         /(January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, \d{4} at \d{1,2}:\d{2}\s*(AM|PM)/,
       );

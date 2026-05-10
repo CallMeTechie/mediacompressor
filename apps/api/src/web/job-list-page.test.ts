@@ -493,30 +493,42 @@ describe('web/job-list-page', () => {
       // Seed a job with a fixed createdAt (UTC noon — TZ-stable per
       // WC-i18n-f1 hardcoded UTC formatter).
       const fixedCreated = new Date('2026-05-15T10:00:00Z');
-      await seedJob({
+      const job = await seedJob({
         userId: user!.id,
         inputFilename: 'de-format-job.png',
         status: 'succeeded',
         createdAt: fixedCreated,
       });
 
-      const sessionCookie = await login(app, 'job-list-de-format@test.invalid');
-      const res = await app.inject({
-        method: 'GET',
-        url: '/jobs',
-        headers: {
-          accept: 'text/html',
-          cookie: `${sessionCookie}; mc_locale=de`,
-        },
-      });
-      expect(res.statusCode).toBe(200);
-      const body = res.body as string;
-      // DE numeric: dd.mm.yyyy (Intl.DateTimeFormat 'de' + dateStyle:'medium').
-      expect(body).toMatch(/15\.05\.2026/);
-      // EN long-month-name MUST NOT leak into DE-rendered cell.
-      expect(body).not.toMatch(/May 15, 2026/);
-      // Canonical ISO MUST remain in the <time datetime="..."> attribute.
-      expect(body).toMatch(/<time[^>]+datetime="2026-05-15T10:00:00\.000Z"/);
+      try {
+        const sessionCookie = await login(app, 'job-list-de-format@test.invalid');
+        const res = await app.inject({
+          method: 'GET',
+          url: '/jobs',
+          headers: {
+            accept: 'text/html',
+            cookie: `${sessionCookie}; mc_locale=de`,
+          },
+        });
+        expect(res.statusCode).toBe(200);
+        const body = res.body as string;
+        // DE numeric: dd.mm.yyyy (Intl.DateTimeFormat 'de' + dateStyle:'medium').
+        expect(body).toMatch(/15\.05\.2026/);
+        // EN long-month-name MUST NOT leak into DE-rendered cell.
+        expect(body).not.toMatch(/May 15, 2026/);
+        // Canonical ISO MUST remain in the <time datetime="..."> attribute.
+        expect(body).toMatch(/<time[^>]+datetime="2026-05-15T10:00:00\.000Z"/);
+      } finally {
+        // Explicit per-test cleanup for parity with profile-page-test pattern.
+        // The describe-level beforeEach normally handles job cleanup, but a
+        // finally guarantee keeps reruns deterministic if a later test before
+        // beforeEach throws mid-cleanup.
+        await prisma.job
+          .deleteMany({ where: { id: job.id } })
+          .catch((e: { code?: string }) => {
+            if (e?.code !== 'P2025') throw e;
+          });
+      }
     } finally {
       await app.close();
     }

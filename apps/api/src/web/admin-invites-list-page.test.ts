@@ -105,14 +105,6 @@ describe('web/admin-invites-list-page', () => {
     adminId = admin!.id;
   });
 
-  beforeEach(async () => {
-    await resetLoginRateLimits(redis, TEST_EMAILS);
-    // Clean invites between tests to ensure deterministic seeding.
-    await prisma.invite.deleteMany({
-      where: { createdById: adminId },
-    });
-  });
-
   async function getAdminIds(): Promise<string[]> {
     const admins = await prisma.user.findMany({
       where: { email: { in: TEST_EMAILS } },
@@ -120,6 +112,17 @@ describe('web/admin-invites-list-page', () => {
     });
     return admins.map((a) => a.id);
   }
+
+  beforeEach(async () => {
+    await resetLoginRateLimits(redis, TEST_EMAILS);
+    // Clean invites between tests to ensure deterministic seeding. Includes
+    // TEST_EMAIL_ADMIN_DE so the DE-format test can rely on beforeEach for
+    // cleanup symmetrically with the other admin scopes (no per-test manual
+    // teardown required).
+    await prisma.invite.deleteMany({
+      where: { createdById: { in: await getAdminIds() } },
+    });
+  });
 
   afterAll(async () => {
     await prisma.invite.deleteMany({
@@ -429,11 +432,6 @@ describe('web/admin-invites-list-page', () => {
       // Canonical ISO MUST remain in the <time datetime="..."> attribute
       // (HTML5 machine-readable; locale-formatting is inner-text only).
       expect(body).toMatch(/<time[^>]+datetime="2026-05-15T10:00:00\.000Z"/);
-
-      // Cleanup: this test seeded an invite under TEST_EMAIL_ADMIN_DE which
-      // is NOT in the beforeEach `createdById: adminId` cleanup. Tear down
-      // explicitly so reruns stay deterministic.
-      await prisma.invite.deleteMany({ where: { createdById: admin!.id } });
     } finally {
       await app.close();
     }

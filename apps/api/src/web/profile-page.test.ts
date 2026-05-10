@@ -459,7 +459,9 @@ describe('web/profile-page', () => {
         expect(body).toMatch(/<time[^>]+datetime="2026-05-15T10:00:00\.000Z"/);
       } finally {
         // Cleanup — seeded session would otherwise pollute later runs.
-        await prisma.session.delete({ where: { id: seeded.id } }).catch(() => undefined);
+        await prisma.session.delete({ where: { id: seeded.id } }).catch((e: { code?: string }) => {
+          if (e?.code !== 'P2025') throw e;
+        });
       }
     } finally {
       await app.close();

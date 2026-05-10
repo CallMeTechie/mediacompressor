@@ -422,7 +422,7 @@ describe('web/api-keys-list-page', () => {
       // Seed an api-key with a fixed createdAt — the formatter hardcodes
       // timeZone:'UTC' (WC-i18n-f1) so noon-UTC is TZ-stable.
       const fixedCreated = new Date('2026-05-15T10:00:00Z');
-      await prisma.apiKey.create({
+      const apiKey = await prisma.apiKey.create({
         data: {
           userId: user!.id,
           name: 'de-format-key',
@@ -433,23 +433,34 @@ describe('web/api-keys-list-page', () => {
         },
       });
 
-      const sessionCookie = await loginAndCookies(app, 'apikeys-list-de-format@test.invalid');
-      const res = await app.inject({
-        method: 'GET',
-        url: '/profile/api-keys',
-        headers: {
-          accept: 'text/html',
-          cookie: `${sessionCookie}; mc_locale=de`,
-        },
-      });
-      expect(res.statusCode).toBe(200);
-      const body = res.body as string;
-      // DE numeric: dd.mm.yyyy.
-      expect(body).toMatch(/15\.05\.2026/);
-      // EN long-month-name MUST NOT leak.
-      expect(body).not.toMatch(/May 15, 2026/);
-      // Canonical ISO MUST remain in the <time datetime="..."> attribute.
-      expect(body).toMatch(/<time[^>]+datetime="2026-05-15T10:00:00\.000Z"/);
+      try {
+        const sessionCookie = await loginAndCookies(app, 'apikeys-list-de-format@test.invalid');
+        const res = await app.inject({
+          method: 'GET',
+          url: '/profile/api-keys',
+          headers: {
+            accept: 'text/html',
+            cookie: `${sessionCookie}; mc_locale=de`,
+          },
+        });
+        expect(res.statusCode).toBe(200);
+        const body = res.body as string;
+        // DE numeric: dd.mm.yyyy.
+        expect(body).toMatch(/15\.05\.2026/);
+        // EN long-month-name MUST NOT leak.
+        expect(body).not.toMatch(/May 15, 2026/);
+        // Canonical ISO MUST remain in the <time datetime="..."> attribute.
+        expect(body).toMatch(/<time[^>]+datetime="2026-05-15T10:00:00\.000Z"/);
+      } finally {
+        // Explicit per-test cleanup for parity with profile-page-test pattern.
+        // beforeEach normally handles api-key cleanup, but a finally guarantee
+        // keeps reruns deterministic if a test before us throws mid-cleanup.
+        await prisma.apiKey
+          .deleteMany({ where: { id: apiKey.id } })
+          .catch((e: { code?: string }) => {
+            if (e?.code !== 'P2025') throw e;
+          });
+      }
     } finally {
       await app.close();
     }
