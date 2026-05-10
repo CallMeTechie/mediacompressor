@@ -261,6 +261,62 @@ export function registerTProfileHelper(i18n: i18n): void {
 }
 
 /**
+ * Plan 10 Task 4: `{{tAuditAction action}}` + `{{tAuditTarget targetType}}`
+ * Handlebars helpers — translate canonical EN audit-action / target-type
+ * strings (`invite_create`, `user_update`, `invite`, `user`) into locale-
+ * specific labels for display.
+ *
+ * Mirror of `registerTStatusHelper` (Task 2) — same `_locale` 3-tier priority
+ * (`@root._locale` -> `this._locale` -> DEFAULT_LOCALE) so the helpers work
+ * inside `{{#each events}}` rows AND outside loops on plain top-level renders.
+ *
+ * Translation Discipline (Plan 8e Sektion "Translation Discipline"): the
+ * canonical EN action-string is the DB-stored canonical value (per `@mediacompressor/audit`'s
+ * `AUDIT_ACTIONS` const-tuple); the helper ONLY translates the visible LABEL
+ * for the table-cell. Filter-form-VALUEs (`<a href="?action=invite_create">`)
+ * keep canonical EN — verified by PFLICHT WC-audit-12 in admin-audit-events-page.test.ts.
+ *
+ * Unknown action/target values return the raw key (e.g. `audit_action_zzz`)
+ * via i18next's default missing-key handler — loud-broken, visible to QA, NOT
+ * silent-empty.
+ *
+ * Idempotent — Handlebars overwrites the previous registration.
+ */
+export function registerTAuditActionHelper(i18n: i18n): void {
+  handlebars.registerHelper(
+    'tAuditAction',
+    function (
+      this: { _locale?: SupportedLocale } | null,
+      action: string,
+      opts: handlebars.HelperOptions,
+    ) {
+      const root = (opts?.data?.root ?? {}) as { _locale?: SupportedLocale };
+      const thisLocale = this?._locale;
+      const locale: SupportedLocale = root._locale ?? thisLocale ?? DEFAULT_LOCALE;
+      const out = i18n.t(`audit_action_${action}`, { lng: locale, ns: 'admin' });
+      return new handlebars.SafeString(out as string);
+    },
+  );
+}
+
+export function registerTAuditTargetHelper(i18n: i18n): void {
+  handlebars.registerHelper(
+    'tAuditTarget',
+    function (
+      this: { _locale?: SupportedLocale } | null,
+      targetType: string,
+      opts: handlebars.HelperOptions,
+    ) {
+      const root = (opts?.data?.root ?? {}) as { _locale?: SupportedLocale };
+      const thisLocale = this?._locale;
+      const locale: SupportedLocale = root._locale ?? thisLocale ?? DEFAULT_LOCALE;
+      const out = i18n.t(`audit_target_${targetType}`, { lng: locale, ns: 'admin' });
+      return new handlebars.SafeString(out as string);
+    },
+  );
+}
+
+/**
  * Plan 8f Task 1 (Rev. 2.1, WC-i18n-f1 + WC-i18n-f12 + WC-i18n-f18):
  * `{{formatDateTime value [style="short|medium|long"]}}` Handlebars helper —
  * locale-aware date+time rendering for detail-view contexts (`<dl>/<dd>` or
@@ -553,6 +609,13 @@ const i18nFastifyPluginImpl = async (app: FastifyInstance) => {
   // the same plugin scope.
   registerTKindHelper(i18n);
   registerTProfileHelper(i18n);
+  // Plan 10 Task 4: tAuditAction + tAuditTarget helpers translate the
+  // canonical EN audit-action / target-type strings (Plan 10 Task 2's
+  // AUDIT_ACTIONS / AUDIT_TARGET_TYPES const-tuple) into locale-specific
+  // labels for the /admin/audit-events table. Wired alongside the other
+  // enum-translation helpers so a single plugin-load registers them all.
+  registerTAuditActionHelper(i18n);
+  registerTAuditTargetHelper(i18n);
   // Plan 8f Task 1 (Rev. 2.1): format-helpers for dynamic values —
   // formatDateTime (detail-views), formatDate (table-rows, WC-i18n-f18 split),
   // formatBytes (binary 1024-base, bigint-aware per WC-i18n-f10 + round-half-up

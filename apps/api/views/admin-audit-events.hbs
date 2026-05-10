@@ -1,0 +1,70 @@
+<header class="page-header">
+  <h1>{{t 'page_title_audit_events' ns='admin'}}</h1>
+  <nav class="page-nav">
+    <a href="/admin">{{t 'nav_dashboard' ns='admin'}}</a>
+    <a href="/admin/users">{{t 'nav_users' ns='admin'}}</a>
+    <a href="/admin/invites">{{t 'nav_invites' ns='admin'}}</a>
+    <a href="/admin/stats">{{t 'nav_stats' ns='admin'}}</a>
+  </nav>
+</header>
+
+{{!-- Plan 10 Task 4 PFLICHT WC-audit-12 + WC-audit-17 (Rev. 2.1): filter
+     buttons MUST drop the cursor (force-reset on filter-change) AND
+     preserve the OTHER filter (actorId on action-toggle; action on
+     actorId-clear). Composed inline via {{#if}} blocks so a single href
+     emits the right set of querystring params for every (currentAction x
+     currentActorId) combination. --}}
+<section class="audit-events-filters">
+  <p>
+    <strong>{{t 'audit_events_filter_actions_label' ns='admin'}}:</strong>
+    {{!-- "All actions" link: clears action, preserves actorId. --}}
+    <a href="/admin/audit-events{{#if currentActorId}}?actorId={{currentActorId}}{{/if}}">{{t 'audit_events_filter_all_actions' ns='admin'}}</a>
+    {{#each auditActions}}
+      |
+      <a href="/admin/audit-events?action={{this}}{{#if @root.currentActorId}}&actorId={{@root.currentActorId}}{{/if}}">{{tAuditAction this}}</a>
+    {{/each}}
+  </p>
+</section>
+
+{{#if events.length}}
+<table class="admin-table">
+  <thead>
+    <tr>
+      <th>{{t 'audit_events_table_when' ns='admin'}}</th>
+      <th>{{t 'audit_events_table_actor' ns='admin'}}</th>
+      <th>{{t 'audit_events_table_action' ns='admin'}}</th>
+      <th>{{t 'audit_events_table_target' ns='admin'}}</th>
+      <th>{{t 'audit_events_table_payload' ns='admin'}}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each events}}
+      {{!-- data-event-id exposes the row's UUID for E2E + cursor-tie-break
+           tests (PFLICHT WC-audit-5). Handlebars auto-escapes attribute
+           values, so no injection-vector here. --}}
+      <tr data-event-id="{{id}}">
+        <td><time datetime="{{createdAt}}">{{formatDateTime createdAt style="long"}}</time></td>
+        <td>{{actorEmail}}</td>
+        <td>{{tAuditAction action}}</td>
+        <td>{{tAuditTarget targetType}} <code class="muted">{{targetId}}</code></td>
+        {{!-- Default double-mustache HTML-encodes payloadJson, so any
+             script-tag characters from the persisted payload are rendered
+             as text (PFLICHT WC-audit-4). NEVER switch to triple-mustache
+             or unescape-helper here -- payload is user-controlled. --}}
+        <td><code>{{payloadJson}}</code></td>
+      </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p class="muted">{{t 'audit_events_empty' ns='admin'}}</p>
+{{/if}}
+
+{{#if nextCursor}}
+  {{!-- Pagination link preserves BOTH filters AND adds the new cursor
+       (PFLICHT WC-audit-17 Rev. 2.1). The cursor MUST come first in the
+       querystring so the test-regex matches deterministically. --}}
+  <p>
+    <a href="/admin/audit-events?cursor={{nextCursor}}{{#if currentAction}}&action={{currentAction}}{{/if}}{{#if currentActorId}}&actorId={{currentActorId}}{{/if}}">{{t 'audit_events_pagination_next' ns='admin'}}</a>
+  </p>
+{{/if}}

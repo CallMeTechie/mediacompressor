@@ -55,6 +55,7 @@ import { adminInvitesListPagePlugin } from './web/admin-invites-list-page.js';
 import { adminInviteCreateRoutePlugin } from './web/admin-invite-create-route.js';
 import { adminInviteRevokeRoutePlugin } from './web/admin-invite-revoke-route.js';
 import { adminStatsPagePlugin } from './web/admin-stats-page.js';
+import { adminAuditEventsPagePlugin } from './web/admin-audit-events-page.js';
 
 export interface AppDeps {
   prisma: PrismaClient;
@@ -476,6 +477,15 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   // Registered AFTER the invite plugins (sibling ordering) and BEFORE
   // errorPagesPlugin (the catch-all 404). NOT fp-wrapped (no decorators).
   await app.register(adminStatsPagePlugin);
+
+  // Plan 10 Task 4: GET /admin/audit-events -- paginated audit-trail list
+  // with composable filters (actorId, action). Reads AuditEvent rows
+  // directly via Prisma (Plan 10 has no inner JSON-API for audit-events).
+  // preHandler: app.requireAdminSession (303 unauth, 403 non-admin).
+  // Cache-Control: no-store, max-age=0. Registered AFTER the other admin
+  // page plugins (sibling ordering) and BEFORE errorPagesPlugin (the
+  // catch-all 404). NOT fp-wrapped (no decorators).
+  await app.register(adminAuditEventsPagePlugin);
 
   // Plan 8a Task 6: Accept-aware 404/500 (BFF). MUST be registered LAST so
   // the catch-all setNotFoundHandler doesn't shadow real routes registered

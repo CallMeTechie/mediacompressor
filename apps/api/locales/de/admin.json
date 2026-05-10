@@ -71,5 +71,22 @@
   "stats_storage_disk_total": "Festplatte gesamt",
   "stats_storage_disk_unavailable": "Festplatten-Stats nicht verfügbar",
   "stats_queue_waiting": "Komprimierung wartend",
-  "stats_queue_active": "Komprimierung aktiv"
+  "stats_queue_active": "Komprimierung aktiv",
+  "page_title_audit_events": "Audit-Log",
+  "nav_audit_events": "Audit-Log",
+  "audit_events_table_when": "Zeitpunkt",
+  "audit_events_table_actor": "Aktor",
+  "audit_events_table_action": "Aktion",
+  "audit_events_table_target": "Ziel",
+  "audit_events_table_payload": "Details",
+  "audit_events_empty": "Bisher keine Audit-Ereignisse aufgezeichnet.",
+  "audit_events_filter_actions_label": "Aktion",
+  "audit_events_filter_all_actions": "Alle Aktionen",
+  "audit_events_pagination_next": "Nächste Seite",
+  "audit_events_anonymized_actor": "(anonymisierter Account)",
+  "audit_action_invite_create": "Einladung erstellt",
+  "audit_action_invite_revoke": "Einladung widerrufen",
+  "audit_action_user_update": "Benutzer aktualisiert",
+  "audit_target_invite": "Einladung",
+  "audit_target_user": "Benutzer"
 }

@@ -71,5 +71,22 @@
   "stats_storage_disk_total": "Disk total",
   "stats_storage_disk_unavailable": "Disk stats unavailable",
   "stats_queue_waiting": "Compression waiting",
-  "stats_queue_active": "Compression active"
+  "stats_queue_active": "Compression active",
+  "page_title_audit_events": "Audit log",
+  "nav_audit_events": "Audit log",
+  "audit_events_table_when": "When",
+  "audit_events_table_actor": "Actor",
+  "audit_events_table_action": "Action",
+  "audit_events_table_target": "Target",
+  "audit_events_table_payload": "Details",
+  "audit_events_empty": "No audit events recorded yet.",
+  "audit_events_filter_actions_label": "Action",
+  "audit_events_filter_all_actions": "All actions",
+  "audit_events_pagination_next": "Next page",
+  "audit_events_anonymized_actor": "(anonymized account)",
+  "audit_action_invite_create": "Invite created",
+  "audit_action_invite_revoke": "Invite revoked",
+  "audit_action_user_update": "User updated",
+  "audit_target_invite": "Invite",
+  "audit_target_user": "User"
 }

@@ -89,6 +89,12 @@ const IDENTICAL_BY_DESIGN = new Set<string>([
   // form input label (single key, see Plan 8e Task 6 review concern #4).
   'profile.label_apikey_name',
 
+  // -- Plan 10 Task 4 admin namespace (audit-events page) --
+  // "Details" — established Anglicism in DE technical UI vocabulary; the
+  // standard German noun "Einzelheiten" is overly formal for a table-column
+  // header. Used as the column header for the JSON payload cell.
+  'admin.audit_events_table_payload',
+
   // Add new entries here as deliberate exceptions, with a justifying comment.
 ]);
 
