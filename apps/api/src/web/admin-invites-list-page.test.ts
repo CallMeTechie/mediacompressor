@@ -18,11 +18,13 @@ const TEST_EMAIL_USER = 'admin-invites-list-user@test.invalid';
 const TEST_EMAIL_ADMIN = 'admin-invites-list@test.invalid';
 const TEST_EMAIL_ADMIN_EMPTY = 'admin-invites-list-empty@test.invalid';
 const TEST_EMAIL_ADMIN_FLASH = 'admin-invites-list-flash@test.invalid';
+const TEST_EMAIL_ADMIN_DE = 'admin-invites-list-de@test.invalid';
 const TEST_EMAILS = [
   TEST_EMAIL_USER,
   TEST_EMAIL_ADMIN,
   TEST_EMAIL_ADMIN_EMPTY,
   TEST_EMAIL_ADMIN_FLASH,
+  TEST_EMAIL_ADMIN_DE,
 ];
 
 const config: Config = {
@@ -85,6 +87,14 @@ describe('web/admin-invites-list-page', () => {
     });
     await prisma.user.update({
       where: { email: TEST_EMAIL_ADMIN_FLASH },
+      data: { role: 'admin' },
+    });
+    await createTestUser(prisma, {
+      email: TEST_EMAIL_ADMIN_DE,
+      password: 'hunter22hunter22',
+    });
+    await prisma.user.update({
+      where: { email: TEST_EMAIL_ADMIN_DE },
       data: { role: 'admin' },
     });
 
@@ -368,6 +378,62 @@ describe('web/admin-invites-list-page', () => {
       // a flash banner.
       expect(res.statusCode).toBe(400);
       expect(res.body).not.toMatch(/<div[^>]*class="flash[^"]*"[^>]*>[^<]*evil-marker-list/);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // Plan 8f Task 2 PFLICHT (WC-i18n-f-task2 / WC-i18n-f18 — Format-Style
+  // Discipline): the table-row date-cell migrated from raw `{{expiresAt}}`
+  // ISO-rendering to `{{formatDate expiresAt}}` (medium, default style). With
+  // `mc_locale=de` the cell MUST render the DE numeric format `15.05.2026`
+  // (not `2026-05-15` raw ISO, not `May 15, 2026` EN). The canonical ISO
+  // remains in the surrounding `<time datetime="...">` machine-readable
+  // attribute. Without a per-row `_locale` resolution against `@root`
+  // (registerFormatDateHelper's 3-tier fallback), the render would default to
+  // EN inside the `{{#each invites}}` block — this test pins the locale-flow.
+  it('PFLICHT WC-i18n-f-task2: GET /admin/invites with mc_locale=de renders expiresAt in DE numeric format (formatDate medium)', async () => {
+    const app = await buildServer(config);
+    try {
+      const admin = await prisma.user.findUnique({
+        where: { email: TEST_EMAIL_ADMIN_DE },
+        select: { id: true },
+      });
+      // Fixed-date invite (UTC midday — TZ-stable across `Intl.DateTimeFormat`
+      // UTC formatter — the helper hardcodes timeZone:'UTC' per WC-i18n-f1).
+      const fixedExpires = new Date('2026-05-15T10:00:00Z');
+      await prisma.invite.create({
+        data: {
+          token: 'e'.repeat(64),
+          email: 'de-format-test@test.invalid',
+          createdById: admin!.id,
+          expiresAt: fixedExpires,
+        },
+      });
+
+      const sessionCookie = await loginAndCookies(app, TEST_EMAIL_ADMIN_DE);
+      const res = await app.inject({
+        method: 'GET',
+        url: '/admin/invites',
+        headers: {
+          accept: 'text/html',
+          cookie: `${sessionCookie}; mc_locale=de`,
+        },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.body as string;
+      // DE numeric: dd.mm.yyyy (Intl.DateTimeFormat 'de' + dateStyle:'medium').
+      expect(body).toMatch(/15\.05\.2026/);
+      // EN long-month-name MUST NOT leak into DE-rendered cell.
+      expect(body).not.toMatch(/May 15, 2026/);
+      // Canonical ISO MUST remain in the <time datetime="..."> attribute
+      // (HTML5 machine-readable; locale-formatting is inner-text only).
+      expect(body).toMatch(/<time[^>]+datetime="2026-05-15T10:00:00\.000Z"/);
+
+      // Cleanup: this test seeded an invite under TEST_EMAIL_ADMIN_DE which
+      // is NOT in the beforeEach `createdById: adminId` cleanup. Tear down
+      // explicitly so reruns stay deterministic.
+      await prisma.invite.deleteMany({ where: { createdById: admin!.id } });
     } finally {
       await app.close();
     }

@@ -26,6 +26,7 @@ const TEST_EMAILS = [
   'job-list-terminal@test.invalid',
   'job-list-de-fragment@test.invalid',
   'job-list-de-kindprof@test.invalid',
+  'job-list-de-format@test.invalid',
 ];
 
 const config: Config = {
@@ -470,6 +471,52 @@ describe('web/job-list-page', () => {
       expect(res.body).not.toMatch(/<td[^>]*>[^<]*web-optimized/);
       // Sanity: the row IS being rendered — its filename appears in the body.
       expect(res.body).toContain('kindprof-de.png');
+    } finally {
+      await app.close();
+    }
+  });
+
+  // Plan 8f Task 2 PFLICHT (WC-i18n-f-task2 / WC-i18n-f18 — Format-Style
+  // Discipline): the job-list-rows table-cell migrated from raw
+  // `{{createdAt}}` ISO-rendering to `{{formatDate createdAt}}` (medium,
+  // default style). With `mc_locale=de` the cell MUST render `15.05.2026`
+  // (DE numeric, NOT raw ISO, NOT EN format). job-list-rows.hbs is rendered
+  // both as a full page (`/jobs`) and as a polling fragment
+  // (`/jobs?fragment=1`); the helper resolves locale via @root._locale 3-tier
+  // fallback so both render-paths apply DE format.
+  it('PFLICHT WC-i18n-f-task2: GET /jobs with mc_locale=de renders createdAt in DE numeric format (formatDate medium)', async () => {
+    const app = await buildServer(config);
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: 'job-list-de-format@test.invalid' },
+      });
+      // Seed a job with a fixed createdAt (UTC noon — TZ-stable per
+      // WC-i18n-f1 hardcoded UTC formatter).
+      const fixedCreated = new Date('2026-05-15T10:00:00Z');
+      await seedJob({
+        userId: user!.id,
+        inputFilename: 'de-format-job.png',
+        status: 'succeeded',
+        createdAt: fixedCreated,
+      });
+
+      const sessionCookie = await login(app, 'job-list-de-format@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: '/jobs',
+        headers: {
+          accept: 'text/html',
+          cookie: `${sessionCookie}; mc_locale=de`,
+        },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.body as string;
+      // DE numeric: dd.mm.yyyy (Intl.DateTimeFormat 'de' + dateStyle:'medium').
+      expect(body).toMatch(/15\.05\.2026/);
+      // EN long-month-name MUST NOT leak into DE-rendered cell.
+      expect(body).not.toMatch(/May 15, 2026/);
+      // Canonical ISO MUST remain in the <time datetime="..."> attribute.
+      expect(body).toMatch(/<time[^>]+datetime="2026-05-15T10:00:00\.000Z"/);
     } finally {
       await app.close();
     }

@@ -22,8 +22,8 @@
         <tr class="session-row{{#if isCurrent}} current{{/if}}">
           <td><code>{{userAgent}}</code></td>
           <td>{{ip}}</td>
-          <td><time datetime="{{lastUsedAt}}">{{lastUsedAt}}</time></td>
-          <td><time datetime="{{expiresAt}}">{{expiresAt}}</time></td>
+          <td><time datetime="{{lastUsedAt}}">{{formatDate lastUsedAt}}</time></td>
+          <td><time datetime="{{expiresAt}}">{{formatDate expiresAt}}</time></td>
           <td>
             {{#if isCurrent}}
               <span class="muted">{{t 'label_session_current' ns='profile'}}</span>

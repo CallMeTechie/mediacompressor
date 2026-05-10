@@ -15,7 +15,7 @@
   <dt>{{t 'invite_created_label_email' ns='admin'}}</dt>
   <dd>{{#if invite.email}}{{invite.email}}{{else}}<span class="muted">&mdash;</span>{{/if}}</dd>
   <dt>{{t 'invite_created_label_expires_at' ns='admin'}}</dt>
-  <dd><time datetime="{{invite.expiresAt}}">{{invite.expiresAt}}</time></dd>
+  <dd><time datetime="{{invite.expiresAt}}">{{formatDateTime invite.expiresAt style="long"}}</time></dd>
 </dl>
 
 <p>

@@ -17,9 +17,9 @@
         <td>{{name}}</td>
         <td><code>{{keyPrefix}}&hellip;</code></td>
         <td><code>{{#each scopes}}{{this}} {{/each}}</code></td>
-        <td><time datetime="{{createdAt}}">{{createdAt}}</time></td>
+        <td><time datetime="{{createdAt}}">{{formatDate createdAt}}</time></td>
         <td>
-          {{#if lastUsedAt}}<time datetime="{{lastUsedAt}}">{{lastUsedAt}}</time>{{else}}<span class="muted">{{t 'label_apikey_never_used' ns='profile'}}</span>{{/if}}
+          {{#if lastUsedAt}}<time datetime="{{lastUsedAt}}">{{formatDate lastUsedAt}}</time>{{else}}<span class="muted">{{t 'label_apikey_never_used' ns='profile'}}</span>{{/if}}
         </td>
         <td>
           <form method="POST" action="/profile/api-keys/{{id}}/revoke" class="inline-form">

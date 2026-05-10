@@ -20,6 +20,7 @@ const TEST_EMAILS = [
   'apikeys-list-many@test.invalid',
   'apikeys-list-leak@test.invalid',
   'apikeys-list-flash@test.invalid',
+  'apikeys-list-de-format@test.invalid',
 ];
 
 const config: Config = {
@@ -401,6 +402,54 @@ describe('web/api-keys-list-page', () => {
       });
       expect(res.statusCode).toBe(200);
       expect(res.body).not.toContain('evil-marker-list');
+    } finally {
+      await app.close();
+    }
+  });
+
+  // Plan 8f Task 2 PFLICHT (WC-i18n-f-task2 / WC-i18n-f18 — Format-Style
+  // Discipline): the api-keys table-row date-cell migrated from raw
+  // `{{createdAt}}` ISO-rendering to `{{formatDate createdAt}}` (medium,
+  // default style). With `mc_locale=de` the cell MUST render DE numeric
+  // format `15.05.2026`, NOT raw ISO and NOT EN format. Canonical ISO
+  // remains in the surrounding `<time datetime="...">` attribute.
+  it('PFLICHT WC-i18n-f-task2: GET /profile/api-keys with mc_locale=de renders createdAt in DE numeric format (formatDate medium)', async () => {
+    const app = await buildServer(config);
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: 'apikeys-list-de-format@test.invalid' },
+      });
+      // Seed an api-key with a fixed createdAt — the formatter hardcodes
+      // timeZone:'UTC' (WC-i18n-f1) so noon-UTC is TZ-stable.
+      const fixedCreated = new Date('2026-05-15T10:00:00Z');
+      await prisma.apiKey.create({
+        data: {
+          userId: user!.id,
+          name: 'de-format-key',
+          keyHash: 'f'.repeat(64),
+          keyPrefix: 'feeeeeee',
+          scopes: ['jobs:read'],
+          createdAt: fixedCreated,
+        },
+      });
+
+      const sessionCookie = await loginAndCookies(app, 'apikeys-list-de-format@test.invalid');
+      const res = await app.inject({
+        method: 'GET',
+        url: '/profile/api-keys',
+        headers: {
+          accept: 'text/html',
+          cookie: `${sessionCookie}; mc_locale=de`,
+        },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.body as string;
+      // DE numeric: dd.mm.yyyy.
+      expect(body).toMatch(/15\.05\.2026/);
+      // EN long-month-name MUST NOT leak.
+      expect(body).not.toMatch(/May 15, 2026/);
+      // Canonical ISO MUST remain in the <time datetime="..."> attribute.
+      expect(body).toMatch(/<time[^>]+datetime="2026-05-15T10:00:00\.000Z"/);
     } finally {
       await app.close();
     }

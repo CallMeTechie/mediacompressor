@@ -43,7 +43,7 @@
           {{#if email}}{{email}}{{else}}<span class="muted">&mdash;</span>{{/if}}
         </td>
         <td>
-          <time datetime="{{expiresAt}}">{{expiresAt}}</time>
+          <time datetime="{{expiresAt}}">{{formatDate expiresAt}}</time>
         </td>
         <td>{{t statusKey ns='admin'}}</td>
         <td>

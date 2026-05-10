@@ -706,4 +706,52 @@ describe('web/admin-invite-create-route', () => {
       await app.close();
     }
   });
+
+  // Plan 8f Task 2 PFLICHT (WC-i18n-f-task2 / WC-i18n-f18 — Format-Style
+  // Discipline, detail-view variant): the admin-invite-created.hbs <dd>
+  // expiresAt cell migrated from raw `{{invite.expiresAt}}` ISO-rendering to
+  // `{{formatDateTime invite.expiresAt style="long"}}`. With `mc_locale=de`
+  // the cell MUST render a DE long-month-name format like
+  // `15. Mai 2026 um 10:00` (D. Monat YYYY um HH:MM), NOT raw ISO and NOT
+  // the EN format `at 10:00 AM`. The assertion is pattern-based (matches any
+  // DE month-name) because expiresAt = now+expiresInHours is non-deterministic
+  // by exact date; the FORMAT-shape is the contract under test.
+  it('PFLICHT WC-i18n-f-task2: POST /admin/invites with mc_locale=de renders expiresAt in DE long format on admin-invite-created (formatDateTime style="long")', async () => {
+    const app = await buildServer(config);
+    try {
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
+        app,
+        TEST_EMAIL_ADMIN_NOEMAIL,
+      );
+      // Append mc_locale=de to the cookie-header for this request so the
+      // detail-view rendering resolves DE locale through @root._locale.
+      const cookieWithLocale = `${cookieHeader}; mc_locale=de`;
+      const res = await app.inject({
+        method: 'POST',
+        url: '/admin/invites',
+        headers: {
+          cookie: cookieWithLocale,
+          'content-type': 'application/x-www-form-urlencoded',
+          'x-csrf-token': csrf,
+        },
+        payload: `_csrf=${encodeURIComponent(csrf)}`,
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.body as string;
+      // DE long-month-name format: e.g. "15. Mai 2026 um 10:00".
+      // Pattern-assert any DE month name (Intl.DateTimeFormat 'de' +
+      // dateStyle:'long' + timeStyle:'short' output).
+      expect(body).toMatch(
+        /\d{1,2}\. (Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember) \d{4} um \d{2}:\d{2}/,
+      );
+      // EN long format MUST NOT leak (would indicate locale-fallback bug).
+      expect(body).not.toMatch(
+        /(January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, \d{4} at \d{1,2}:\d{2}\s*(AM|PM)/,
+      );
+      // Canonical ISO MUST remain in the <time datetime="..."> attribute.
+      expect(body).toMatch(/<time[^>]+datetime="[0-9T:.\-Z]+">/);
+    } finally {
+      await app.close();
+    }
+  });
 });

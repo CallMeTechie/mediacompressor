@@ -4,7 +4,7 @@
       <td><a href="/jobs/{{id}}">{{inputFilename}}</a></td>
       <td>{{> job-status-badge}}</td>
       <td>{{tKind kind}} &middot; {{tProfile profile}}</td>
-      <td><time datetime="{{createdAt}}">{{createdAt}}</time></td>
+      <td><time datetime="{{createdAt}}">{{formatDate createdAt}}</time></td>
     </tr>
   {{else}}
     <tr><td colspan="4" class="muted">{{t 'list_empty' ns='jobs'}} <a href="/upload">{{t 'list_empty_link' ns='jobs'}}</a>.</td></tr>

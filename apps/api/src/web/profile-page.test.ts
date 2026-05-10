@@ -20,6 +20,7 @@ const TEST_EMAILS = [
   'profile-multi@test.invalid',
   'profile-xss@test.invalid',
   'profile-flash@test.invalid',
+  'profile-de-format@test.invalid',
 ];
 
 const config: Config = {
@@ -401,6 +402,65 @@ describe('web/profile-page', () => {
       });
       expect(res.statusCode).toBe(200);
       expect(res.body).not.toContain('evil-marker-profile');
+    } finally {
+      await app.close();
+    }
+  });
+
+  // Plan 8f Task 2 PFLICHT (WC-i18n-f-task2 / WC-i18n-f18 — Format-Style
+  // Discipline): the sessions-table date-cells migrated from raw
+  // `{{lastUsedAt}}` / `{{expiresAt}}` ISO-rendering to
+  // `{{formatDate ...}}` (medium, default style). With `mc_locale=de` the
+  // cell MUST render the DE numeric format `15.05.2026` (not raw ISO, not
+  // `May 15, 2026` EN). Seeds an extra non-current session with a fixed
+  // future expiresAt so the assertion is deterministic regardless of the
+  // login-fresh session's auto-generated expiresAt.
+  it('PFLICHT WC-i18n-f-task2: GET /profile with mc_locale=de renders sessions expiresAt in DE numeric format (formatDate medium)', async () => {
+    const app = await buildServer(config);
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: 'profile-de-format@test.invalid' },
+      });
+      // Seed a non-current session with a fixed expiresAt — the formatter
+      // hardcodes timeZone:'UTC' (WC-i18n-f1) so noon-UTC is TZ-stable.
+      const fixedExpires = new Date('2026-05-15T10:00:00Z');
+      const seedToken = 'profile-de-format-token-zzzzzzzzz';
+      const seedHash = hashSessionToken(
+        seedToken,
+        Buffer.from(config.SESSION_SECRET),
+      );
+      const seeded = await prisma.session.create({
+        data: {
+          userId: user!.id,
+          tokenHash: seedHash,
+          userAgent: 'DEFormatBrowser/1.0',
+          ip: '10.0.0.99',
+          expiresAt: fixedExpires,
+        },
+      });
+
+      try {
+        const sessionCookie = await loginAndCookies(app, 'profile-de-format@test.invalid');
+        const res = await app.inject({
+          method: 'GET',
+          url: '/profile',
+          headers: {
+            accept: 'text/html',
+            cookie: `${sessionCookie}; mc_locale=de`,
+          },
+        });
+        expect(res.statusCode).toBe(200);
+        const body = res.body as string;
+        // DE numeric: dd.mm.yyyy (Intl.DateTimeFormat 'de' + dateStyle:'medium').
+        expect(body).toMatch(/15\.05\.2026/);
+        // EN long-month-name MUST NOT leak into DE-rendered cell.
+        expect(body).not.toMatch(/May 15, 2026/);
+        // Canonical ISO MUST remain in the <time datetime="..."> attribute.
+        expect(body).toMatch(/<time[^>]+datetime="2026-05-15T10:00:00\.000Z"/);
+      } finally {
+        // Cleanup — seeded session would otherwise pollute later runs.
+        await prisma.session.delete({ where: { id: seeded.id } }).catch(() => undefined);
+      }
     } finally {
       await app.close();
     }
