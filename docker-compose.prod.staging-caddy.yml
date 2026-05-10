@@ -1,0 +1,20 @@
+# Plan 9 Task 2 Rev. 2.1 WC-prod-15: Staging-Caddy overlay.
+# Use during first-deploy-iterations to avoid burning Let's Encrypt
+# production rate-limit (50 certs/domain/week).
+#
+# Usage:
+#   docker compose --env-file .env.production \
+#     -f docker-compose.yml \
+#     -f docker-compose.prod.yml \
+#     -f docker-compose.prod.staging-caddy.yml \
+#     up -d
+#
+# Switch to production-cutover by removing this overlay-file from the
+# command (Caddy then mounts the production Caddyfile via docker-compose.prod.yml).
+
+services:
+  caddy:
+    volumes:
+      - ./caddy/Caddyfile.staging:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config

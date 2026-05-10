@@ -197,5 +197,8 @@ volumes:
 networks:
   mediacompressor-internal:
     driver: bridge
-    # internal: true wird in Plan 9 ergänzt, sobald die Worker-/API-Egress-Trennung
-    # final konfiguriert ist. In Foundation muss migrate noch online installieren.
+    # Plan 9 Tag-Annotation (production-compose-caddy-v0.1.0): egress-trennung
+    # via `internal: true` is DEFERRED to Plan 10+. Worker has implicit egress
+    # for ffmpeg-binary-deps (currently bundled, but Plan 10+ may add OS-level
+    # codec-installs). API has implicit egress for ACME-fallback (handled by
+    # Caddy in production, but dev-flow keeps egress-open).
