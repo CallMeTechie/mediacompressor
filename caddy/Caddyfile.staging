@@ -1,0 +1,60 @@
+# Plan 9 Task 1 Rev. 2.1: Staging Caddyfile -- Let's Encrypt STAGING-CA.
+# Use during first-deploy validation to avoid burning production
+# rate-limit (50 certs/domain/week). Mount via docker-compose-override:
+#   docker compose --env-file .env.production \
+#     -f docker-compose.yml -f docker-compose.prod.yml \
+#     -f docker-compose.prod.staging-caddy.yml \
+#     up -d caddy
+# Browser-warnings during staging-mode are EXPECTED. Switch to
+# caddy/Caddyfile (production) once DNS + reachability verified.
+#
+# HSTS max-age=0: staging-cert is untrusted; HSTS-pinning would break
+# browsers when switching back to production. Hard-set to 0.
+{
+	email {$ACME_EMAIL}
+	# auto_https is on by default in Caddy v2 (literal `auto_https on` not accepted).
+	acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+{$DOMAIN} {
+	log {
+		output stdout
+		format console
+	}
+
+	# Same rules as production -- only acme_ca differs and HSTS is disabled.
+	header {
+		Strict-Transport-Security "max-age=0"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	@static path /static/*
+	header @static Cache-Control "public, max-age=3600"
+
+	@sse path_regexp ^/jobs/[a-f0-9-]+/events$
+	reverse_proxy @sse api:3000 {
+		flush_interval -1
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+
+	@tus path /uploads/*
+	reverse_proxy @tus tusd:1080 {
+		header_up X-Tusd-Shared-Secret {$TUSD_SHARED_SECRET}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+		transport http {
+			versions 1.1
+		}
+	}
+
+	reverse_proxy api:3000 {
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+
+	encode gzip zstd
+}

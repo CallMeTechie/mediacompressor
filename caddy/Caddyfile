@@ -1,0 +1,60 @@
+# Plan 9 Task 1 Rev. 2.1: Production Caddyfile (Let's Encrypt PRODUCTION).
+# - Auto-TLS via Let's Encrypt (DOMAIN env var)
+# - HTTP->HTTPS redirect (Caddy default)
+# - HSTS preload-eligible, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy
+# - Security: NO HTML-content-rewriting (preserves CSP + i18n-bridge meta-attr roundtrip)
+# - tusd-passthrough mit X-Tusd-Shared-Secret-injection
+# - Static-asset-cache nur fuer /static/* (max-age=3600 fuer now; CDN-fingerprinting Plan 10+)
+# - SSE-flush path-scoped fuer /jobs/:id/events (Plan 8b htmx-ext-sse)
+# - Authed-routes: KEIN Caddy-cache (no-store ueber origin-Headers respected)
+{
+	email {$ACME_EMAIL}
+	# auto_https is on by default in Caddy v2 (the literal `auto_https on`
+	# directive is not accepted -- only `off`/`disable_redirects`/etc.).
+	# acme_ca implicitly defaults to https://acme-v02.api.letsencrypt.org/directory
+}
+
+{$DOMAIN} {
+	log {
+		output stdout
+		format console
+	}
+
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(), camera=(), microphone=(), interest-cohort=()"
+		-Server
+	}
+
+	@static path /static/*
+	header @static {
+		Cache-Control "public, max-age=3600"
+	}
+
+	@sse path_regexp ^/jobs/[a-f0-9-]+/events$
+	reverse_proxy @sse api:3000 {
+		flush_interval -1
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+
+	@tus path /uploads/*
+	reverse_proxy @tus tusd:1080 {
+		header_up X-Tusd-Shared-Secret {$TUSD_SHARED_SECRET}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+		transport http {
+			versions 1.1
+		}
+	}
+
+	reverse_proxy api:3000 {
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+
+	encode gzip zstd
+}
