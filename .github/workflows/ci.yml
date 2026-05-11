@@ -33,20 +33,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system dependencies (ffmpeg, libvips, libheif + build deps for sharp HEIC)
+      - name: Install system dependencies (ffmpeg only; sharp uses prebuilt binary in CI)
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends \
-            ffmpeg \
-            libvips42 libvips-dev \
-            libheif1 libheif-dev \
-            build-essential python3
-          sudo apt-get install -y --no-install-recommends \
-            libheif-plugin-libde265 libheif-plugin-x265 libheif-plugin-aomenc \
-            || echo "warning: libheif plugins not available on ubuntu"
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffmpeg -version | head -n 1
 
-      - name: Configure sharp build-from-source
-        run: echo "SHARP_FORCE_GLOBAL_LIBVIPS=true" >> $GITHUB_ENV
+      # Plan 11 Task 5: System-libvips on Ubuntu runner is older than sharp 0.33.5
+      # requires (needs 8.15.3+). To unblock CI, force sharp to use its bundled
+      # prebuilt binary. The .npmrc sets SHARP_FORCE_GLOBAL_LIBVIPS=true for
+      # local/Docker builds; we strip that line in CI so sharp uses prebuild.
+      # HEIC-HEVC will soft-skip in docker-build-smoke (Task 4 Finding 2) —
+      # pre-existing workspace concern.
+      - name: Strip SHARP_FORCE_GLOBAL_LIBVIPS from .npmrc for CI prebuild path
+        run: |
+          sed -i '/SHARP_FORCE_GLOBAL_LIBVIPS/d' .npmrc
+          echo "SHARP_IGNORE_GLOBAL_LIBVIPS=1" >> $GITHUB_ENV
+          echo "--- .npmrc after strip ---"
+          cat .npmrc
 
       - uses: actions/setup-node@v4
         with:
@@ -123,16 +127,14 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v4
-      - name: Install system dependencies
+      - name: Install system dependencies (ffmpeg only)
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends \
-            ffmpeg libvips42 libvips-dev libheif1 libheif-dev \
-            build-essential python3
-          sudo apt-get install -y --no-install-recommends \
-            libheif-plugin-libde265 libheif-plugin-x265 libheif-plugin-aomenc \
-            || echo "warning: libheif plugins not available"
-      - run: echo "SHARP_FORCE_GLOBAL_LIBVIPS=true" >> $GITHUB_ENV
+          sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Strip SHARP_FORCE_GLOBAL_LIBVIPS from .npmrc + use prebuilt sharp
+        run: |
+          sed -i '/SHARP_FORCE_GLOBAL_LIBVIPS/d' .npmrc
+          echo "SHARP_IGNORE_GLOBAL_LIBVIPS=1" >> $GITHUB_ENV
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
