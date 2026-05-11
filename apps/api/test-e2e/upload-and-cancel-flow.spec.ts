@@ -23,6 +23,13 @@ test.afterAll(async () => {
 });
 
 test('user uploads a file, lands on /jobs/:id, sees status, cancels it', async ({ page }) => {
+  // Requires a running worker (BullMQ + ffmpeg/sharp) plus tusd to accept
+  // chunked uploads. GH-Runner CI provides only postgres + redis as services.
+  // Enable on full docker-compose runs by exporting WORKER_ENABLED=1.
+  test.skip(
+    process.env.WORKER_ENABLED !== '1',
+    'Upload/cancel flow requires a running worker + tusd (WORKER_ENABLED=1).',
+  );
   // 1. Login.
   await page.goto('/login');
   await page.fill('input[name="email"]', TEST_EMAIL);

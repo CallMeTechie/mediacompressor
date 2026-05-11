@@ -196,6 +196,14 @@ jobs:
         env:
           BASE_URL: http://localhost:3000
           DATABASE_URL: postgresql://mediacompressor:ci@localhost:5432/mediacompressor?schema=public
+          # Specs use testRedisUrl() which reads REDIS_URL or defaults to redis://redis:6379
+          # (the docker-compose hostname). CI postgres+redis run on localhost services.
+          REDIS_URL: redis://localhost:6379
+          # invite-redeem-flow.spec.ts hashes invite tokens with SESSION_SECRET; must
+          # match the value the api was booted with in the prior step.
+          SESSION_SECRET: ${{ secrets.CI_SESSION_SECRET }}
+          API_KEY_PEPPER: ${{ secrets.CI_API_KEY_PEPPER }}
+          CSRF_SECRET: ${{ secrets.CI_CSRF_SECRET }}
 
       - name: Upload Playwright report on failure
         if: failure()

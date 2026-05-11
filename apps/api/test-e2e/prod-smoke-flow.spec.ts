@@ -44,6 +44,15 @@ test.afterAll(async () => {
 });
 
 test.describe('Plan 9 production-stack smoke', () => {
+  // The whole suite requires the full docker-compose.prod.yml stack (Caddy +
+  // tusd + worker + api) plus TLS termination at https://localhost. GH-Runner
+  // CI has no such stack. Enable by exporting `PROD_SMOKE_ENABLED=1` and
+  // pointing `PROD_BASE_URL` at a real prod/staging URL.
+  test.skip(
+    process.env.PROD_SMOKE_ENABLED !== '1',
+    'Plan 9 production-stack smoke requires PROD_SMOKE_ENABLED=1 (full Caddy+TLS+tusd+worker stack).',
+  );
+
   test('GET /api/v1/health via Caddy returns ok', async ({ request }) => {
     const res = await request.get(`${PROD_BASE_URL}/api/v1/health`, {
       ignoreHTTPSErrors: true,
