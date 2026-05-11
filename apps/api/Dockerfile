@@ -14,7 +14,7 @@ COPY apps/api ./apps/api
 RUN corepack enable && corepack prepare pnpm@9 --activate \
  && pnpm install --frozen-lockfile \
  && pnpm --filter @mediacompressor/db prisma:generate \
- && pnpm --filter @mediacompressor/api build
+ && pnpm --filter '@mediacompressor/api...' build
 
 # Stage 2: runtime — slim image with the EXISTING node_modules from builder
 # (no --prod re-install, no risk of rebuild surprises). The extra dev-deps

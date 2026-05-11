@@ -28,7 +28,7 @@ COPY apps/worker ./apps/worker
 RUN corepack enable && corepack prepare pnpm@9 --activate \
  && pnpm install --frozen-lockfile \
  && pnpm --filter @mediacompressor/db prisma:generate \
- && pnpm --filter @mediacompressor/worker build
+ && pnpm --filter '@mediacompressor/worker...' build
 
 # Stage 2: runtime — runtime libs only (NO -dev, NO build-essential, NO python3).
 # WC-cicd-17: node_modules wird DIREKT vom builder kopiert — KEIN --prod

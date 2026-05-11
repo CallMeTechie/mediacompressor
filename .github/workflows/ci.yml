@@ -161,7 +161,7 @@ jobs:
       # Plan 11 Task 4 Finding 1: healthz path is /api/v1/health (not /healthz).
       - name: Start API in background
         run: |
-          pnpm --filter @mediacompressor/api build
+          pnpm --filter '@mediacompressor/api...' build
           (cd apps/api && node dist/index.js > /tmp/api.log 2>&1 &)
           echo "Waiting for /api/v1/health..."
           for i in $(seq 1 30); do
