@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@mediacompressor/shared": "workspace:*",
-    "file-type": "~19.6.0"
+    "file-type": "~21.3.2"
   },
   "devDependencies": {
     "@types/node": "~22.7.0"
