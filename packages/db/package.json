@@ -17,7 +17,8 @@
     "test": "vitest run",
     "prisma:generate": "prisma generate --schema=./prisma/schema.prisma",
     "prisma:migrate:dev": "prisma migrate dev --schema=./prisma/schema.prisma",
-    "prisma:migrate:deploy": "prisma migrate deploy --schema=./prisma/schema.prisma"
+    "prisma:migrate:deploy": "prisma migrate deploy --schema=./prisma/schema.prisma",
+    "prisma:migrate:reset": "prisma migrate reset --force --skip-seed --schema=./prisma/schema.prisma"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0"
