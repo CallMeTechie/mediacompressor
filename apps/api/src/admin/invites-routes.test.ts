@@ -61,18 +61,9 @@ async function loginAndGetCreds(
 }
 
 // Per-describe scoped emails for parallel-test isolation.
-const TEST_EMAILS_POST = [
-  'inv-post-admin@test.invalid',
-  'inv-post-user@test.invalid',
-];
-const TEST_EMAILS_GET = [
-  'inv-get-admin@test.invalid',
-  'inv-get-consumer@test.invalid',
-];
-const TEST_EMAILS_DELETE = [
-  'inv-del-admin@test.invalid',
-  'inv-del-consumer@test.invalid',
-];
+const TEST_EMAILS_POST = ['inv-post-admin@test.invalid', 'inv-post-user@test.invalid'];
+const TEST_EMAILS_GET = ['inv-get-admin@test.invalid', 'inv-get-consumer@test.invalid'];
+const TEST_EMAILS_DELETE = ['inv-del-admin@test.invalid', 'inv-del-consumer@test.invalid'];
 const TEST_EMAILS_CSRF = ['inv-csrf-admin@test.invalid'];
 
 describe('admin invites routes — POST /api/v1/admin/invites', () => {
@@ -149,9 +140,7 @@ describe('admin invites routes — POST /api/v1/admin/invites', () => {
       select: { token: true },
     });
     expect(stored).not.toBeNull();
-    expect(stored!.token).toBe(
-      hashInviteToken(body.token, Buffer.from(config.SESSION_SECRET)),
-    );
+    expect(stored!.token).toBe(hashInviteToken(body.token, Buffer.from(config.SESSION_SECRET)));
     await app.close();
   });
 

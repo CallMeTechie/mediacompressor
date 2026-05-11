@@ -1,10 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { createPrismaClient } from '@mediacompressor/db';
-import {
-  createTestUser,
-  cleanupTestUsers,
-  testDatabaseUrl,
-} from '@mediacompressor/test-helpers';
+import { createTestUser, cleanupTestUsers, testDatabaseUrl } from '@mediacompressor/test-helpers';
 
 /**
  * Plan 8d Task 7: end-to-end happy-path for the admin panel + locale-switch.
@@ -91,21 +87,14 @@ test('admin happy-path: dashboard → edit user → invite create+reveal+revoke 
   await page.goto('/login');
   await page.fill('input[name="email"]', ADMIN_EMAIL);
   await page.fill('input[name="password"]', PASSWORD);
-  await Promise.all([
-    page.waitForURL('**/'),
-    page.click('button[type="submit"]'),
-  ]);
+  await Promise.all([page.waitForURL('**/'), page.click('button[type="submit"]')]);
 
   // 2. /admin dashboard. h1 = page_title_dashboard ("Admin" in EN/DE).
   await page.goto('/admin');
   await expect(page.locator('h1')).toContainText(/Admin/);
   // Locale-switcher exposes both buttons.
-  await expect(
-    page.locator('form[action="/locale"] button[value="en"]'),
-  ).toBeVisible();
-  await expect(
-    page.locator('form[action="/locale"] button[value="de"]'),
-  ).toBeVisible();
+  await expect(page.locator('form[action="/locale"] button[value="en"]')).toBeVisible();
+  await expect(page.locator('form[action="/locale"] button[value="de"]')).toBeVisible();
   // Nav-links point to /admin/{users,invites,stats}.
   await expect(page.locator('a[href="/admin/users"]')).toBeVisible();
   await expect(page.locator('a[href="/admin/invites"]')).toBeVisible();
@@ -178,24 +167,17 @@ test('admin happy-path: dashboard → edit user → invite create+reveal+revoke 
   await expect(page.locator('section.stats-section')).toHaveCount(4);
 });
 
-test('locale-switch: clicking DE on /admin reloads with German strings', async ({
-  page,
-}) => {
+test('locale-switch: clicking DE on /admin reloads with German strings', async ({ page }) => {
   // Fresh login (each Playwright test gets a clean storageState).
   await page.goto('/login');
   await page.fill('input[name="email"]', ADMIN_EMAIL);
   await page.fill('input[name="password"]', PASSWORD);
-  await Promise.all([
-    page.waitForURL('**/'),
-    page.click('button[type="submit"]'),
-  ]);
+  await Promise.all([page.waitForURL('**/'), page.click('button[type="submit"]')]);
 
   await page.goto('/admin');
   // Pre-condition: default locale is `en` (no mc_locale cookie set), so the
   // dashboard nav-link to invites reads "Invites" (en/admin.json:nav_invites).
-  await expect(page.locator('a[href="/admin/invites"]')).toContainText(
-    'Invites',
-  );
+  await expect(page.locator('a[href="/admin/invites"]')).toContainText('Invites');
 
   // Click the DE button. The form does method=POST action=/locale with a
   // hidden _csrf + redirectTo=/admin and submits via name="locale" value="de".
@@ -206,9 +188,7 @@ test('locale-switch: clicking DE on /admin reloads with German strings', async (
 
   // After reload the nav-link to invites must read "Einladungen" (de.nav_invites).
   // This is THE canonical proof that detectLocale() picked up the new cookie.
-  await expect(page.locator('a[href="/admin/invites"]')).toContainText(
-    'Einladungen',
-  );
+  await expect(page.locator('a[href="/admin/invites"]')).toContainText('Einladungen');
   // Defense-in-depth: at least one other German string is present in the
   // page (page-title is "Admin" in both languages, so we don't gate on it).
   await expect(page.locator('body')).toContainText(/Sprache|Statistik/);

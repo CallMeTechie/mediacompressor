@@ -57,9 +57,7 @@ function encodeCursor(createdAt: Date, id: string): string {
   return Buffer.from(`${createdAt.getTime()}:${id}`, 'utf8').toString('base64url');
 }
 
-function decodeCursor(
-  value: string | undefined,
-): { createdAtMs: number; id: string } | null {
+function decodeCursor(value: string | undefined): { createdAtMs: number; id: string } | null {
   if (!value) return null;
   try {
     const decoded = Buffer.from(value, 'base64url').toString('utf8');

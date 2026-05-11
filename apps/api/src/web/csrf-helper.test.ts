@@ -49,11 +49,7 @@ describe('web/csrf-helper', () => {
   it('csrf-protection accepts a form post that echoes the token back via _csrf field', async () => {
     const app = await buildServer(config);
     // Test route requiring CSRF on a state-changing form-encoded body.
-    app.post(
-      '/__test_csrf_post',
-      { preHandler: app.csrfProtection },
-      async () => ({ ok: true }),
-    );
+    app.post('/__test_csrf_post', { preHandler: app.csrfProtection }, async () => ({ ok: true }));
     app.get('/__test_csrf_get', async (_req, reply) => {
       return reply.view('partials/csrf', { _csrfField: reply.renderCsrfField() });
     });

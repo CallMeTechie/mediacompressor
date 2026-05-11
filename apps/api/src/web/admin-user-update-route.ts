@@ -102,10 +102,7 @@ export const adminUserUpdateRoutePlugin: FastifyPluginAsync = async (app) => {
       // numeric strings. JSON has no BigInt literal anyway. Explicit type
       // (instead of Record<string, unknown>) keeps the status / parallel /
       // hourly union narrow downstream (logger + inject payload).
-      type PatchForJson = Omit<
-        z.infer<typeof UpdateForm>,
-        '_csrf' | 'storageQuota'
-      > & {
+      type PatchForJson = Omit<z.infer<typeof UpdateForm>, '_csrf' | 'storageQuota'> & {
         storageQuota?: string;
       };
       const patchForJson: PatchForJson = {
@@ -113,12 +110,8 @@ export const adminUserUpdateRoutePlugin: FastifyPluginAsync = async (app) => {
         ...(patch.storageQuota !== undefined
           ? { storageQuota: patch.storageQuota.toString() }
           : {}),
-        ...(patch.parallelQuota !== undefined
-          ? { parallelQuota: patch.parallelQuota }
-          : {}),
-        ...(patch.hourlyQuota !== undefined
-          ? { hourlyQuota: patch.hourlyQuota }
-          : {}),
+        ...(patch.parallelQuota !== undefined ? { parallelQuota: patch.parallelQuota } : {}),
+        ...(patch.hourlyQuota !== undefined ? { hourlyQuota: patch.hourlyQuota } : {}),
       };
 
       // Forward CSRF: header takes precedence over body (matches the global
@@ -168,10 +161,7 @@ export const adminUserUpdateRoutePlugin: FastifyPluginAsync = async (app) => {
           'admin action',
         );
         const successKey: AdminUserFlashKey = 'updated';
-        return reply
-          .code(303)
-          .header('location', `/admin/users?updateflash=${successKey}`)
-          .send();
+        return reply.code(303).header('location', `/admin/users?updateflash=${successKey}`).send();
       }
       if (inner.statusCode === 400) {
         // Concern #1: BFF UpdateForm and Plan-7 PatchBody bounds match today
@@ -180,9 +170,7 @@ export const adminUserUpdateRoutePlugin: FastifyPluginAsync = async (app) => {
         // a generic 500. Defensive parse: inner body might not be JSON.
         let innerErrorMessage: string | undefined;
         try {
-          const payload = inner.json() as
-            | { error?: { message?: unknown } }
-            | undefined;
+          const payload = inner.json() as { error?: { message?: unknown } } | undefined;
           if (typeof payload?.error?.message === 'string') {
             innerErrorMessage = payload.error.message;
           }
@@ -217,8 +205,7 @@ export const adminUserUpdateRoutePlugin: FastifyPluginAsync = async (app) => {
             // Re-render with submitted values so the admin doesn't lose typed
             // input. patchForJson holds the (already-validated-by-BFF) values.
             status: patchForJson.status ?? user.status,
-            storageQuota:
-              patchForJson.storageQuota ?? user.storageQuota.toString(),
+            storageQuota: patchForJson.storageQuota ?? user.storageQuota.toString(),
             parallelQuota: patchForJson.parallelQuota ?? user.parallelQuota,
             hourlyQuota: patchForJson.hourlyQuota ?? user.hourlyQuota,
           },

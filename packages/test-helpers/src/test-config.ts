@@ -14,8 +14,6 @@ export function testDatabaseUrl(): string {
 
 export function testRedisUrl(): string {
   return (
-    process.env.REDIS_URL ??
-    process.env.TEST_REDIS_URL ??
-    `redis://${DEFAULT_REDIS_HOST}:6379`
+    process.env.REDIS_URL ?? process.env.TEST_REDIS_URL ?? `redis://${DEFAULT_REDIS_HOST}:6379`
   );
 }

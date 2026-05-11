@@ -83,10 +83,7 @@ export const tusdHooksDispatcher: FastifyPluginAsync = async (app) => {
     // content-type — pass both through unchanged.
     const ct = inner.headers['content-type'];
     reply.code(inner.statusCode);
-    reply.header(
-      'content-type',
-      typeof ct === 'string' ? ct : 'application/json; charset=utf-8',
-    );
+    reply.header('content-type', typeof ct === 'string' ? ct : 'application/json; charset=utf-8');
     reply.raw.end(inner.body ?? '');
     return reply;
   });

@@ -11,10 +11,7 @@
   document.body.addEventListener('htmx:beforeSwap', function (ev) {
     var xhr = ev.detail && ev.detail.xhr;
     if (!xhr || !xhr.responseURL) return;
-    if (
-      xhr.responseURL.endsWith('/login') ||
-      xhr.responseURL.indexOf('/login?') !== -1
-    ) {
+    if (xhr.responseURL.endsWith('/login') || xhr.responseURL.indexOf('/login?') !== -1) {
       window.location.href = '/login';
       ev.detail.shouldSwap = false;
     }

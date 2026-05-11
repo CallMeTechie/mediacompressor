@@ -237,7 +237,10 @@ describe('web/login-page', () => {
       expect(csrfBefore).toBeTruthy();
       // Extract the CSRF token from the rendered form for the POST.
       const formToken = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-      const cookieHeader = getCookies.map((c) => c?.split(';')[0]).filter(Boolean).join('; ');
+      const cookieHeader = getCookies
+        .map((c) => c?.split(';')[0])
+        .filter(Boolean)
+        .join('; ');
 
       // 2. POST /login (success) → response should carry a NEW mc_csrf cookie.
       const post = await app.inject({

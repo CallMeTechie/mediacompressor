@@ -1,10 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPrismaClient, type PrismaClient } from '@mediacompressor/db';
-import {
-  cleanupTestUsers,
-  createTestUser,
-  testDatabaseUrl,
-} from '@mediacompressor/test-helpers';
+import { cleanupTestUsers, createTestUser, testDatabaseUrl } from '@mediacompressor/test-helpers';
 import { recordAuditEvent } from './audit-event.js';
 
 const ACTOR_EMAIL = 'audit-event-test-actor@test.invalid';
@@ -38,9 +34,7 @@ describe('audit-event/recordAuditEvent', () => {
       targetId,
       payload: { note: 'hello' },
     });
-    expect(result.id).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-    );
+    expect(result.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     expect(result.createdAt).toBeInstanceOf(Date);
 
     const stored = await prisma.auditEvent.findUnique({ where: { id: result.id } });
@@ -80,14 +74,7 @@ describe('audit-event/recordAuditEvent', () => {
     ).rejects.toThrow();
   });
 
-  for (const key of [
-    'token',
-    'password',
-    'passwordHash',
-    'secret',
-    'apiKey',
-    'sessionToken',
-  ]) {
+  for (const key of ['token', 'password', 'passwordHash', 'secret', 'apiKey', 'sessionToken']) {
     it(`FORBIDDEN_PAYLOAD_KEYS: rejects payload-key "${key}"`, async () => {
       await expect(
         recordAuditEvent(prisma, {
@@ -288,9 +275,7 @@ describe('audit-event/recordAuditEvent', () => {
     const exports = await import('./index.js');
     const exportNames = Object.keys(exports);
     // recordAuditEvent is the ONLY mutation-API; everything else is types/constants/validators.
-    const mutating = exportNames.filter((n) =>
-      /update|delete|drop|truncate|modify|patch/i.test(n),
-    );
+    const mutating = exportNames.filter((n) => /update|delete|drop|truncate|modify|patch/i.test(n));
     expect(mutating).toEqual([]);
     expect(exportNames).toContain('recordAuditEvent');
   });

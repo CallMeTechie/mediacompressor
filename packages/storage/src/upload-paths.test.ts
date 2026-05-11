@@ -31,6 +31,10 @@ describe('upload-paths', () => {
 
   it('UC13: rejects UUIDs with dashes at wrong positions', () => {
     // 36 chars, dashes vorhanden, aber nicht 8-4-4-4-12-Layout
-    expect(parseUploadPath('uploads/aaaaaaaa-aaaaaa-aaaa-aaaa-aaaaaaaaaaaa/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/source.bin')).toBeNull();
+    expect(
+      parseUploadPath(
+        'uploads/aaaaaaaa-aaaaaa-aaaa-aaaa-aaaaaaaaaaaa/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/source.bin',
+      ),
+    ).toBeNull();
   });
 });

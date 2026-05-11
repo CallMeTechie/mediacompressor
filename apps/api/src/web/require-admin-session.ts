@@ -22,10 +22,7 @@ declare module 'fastify' {
      * Used as a Fastify preHandler:
      *   app.get('/admin', { preHandler: app.requireAdminSession }, ...)
      */
-    requireAdminSession(
-      req: FastifyRequest,
-      reply: FastifyReply,
-    ): Promise<string | undefined>;
+    requireAdminSession(req: FastifyRequest, reply: FastifyReply): Promise<string | undefined>;
   }
 }
 
@@ -35,11 +32,7 @@ const requireAdminSessionImpl = async (app: FastifyInstance) => {
     async (req: FastifyRequest, reply: FastifyReply): Promise<string | undefined> => {
       const userId = await app.requireSession(req, reply);
       if (!userId) return undefined; // requireSession already 303'd + cleared cookie.
-      if (
-        !req.auth ||
-        req.auth.role !== 'admin' ||
-        req.auth.status !== 'active'
-      ) {
+      if (!req.auth || req.auth.role !== 'admin' || req.auth.status !== 'active') {
         reply.code(403).header('cache-control', 'no-store, max-age=0');
         // Plan 8e Task 2: title + message both routed through i18n
         // (`common.error_403_title`, `common.error_403_admin_body`). The

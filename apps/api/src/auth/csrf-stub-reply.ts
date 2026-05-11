@@ -38,9 +38,7 @@ export async function runCsrfHook(
     return {
       ok: false,
       reason: 'missing-hook',
-      err: new Error(
-        'csrfProtection hook missing — @fastify/csrf-protection not registered',
-      ),
+      err: new Error('csrfProtection hook missing — @fastify/csrf-protection not registered'),
     };
   }
   return new Promise<CsrfOutcome>((resolve) => {
@@ -51,10 +49,7 @@ export async function runCsrfHook(
             resolve({
               ok: false,
               reason: 'rejected',
-              err:
-                payload instanceof Error
-                  ? payload
-                  : new Error('CSRF protection rejected'),
+              err: payload instanceof Error ? payload : new Error('CSRF protection rejected'),
             });
             return stubReply;
           };

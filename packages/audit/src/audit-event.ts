@@ -77,11 +77,7 @@ type JsonValue = Prisma.InputJsonValue | null;
  *
  * Cycle-detection via `seen` set; depth-limit via `depth` counter.
  */
-function coerceValue(
-  value: unknown,
-  depth: number,
-  seen: Set<unknown>,
-): JsonValue {
+function coerceValue(value: unknown, depth: number, seen: Set<unknown>): JsonValue {
   if (depth > MAX_NESTING_DEPTH) {
     throw new Error(`audit payload exceeds max nesting depth (${MAX_NESTING_DEPTH})`);
   }

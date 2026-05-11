@@ -117,11 +117,7 @@ export const preCreateHook: FastifyPluginAsync = async (app) => {
       // 5. C5-Rev3: global disk-free check. Prevents over-commit when the
       // sum of user quotas exceeds physical disk capacity.
       try {
-        checkGlobalDiskFree(
-          config.MEDIA_MOUNT_PATH,
-          claimedSize,
-          config.MIN_FREE_BYTES_RESERVE,
-        );
+        checkGlobalDiskFree(config.MEDIA_MOUNT_PATH, claimedSize, config.MIN_FREE_BYTES_RESERVE);
       } catch (err) {
         if (err instanceof GlobalDiskLowError) {
           return reply.code(503).send({

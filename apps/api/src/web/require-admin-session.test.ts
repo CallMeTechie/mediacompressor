@@ -97,9 +97,11 @@ describe('web/require-admin-session', () => {
   ): Promise<string> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -112,9 +114,11 @@ describe('web/require-admin-session', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf)}`,
     });
-    return (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    return (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -127,11 +131,7 @@ describe('web/require-admin-session', () => {
    */
   async function appWithProbe(probePath = '/__test_admin') {
     const app = await buildServer(config);
-    app.get(
-      probePath,
-      { preHandler: app.requireAdminSession },
-      async () => ({ ok: true }),
-    );
+    app.get(probePath, { preHandler: app.requireAdminSession }, async () => ({ ok: true }));
     return app;
   }
 
@@ -223,9 +223,7 @@ describe('web/require-admin-session', () => {
         const setCookie = res.headers['set-cookie'];
         const cookies = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
         expect(
-          cookies.some(
-            (c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c),
-          ),
+          cookies.some((c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c)),
         ).toBe(true);
         // Crucial: this must NOT be a 403 — requireSession clears the cookie
         // BEFORE requireAdminSession's role-check runs.
@@ -271,21 +269,18 @@ describe('web/require-admin-session', () => {
     // about which admin-routes exist.
     const app = await buildServer(config);
     try {
-      app.get(
-        '/__test_admin_root',
-        { preHandler: app.requireAdminSession },
-        async () => ({ ok: true, route: 'root' }),
-      );
-      app.get(
-        '/__test_admin_users',
-        { preHandler: app.requireAdminSession },
-        async () => ({ ok: true, route: 'users' }),
-      );
-      app.get(
-        '/__test_admin_nonexistent',
-        { preHandler: app.requireAdminSession },
-        async () => ({ ok: true, route: 'nonexistent' }),
-      );
+      app.get('/__test_admin_root', { preHandler: app.requireAdminSession }, async () => ({
+        ok: true,
+        route: 'root',
+      }));
+      app.get('/__test_admin_users', { preHandler: app.requireAdminSession }, async () => ({
+        ok: true,
+        route: 'users',
+      }));
+      app.get('/__test_admin_nonexistent', { preHandler: app.requireAdminSession }, async () => ({
+        ok: true,
+        route: 'nonexistent',
+      }));
 
       const cookie = await loginAndCookies(app, TEST_EMAIL_USER);
 
@@ -312,10 +307,7 @@ describe('web/require-admin-session', () => {
       // would assert on a random byte-string instead of on the
       // admin-existence-leak property the comment above describes.
       const stripCsrf = (body: string): string =>
-        body.replace(
-          /name="_csrf" value="[^"]*"/g,
-          'name="_csrf" value="<NORMALIZED>"',
-        );
+        body.replace(/name="_csrf" value="[^"]*"/g, 'name="_csrf" value="<NORMALIZED>"');
       const [r0, r1, r2] = responses;
       expect(stripCsrf(r1!.body)).toBe(stripCsrf(r0!.body));
       expect(stripCsrf(r2!.body)).toBe(stripCsrf(r0!.body));
@@ -323,7 +315,9 @@ describe('web/require-admin-session', () => {
       // Same Cache-Control header on all three.
       expect(r1!.headers['cache-control']).toBe(r0!.headers['cache-control']);
       expect(r2!.headers['cache-control']).toBe(r0!.headers['cache-control']);
-      expect(typeof r0!.headers['cache-control'] === 'string' ? r0!.headers['cache-control'] : '').toMatch(/no-store/);
+      expect(
+        typeof r0!.headers['cache-control'] === 'string' ? r0!.headers['cache-control'] : '',
+      ).toMatch(/no-store/);
 
       // Same content-type on all three.
       expect(r1!.headers['content-type']).toBe(r0!.headers['content-type']);

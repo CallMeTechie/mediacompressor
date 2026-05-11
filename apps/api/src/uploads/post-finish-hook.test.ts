@@ -40,7 +40,7 @@ function makeConfig(): Config {
     CSRF_SECRET: TEST_CSRF_SECRET,
     API_KEY_PEPPER: TEST_API_KEY_PEPPER,
     TUSD_SHARED_SECRET: SHARED_SECRET,
-  TUSD_REQUIRE_SHARED_SECRET: true,
+    TUSD_REQUIRE_SHARED_SECRET: true,
     TUSD_DATA_DIR: tusdDataDir,
     TUSD_FINAL_DIR: tusdFinalDir,
     MEDIA_MOUNT_PATH: '/tmp',
@@ -68,9 +68,7 @@ function tusdHookBody(opts: {
       Upload: {
         ID: opts.uploadId,
         Size: opts.size,
-        Storage: opts.storagePath
-          ? { Type: 'filestore', Path: opts.storagePath }
-          : undefined,
+        Storage: opts.storagePath ? { Type: 'filestore', Path: opts.storagePath } : undefined,
         MetaData: opts.metadata ?? {},
       },
     },
@@ -127,7 +125,6 @@ describe('post-finish-hook — POST /api/v1/internal/uploads/hooks/post-finish',
         hourlyQuota: 1000,
       },
     });
-
   });
 
   beforeEach(async () => {
@@ -135,9 +132,9 @@ describe('post-finish-hook — POST /api/v1/internal/uploads/hooks/post-finish',
     // points at one of those Job-rows. We DO NOT obliterate the whole queue:
     // sibling test files (jobs-routes.test.ts) run in parallel and use the
     // same `compression` queue; obliterate would race-delete their jobs.
-    const oldJobIds = (
-      await prisma.job.findMany({ where: { userId }, select: { id: true } })
-    ).map((j) => j.id);
+    const oldJobIds = (await prisma.job.findMany({ where: { userId }, select: { id: true } })).map(
+      (j) => j.id,
+    );
     await prisma.job.deleteMany({ where: { userId } });
     const q = new Queue('compression', { connection: redis });
     try {

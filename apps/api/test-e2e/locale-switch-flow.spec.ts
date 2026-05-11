@@ -52,18 +52,13 @@ test('full DE locale traversal: dashboard → jobs → upload → profile → ap
   await page.goto('/login');
   await page.fill('input[name="email"]', TEST_EMAIL);
   await page.fill('input[name="password"]', PASSWORD);
-  await Promise.all([
-    page.waitForURL('**/'),
-    page.click('button[type="submit"]'),
-  ]);
+  await Promise.all([page.waitForURL('**/'), page.click('button[type="submit"]')]);
 
   // 2. Set mc_locale=de cookie via context (skips the locale-switcher form so
   //    this spec stays orthogonal to admin-and-i18n-flow.spec.ts which
   //    exercises the form-based switch). Same allowlist-validated cookie name
   //    as detectLocale() reads.
-  await context.addCookies([
-    { name: 'mc_locale', value: 'de', domain: 'localhost', path: '/' },
-  ]);
+  await context.addCookies([{ name: 'mc_locale', value: 'de', domain: 'localhost', path: '/' }]);
 
   // 3. Dashboard in DE — `page_title` ('Übersicht') is the h1 from
   //    dashboard.hbs; the welcome_heading paragraph contains 'Willkommen
@@ -116,22 +111,14 @@ test('full DE locale traversal: dashboard → jobs → upload → profile → ap
   // is out of scope for Plan 8e Task 7.)
   await page.fill('input[name="name"]', 'e2e-de-key');
   await page.click('form.api-key-form button[type="submit"]');
-  await expect(page.locator('body')).toContainText(
-    /jetzt kopieren|jetzt speichern|nur einmal/i,
-  );
+  await expect(page.locator('body')).toContainText(/jetzt kopieren|jetzt speichern|nur einmal/i);
 });
 
-test('locale round-trip EN → DE → EN preserves form-state and CSRF', async ({
-  page,
-  context,
-}) => {
+test('locale round-trip EN → DE → EN preserves form-state and CSRF', async ({ page, context }) => {
   await page.goto('/login');
   await page.fill('input[name="email"]', TEST_EMAIL);
   await page.fill('input[name="password"]', PASSWORD);
-  await Promise.all([
-    page.waitForURL('**/'),
-    page.click('button[type="submit"]'),
-  ]);
+  await Promise.all([page.waitForURL('**/'), page.click('button[type="submit"]')]);
 
   // EN baseline — list_heading is 'Your jobs', so 'Jobs' is the canonical
   // EN fragment to match. This also asserts the cookie-less default goes to
@@ -140,9 +127,7 @@ test('locale round-trip EN → DE → EN preserves form-state and CSRF', async (
   await expect(page.locator('h1')).toContainText(/jobs/i);
 
   // Flip to DE via cookie + reload.
-  await context.addCookies([
-    { name: 'mc_locale', value: 'de', domain: 'localhost', path: '/' },
-  ]);
+  await context.addCookies([{ name: 'mc_locale', value: 'de', domain: 'localhost', path: '/' }]);
   await page.reload();
   await expect(page.locator('h1')).toContainText(/Aufgaben/);
 
@@ -150,9 +135,7 @@ test('locale round-trip EN → DE → EN preserves form-state and CSRF', async (
   // mirroring how the locale-switcher form re-sets the cookie. Asserts the
   // cookie change is the SOLE state that decides locale (no server-side
   // session-storage stickiness leaks across the round-trip).
-  await context.addCookies([
-    { name: 'mc_locale', value: 'en', domain: 'localhost', path: '/' },
-  ]);
+  await context.addCookies([{ name: 'mc_locale', value: 'en', domain: 'localhost', path: '/' }]);
   await page.reload();
   await expect(page.locator('h1')).toContainText(/jobs/i);
 });

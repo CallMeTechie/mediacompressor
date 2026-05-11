@@ -29,35 +29,31 @@ export const adminInvitesRoutes: FastifyPluginAsync = async (app) => {
 
   // POST /api/v1/admin/invites — create new invite. AP1: CSRF-required for
   // cookie-auth (state-changing).
-  app.post(
-    '/api/v1/admin/invites',
-    { schema: { body: PostBody } },
-    async (req, reply) => {
-      const adminId = await app.requireAdminCsrf(req, reply);
-      if (!adminId) return;
-      const { email, expiresInHours } = req.body as z.infer<typeof PostBody>;
+  app.post('/api/v1/admin/invites', { schema: { body: PostBody } }, async (req, reply) => {
+    const adminId = await app.requireAdminCsrf(req, reply);
+    if (!adminId) return;
+    const { email, expiresInHours } = req.body as z.infer<typeof PostBody>;
 
-      const token = generateInviteToken();
-      const tokenHash = hashInviteToken(token, invitePepper);
-      const expiresAt = new Date(Date.now() + expiresInHours * 3600_000);
+    const token = generateInviteToken();
+    const tokenHash = hashInviteToken(token, invitePepper);
+    const expiresAt = new Date(Date.now() + expiresInHours * 3600_000);
 
-      // exactOptionalPropertyTypes: only spread `email` when actually provided
-      // (the field is optional in the model and we want SQL NULL, not empty
-      // string, when omitted).
-      const invite = await prisma.invite.create({
-        data: {
-          token: tokenHash,
-          ...(email !== undefined ? { email } : {}),
-          createdById: adminId,
-          expiresAt,
-        },
-        select: { id: true, email: true, expiresAt: true },
-      });
-      // The Invite model has no `createdAt` column (verified in
-      // prisma/schema.prisma); ordering on GET uses `expiresAt` instead.
-      return reply.code(201).send({ ...invite, token });
-    },
-  );
+    // exactOptionalPropertyTypes: only spread `email` when actually provided
+    // (the field is optional in the model and we want SQL NULL, not empty
+    // string, when omitted).
+    const invite = await prisma.invite.create({
+      data: {
+        token: tokenHash,
+        ...(email !== undefined ? { email } : {}),
+        createdById: adminId,
+        expiresAt,
+      },
+      select: { id: true, email: true, expiresAt: true },
+    });
+    // The Invite model has no `createdAt` column (verified in
+    // prisma/schema.prisma); ordering on GET uses `expiresAt` instead.
+    return reply.code(201).send({ ...invite, token });
+  });
 
   // GET /api/v1/admin/invites — list active + consumed invites. The raw token
   // is NEVER exposed (only the hash exists in DB, and we don't select it).

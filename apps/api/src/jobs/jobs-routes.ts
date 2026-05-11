@@ -56,17 +56,13 @@ export const jobsRoutes: FastifyPluginAsync = async (app) => {
   // forcing callers to use the canonical tusd upload flow. Tests that need the
   // legacy stub set `ENABLE_LEGACY_JOB_STUB: true` in their config object.
   if (app.deps.config.ENABLE_LEGACY_JOB_STUB) {
-    app.log.warn(
-      'ENABLE_LEGACY_JOB_STUB=true — POST /jobs stub is active. Disable in production.',
-    );
+    app.log.warn('ENABLE_LEGACY_JOB_STUB=true — POST /jobs stub is active. Disable in production.');
     // C1-Rev1: state-changing → CSRF-Pflicht (Bearer-API-Key bypassed via skipCsrf).
     app.post('/api/v1/jobs', { schema: { body: PostJobBody } }, async (req, reply) => {
       const userId = await app.requireAuthCsrf(req, reply);
       if (!userId) return;
 
-      const { inputStorageKey, kind, profile, overrides } = req.body as z.infer<
-        typeof PostJobBody
-      >;
+      const { inputStorageKey, kind, profile, overrides } = req.body as z.infer<typeof PostJobBody>;
 
       // C3-Rev1 + UC13: Server-Side-Check — userUuid im Pfad muss mit auth.userId
       // übereinstimmen. parseUploadPath enforced strikte UUIDv4-Layout (Defense-in-Depth).

@@ -34,7 +34,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M  # was 256M — Rev. 2.1 Task-2-review #2: HTTP/3 + tus-chunk-proxy headroom
+          memory: 512M # was 256M — Rev. 2.1 Task-2-review #2: HTTP/3 + tus-chunk-proxy headroom
           cpus: '0.5'
     logging:
       driver: json-file
@@ -67,9 +67,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G   # ASSUMPTION: WORKER_CONCURRENCY=2 (default) + ≤1080p videos.
-                       # 4K HDR-tonemap (libx265 --preset slower) may exceed this.
-                       # Plan 10+/observability: monitor RSS, raise to 3G if OOM-kills observed.
+          memory:
+            2G # ASSUMPTION: WORKER_CONCURRENCY=2 (default) + ≤1080p videos.
+            # 4K HDR-tonemap (libx265 --preset slower) may exceed this.
+            # Plan 10+/observability: monitor RSS, raise to 3G if OOM-kills observed.
           cpus: '2.0'
     logging:
       driver: json-file
@@ -98,9 +99,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G   # MVP: postgres:16-alpine default tuning (shared_buffers=128MB).
-                       # Plan 10+: tune via `command: postgres -c shared_buffers=256MB ...`
-                       # if connection-saturation or query-perf observed under load.
+          memory:
+            1G # MVP: postgres:16-alpine default tuning (shared_buffers=128MB).
+            # Plan 10+: tune via `command: postgres -c shared_buffers=256MB ...`
+            # if connection-saturation or query-perf observed under load.
           cpus: '1.0'
     logging:
       driver: json-file

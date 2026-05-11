@@ -88,7 +88,7 @@ export const inviteRedeemPagePlugin: FastifyPluginAsync = async (app) => {
           _csrfField: reply.renderCsrfField(),
           email:
             typeof (req.body as Record<string, unknown> | undefined)?.email === 'string'
-              ? ((req.body as Record<string, string>).email)
+              ? (req.body as Record<string, string>).email
               : '',
         });
       }

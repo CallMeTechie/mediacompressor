@@ -138,9 +138,7 @@ describe('web/view-plugin', () => {
         url: '/__test_session_redirect_script',
       });
       expect(res.statusCode).toBe(200);
-      expect(res.body).toContain(
-        '<script src="/static/js/htmx-session-redirect.js"',
-      );
+      expect(res.body).toContain('<script src="/static/js/htmx-session-redirect.js"');
     } finally {
       await app.close();
     }
@@ -155,14 +153,7 @@ describe('web/view-plugin', () => {
   // assignment lives on a property reference (matches the runtime statement
   // `ev.detail.shouldSwap = false`), not in a tidy-able comment.
   it('C10-LI: htmx-session-redirect.js literal-API regex (htmx:beforeSwap + shouldSwap)', () => {
-    const scriptPath = join(
-      __dirname,
-      '..',
-      '..',
-      'public',
-      'js',
-      'htmx-session-redirect.js',
-    );
+    const scriptPath = join(__dirname, '..', '..', 'public', 'js', 'htmx-session-redirect.js');
     const src = readFileSync(scriptPath, 'utf-8');
     expect(src).toMatch(/addEventListener\(['"]htmx:beforeSwap['"]/);
     expect(src).toMatch(/\.shouldSwap\s*=\s*false/);

@@ -79,10 +79,7 @@ export const jobCancelRoutePlugin: FastifyPluginAsync = async (app) => {
       // detail page with a flash hint via cancelflash=csrf-stale so the user
       // gets a fresh form-token and can retry without losing the session.
       if (inner.statusCode === 403) {
-        return reply
-          .code(303)
-          .header('location', `/jobs/${id}?cancelflash=csrf-stale`)
-          .send();
+        return reply.code(303).header('location', `/jobs/${id}?cancelflash=csrf-stale`).send();
       }
       // 5xx — render the 500 page.
       return reply.code(inner.statusCode).view('500', { title: 'Cancel failed' });

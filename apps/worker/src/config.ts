@@ -9,9 +9,7 @@ const ConfigSchema = z.object({
   // Plan 6: cleanup-cron resolves storage keys against this absolute mount.
   MEDIA_MOUNT_PATH: z.string().default('/media'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  LOG_LEVEL: z
-    .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
-    .default('info'),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

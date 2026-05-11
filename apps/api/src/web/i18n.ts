@@ -583,11 +583,7 @@ export function registerJsonHelper(): void {
 export function registerI18nHelper(i18n: i18n): void {
   handlebars.registerHelper(
     't',
-    function (
-      this: { _locale?: SupportedLocale },
-      key: string,
-      opts: handlebars.HelperOptions,
-    ) {
+    function (this: { _locale?: SupportedLocale }, key: string, opts: handlebars.HelperOptions) {
       const root = (opts?.data?.root ?? {}) as { _locale?: SupportedLocale };
       const locale: SupportedLocale = root._locale ?? this._locale ?? DEFAULT_LOCALE;
       const interpol = opts?.hash ?? {};

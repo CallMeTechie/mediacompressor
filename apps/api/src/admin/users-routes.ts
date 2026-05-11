@@ -108,10 +108,7 @@ export const adminUsersRoutes: FastifyPluginAsync = async (app) => {
         // Distinguish 404 (Prisma P2025 = "Record to update not found") from
         // genuine 500-class errors. A bare catch-all would mask DB-connection
         // problems as 404s — sloppy and hides real issues.
-        if (
-          err instanceof Prisma.PrismaClientKnownRequestError &&
-          err.code === 'P2025'
-        ) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
           return reply.code(404).send({ error: { code: 'NOT_FOUND' } });
         }
         throw err;

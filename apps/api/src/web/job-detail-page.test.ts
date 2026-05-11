@@ -91,9 +91,11 @@ describe('web/job-detail-page', () => {
   ): Promise<string> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -106,9 +108,11 @@ describe('web/job-detail-page', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf)}`,
     });
-    return (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    return (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -389,9 +393,7 @@ describe('web/job-detail-page', () => {
         headers: { accept: 'text/html', cookie },
       });
       expect(res.statusCode).toBe(200);
-      expect(res.body).toContain(
-        'Your session token had to be refreshed. Please try again.',
-      );
+      expect(res.body).toContain('Your session token had to be refreshed. Please try again.');
     } finally {
       await app.close();
     }
@@ -420,9 +422,7 @@ describe('web/job-detail-page', () => {
       // Allowlist gate: arbitrary value must NEVER appear in the response.
       expect(res.body).not.toContain(arbitrary);
       // And no flash-error class for the unrecognised value.
-      expect(res.body).not.toContain(
-        'Your session token had to be refreshed. Please try again.',
-      );
+      expect(res.body).not.toContain('Your session token had to be refreshed. Please try again.');
     } finally {
       await app.close();
     }
@@ -455,9 +455,7 @@ describe('web/job-detail-page', () => {
       expect(res.statusCode).toBe(200);
       expect(res.body).toContain('data-sse-target');
       expect(res.body).toContain(`data-sse-url="/api/v1/jobs/${job.id}/events"`);
-      expect(res.body).toContain(
-        `data-fragment-url="/jobs/${job.id}?fragment=1"`,
-      );
+      expect(res.body).toContain(`data-fragment-url="/jobs/${job.id}?fragment=1"`);
       // C5-LI stable ID for Plan-8c co-existence.
       expect(res.body).toContain('id="job-detail-sse-target"');
     } finally {
@@ -577,9 +575,7 @@ describe('web/job-detail-page', () => {
         headers: { accept: 'text/html', cookie },
       });
       expect(res.statusCode).toBe(200);
-      expect(res.body).toContain(
-        '<script src="/static/vendor/htmx-ext-sse.min.js"',
-      );
+      expect(res.body).toContain('<script src="/static/vendor/htmx-ext-sse.min.js"');
     } finally {
       await app.close();
     }
@@ -604,9 +600,7 @@ describe('web/job-detail-page', () => {
         headers: { accept: 'text/html', cookie },
       });
       expect(res.statusCode).toBe(200);
-      expect(res.body).toContain(
-        '<script src="/static/js/job-detail-watchdog.js"',
-      );
+      expect(res.body).toContain('<script src="/static/js/job-detail-watchdog.js"');
     } finally {
       await app.close();
     }
@@ -624,15 +618,10 @@ describe('web/job-detail-page', () => {
   // (htmx-session-redirect.js), since Task 4 moved that logic OUT of the
   // watchdog.
   it('C3-LI: job-detail-watchdog.js binds htmx:sseMessage on [data-sse-target]', () => {
-    const watchdogPath = path.resolve(
-      __dirname,
-      '../../public/js/job-detail-watchdog.js',
-    );
+    const watchdogPath = path.resolve(__dirname, '../../public/js/job-detail-watchdog.js');
     const watchdogJs = fs.readFileSync(watchdogPath, 'utf8');
     expect(watchdogJs).toMatch(/addEventListener\(['"]htmx:sseMessage['"]/);
-    expect(watchdogJs).toMatch(
-      /querySelectorAll\(['"]\[data-sse-target\]['"]\)/,
-    );
+    expect(watchdogJs).toMatch(/querySelectorAll\(['"]\[data-sse-target\]['"]\)/);
   });
 
   // Plan 8f Task 3 review (Concern #1) PFLICHT — SafeString → i18next-
@@ -698,11 +687,9 @@ describe('web/job-detail-page', () => {
         // DE locale uses comma as decimal-separator.
         expect(resDe.body).toMatch(/1,43\s+MB/);
       } finally {
-        await prisma.job
-          .deleteMany({ where: { id: job.id } })
-          .catch((e: { code?: string }) => {
-            if (e?.code !== 'P2025') throw e;
-          });
+        await prisma.job.deleteMany({ where: { id: job.id } }).catch((e: { code?: string }) => {
+          if (e?.code !== 'P2025') throw e;
+        });
       }
     } finally {
       await app.close();

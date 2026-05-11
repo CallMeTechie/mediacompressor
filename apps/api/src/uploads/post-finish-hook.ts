@@ -106,15 +106,9 @@ export const postFinishHook: FastifyPluginAsync = async (app) => {
       // 4. Move file. Prefer tusd-provided Storage.Path; fall back to the
       // filestore-convention `${TUSD_DATA_DIR}/${uploadId}.bin`. tusd-data
       // and uploads are subdirs of the same media-mount, so rename is O(1).
-      const tusdSourcePath =
-        upload.Storage?.Path ?? join(config.TUSD_DATA_DIR, `${uploadId}.bin`);
+      const tusdSourcePath = upload.Storage?.Path ?? join(config.TUSD_DATA_DIR, `${uploadId}.bin`);
       const inputStorageKey = uploadSourcePath(job.userId, job.id);
-      const finalAbsPath = join(
-        config.TUSD_FINAL_DIR,
-        job.userId,
-        job.id,
-        'source.bin',
-      );
+      const finalAbsPath = join(config.TUSD_FINAL_DIR, job.userId, job.id, 'source.bin');
 
       try {
         await fsp.mkdir(dirname(finalAbsPath), { recursive: true });

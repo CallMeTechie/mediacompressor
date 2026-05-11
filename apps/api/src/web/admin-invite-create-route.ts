@@ -175,9 +175,7 @@ export const adminInviteCreateRoutePlugin: FastifyPluginAsync = async (app) => {
             },
             'inner-201 response shape mismatch — possible contract drift',
           );
-          return reply
-            .code(500)
-            .view('500', { title: 'Create invite failed' });
+          return reply.code(500).view('500', { title: 'Create invite failed' });
         }
         const body = inner201.data;
         // Plan 10 Task 3: dual-write -- persist to AuditEvent table THEN log.
@@ -224,10 +222,7 @@ export const adminInviteCreateRoutePlugin: FastifyPluginAsync = async (app) => {
         return reply.code(303).header('location', '/login').send();
       }
       if (inner.statusCode === 403) {
-        return reply
-          .code(303)
-          .header('location', '/admin/invites?updateflash=csrf-stale')
-          .send();
+        return reply.code(303).header('location', '/admin/invites?updateflash=csrf-stale').send();
       }
       if (inner.statusCode === 400) {
         // Defense-in-depth: re-render the list page with the inner's error
@@ -236,9 +231,7 @@ export const adminInviteCreateRoutePlugin: FastifyPluginAsync = async (app) => {
         // the inner error rather than a generic 500.
         let innerErrorMessage: string | undefined;
         try {
-          const innerBody = inner.json() as
-            | { error?: { message?: unknown } }
-            | undefined;
+          const innerBody = inner.json() as { error?: { message?: unknown } } | undefined;
           if (typeof innerBody?.error?.message === 'string') {
             innerErrorMessage = innerBody.error.message;
           }

@@ -79,9 +79,11 @@ describe('web/session-revoke-route', () => {
   ): Promise<{ cookieHeader: string; csrf: string }> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf1 = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -94,9 +96,11 @@ describe('web/session-revoke-route', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf1)}`,
     });
-    const sessCookieHeader = (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    const sessCookieHeader = (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -107,11 +111,12 @@ describe('web/session-revoke-route', () => {
       headers: { cookie: sessCookieHeader },
     });
     const csrf2 = ((get2.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const get2Cookies = (Array.isArray(get2.headers['set-cookie'])
-      ? get2.headers['set-cookie']
-      : get2.headers['set-cookie']
-      ? [get2.headers['set-cookie']]
-      : []
+    const get2Cookies = (
+      Array.isArray(get2.headers['set-cookie'])
+        ? get2.headers['set-cookie']
+        : get2.headers['set-cookie']
+          ? [get2.headers['set-cookie']]
+          : []
     )
       .map((c) => c?.split(';')[0])
       .filter(Boolean);
@@ -123,15 +128,8 @@ describe('web/session-revoke-route', () => {
    * Seed a session row owned by `userId` with a fresh tokenHash. Returns the
    * created session (id + tokenHash) so tests can assert deletion/preservation.
    */
-  async function seedSession(opts: {
-    userId: string;
-    tokenSeed: string;
-    userAgent?: string;
-  }) {
-    const tokenHash = hashSessionToken(
-      opts.tokenSeed,
-      Buffer.from(config.SESSION_SECRET),
-    );
+  async function seedSession(opts: { userId: string; tokenSeed: string; userAgent?: string }) {
+    const tokenHash = hashSessionToken(opts.tokenSeed, Buffer.from(config.SESSION_SECRET));
     return prisma.session.create({
       data: {
         userId: opts.userId,
@@ -206,10 +204,7 @@ describe('web/session-revoke-route', () => {
         tokenSeed: 'other-device-token-yyyyyyyyyyyy',
         userAgent: 'OtherBrowser/1.0',
       });
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        'session-revoke@test.invalid',
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, 'session-revoke@test.invalid');
       const res = await app.inject({
         method: 'POST',
         url: `/profile/sessions/${target.id}/revoke`,
@@ -287,10 +282,7 @@ describe('web/session-revoke-route', () => {
       );
       const cookieToken = cookieMap.mc_session;
       expect(cookieToken).toBeTruthy();
-      const currentTokenHash = hashSessionToken(
-        cookieToken!,
-        Buffer.from(config.SESSION_SECRET),
-      );
+      const currentTokenHash = hashSessionToken(cookieToken!, Buffer.from(config.SESSION_SECRET));
       const currentSession = await prisma.session.findUnique({
         where: { tokenHash: currentTokenHash },
       });

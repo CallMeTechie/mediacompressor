@@ -23,10 +23,7 @@ import {
  * via `unknown` avoids dragging the entire FastifyRequest surface area into
  * the test fixture.
  */
-function makeReq(opts: {
-  cookieLocale?: string;
-  acceptLanguage?: string;
-}): FastifyRequest {
+function makeReq(opts: { cookieLocale?: string; acceptLanguage?: string }): FastifyRequest {
   return {
     cookies: opts.cookieLocale ? { mc_locale: opts.cookieLocale } : {},
     headers: opts.acceptLanguage ? { 'accept-language': opts.acceptLanguage } : {},
@@ -128,9 +125,7 @@ describe('web/i18n', () => {
       // Plan 8e Task 7: defaultNS flipped to 'common', so admin-namespace
       // keys need explicit `ns='admin'` in the {{t}}-helper invocation —
       // mirrors the post-flip annotation pattern in admin-*.hbs templates.
-      const tmpl = handlebars.compile(
-        `{{#each items}}{{t 'nav_users' ns='admin'}}|{{/each}}`,
-      );
+      const tmpl = handlebars.compile(`{{#each items}}{{t 'nav_users' ns='admin'}}|{{/each}}`);
       const out = tmpl({ _locale: 'de' as SupportedLocale, items: [{}, {}] });
       // Two iterations, both must produce 'Benutzer' (de). Without the
       // @root-lookup, this would be 'Users|Users|' (en, the default).
@@ -139,9 +134,7 @@ describe('web/i18n', () => {
 
     it('C7-AD-PR: ifEq helper renders true-branch on equality, inverse on mismatch', () => {
       registerIfEqHelper();
-      const tmpl = handlebars.compile(
-        `{{#ifEq _locale 'en'}}EN{{else}}OTHER{{/ifEq}}`,
-      );
+      const tmpl = handlebars.compile(`{{#ifEq _locale 'en'}}EN{{else}}OTHER{{/ifEq}}`);
       expect(tmpl({ _locale: 'en' })).toBe('EN');
       expect(tmpl({ _locale: 'de' })).toBe('OTHER');
     });
@@ -194,12 +187,12 @@ describe('web/i18n', () => {
       // The DB-canonical value contains a dash; the helper normalizes to
       // `profile_web_optimized` (underscore) for the i18next lookup.
       // de.jobs.profile_web_optimized === "Web-optimiert".
-      expect(
-        tmpl({ _locale: 'de' as SupportedLocale, profile: 'web-optimized' }),
-      ).toBe('Web-optimiert');
-      expect(
-        tmpl({ _locale: 'en' as SupportedLocale, profile: 'web-optimized' }),
-      ).toBe('Web optimized');
+      expect(tmpl({ _locale: 'de' as SupportedLocale, profile: 'web-optimized' })).toBe(
+        'Web-optimiert',
+      );
+      expect(tmpl({ _locale: 'en' as SupportedLocale, profile: 'web-optimized' })).toBe(
+        'Web optimized',
+      );
     });
 
     it('PFLICHT WC-i18n-task5-C1 (helper): tProfile on unknown profile returns the normalized bare key', async () => {
@@ -209,9 +202,9 @@ describe('web/i18n', () => {
       const tmpl = handlebars.compile(`{{tProfile profile}}`);
       // Unknown profile-strings still get dash->underscore normalized in
       // the lookup; the resulting bare key is what i18next emits on miss.
-      expect(
-        tmpl({ _locale: 'de' as SupportedLocale, profile: 'zzz-unknown' }),
-      ).toBe('profile_zzz_unknown');
+      expect(tmpl({ _locale: 'de' as SupportedLocale, profile: 'zzz-unknown' })).toBe(
+        'profile_zzz_unknown',
+      );
     });
 
     it('Plan 8e Task 1 PFLICHT: unknown key falls back to the key itself (i18next default)', async () => {

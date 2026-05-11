@@ -5,11 +5,7 @@ import type { PrismaClient } from '@mediacompressor/db';
 export interface OrphanSweepDeps {
   prisma: PrismaClient;
   mediaMountPath: string;
-  log: (
-    level: 'info' | 'warn' | 'error',
-    msg: string,
-    ctx?: Record<string, unknown>,
-  ) => void;
+  log: (level: 'info' | 'warn' | 'error', msg: string, ctx?: Record<string, unknown>) => void;
 }
 
 export interface OrphanSweepResult {
@@ -32,9 +28,7 @@ const MTIME_GRACE_MS = 60 * 60_000; // DC5: dirs younger than 1h are NEVER delet
  * the DB says orphan — protects against race with active compress() writing
  * mid-job (e.g. DB-row temporarily missing or just renamed).
  */
-export async function sweepOrphans(
-  deps: OrphanSweepDeps,
-): Promise<OrphanSweepResult> {
+export async function sweepOrphans(deps: OrphanSweepDeps): Promise<OrphanSweepResult> {
   let scanned = 0;
   let deleted = 0;
   let kept = 0;

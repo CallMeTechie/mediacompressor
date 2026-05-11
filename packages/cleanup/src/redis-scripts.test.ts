@@ -34,39 +34,18 @@ describe('redis-scripts', () => {
 
   it('tryCleanupAcquire returns 0 when downloads-set non-empty', async () => {
     await redis.sadd('test:downloads:1', 'handler-x');
-    expect(
-      await redis.tryCleanupAcquire(
-        'test:lock:1',
-        'test:downloads:1',
-        'ownerA',
-        60,
-      ),
-    ).toBe(0);
+    expect(await redis.tryCleanupAcquire('test:lock:1', 'test:downloads:1', 'ownerA', 60)).toBe(0);
     expect(await redis.exists('test:lock:1')).toBe(0);
   });
 
   it('tryCleanupAcquire sets lock when downloads empty + lock free', async () => {
-    expect(
-      await redis.tryCleanupAcquire(
-        'test:lock:1',
-        'test:downloads:1',
-        'ownerA',
-        60,
-      ),
-    ).toBe(1);
+    expect(await redis.tryCleanupAcquire('test:lock:1', 'test:downloads:1', 'ownerA', 60)).toBe(1);
     expect(await redis.get('test:lock:1')).toBe('ownerA');
   });
 
   it('tryCleanupAcquire returns 0 when lock already held by other owner', async () => {
     await redis.set('test:lock:1', 'ownerA', 'EX', 60);
-    expect(
-      await redis.tryCleanupAcquire(
-        'test:lock:1',
-        'test:downloads:1',
-        'ownerB',
-        60,
-      ),
-    ).toBe(0);
+    expect(await redis.tryCleanupAcquire('test:lock:1', 'test:downloads:1', 'ownerB', 60)).toBe(0);
     expect(await redis.get('test:lock:1')).toBe('ownerA');
   });
 });

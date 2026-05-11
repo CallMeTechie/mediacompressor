@@ -7,7 +7,10 @@
   --color-muted: #7d8590;
   --space: 0.75rem;
   --radius: 0.375rem;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 body {
   background: var(--color-bg);
@@ -126,16 +129,40 @@ body {
 }
 
 /* Plan 8c additions — profile page (sessions table) */
-.profile-table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
-.profile-table th, .profile-table td { padding: 0.5rem 0.5rem; text-align: left; border-bottom: 1px solid #30363d; }
-.profile-table code { font-size: 0.85em; color: var(--color-muted); }
-.session-row.current { background: rgba(79, 142, 247, 0.08); }
-.profile-summary { margin-bottom: 1.5rem; }
+.profile-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+}
+.profile-table th,
+.profile-table td {
+  padding: 0.5rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid #30363d;
+}
+.profile-table code {
+  font-size: 0.85em;
+  color: var(--color-muted);
+}
+.session-row.current {
+  background: rgba(79, 142, 247, 0.08);
+}
+.profile-summary {
+  margin-bottom: 1.5rem;
+}
 
 /* Plan 8c Task 4 — API-key one-time-reveal page */
-.api-key-detail dt { font-weight: 600; margin-top: 0.5rem; }
-.api-key-detail dd { margin: 0 0 0.25rem 0; }
-.api-key-secret { user-select: all; word-break: break-all; }
+.api-key-detail dt {
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+.api-key-detail dd {
+  margin: 0 0 0.25rem 0;
+}
+.api-key-secret {
+  user-select: all;
+  word-break: break-all;
+}
 
 /* Plan 8e Task 2 — shared layout-nav (rendered from layouts/base.hbs).
    Brand link is always visible (even when unauthenticated); the rest of
@@ -168,4 +195,6 @@ body {
   cursor: pointer;
 }
 .site-nav .btn-link:hover,
-.site-nav a:hover { text-decoration: underline; }
+.site-nav a:hover {
+  text-decoration: underline;
+}

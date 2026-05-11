@@ -19,15 +19,7 @@ import type { Prisma } from '@mediacompressor/db';
 
 const ListQuery = z.object({
   status: z
-    .enum([
-      'queued',
-      'processing',
-      'succeeded',
-      'failed',
-      'canceled',
-      'expired',
-      'uploading',
-    ])
+    .enum(['queued', 'processing', 'succeeded', 'failed', 'canceled', 'expired', 'uploading'])
     .optional(),
   cursor: z.string().optional(),
   fragment: z.coerce.boolean().default(false),
@@ -93,8 +85,7 @@ export const jobListPagePlugin: FastifyPluginAsync = async (app) => {
       const hasMore = items.length > PAGE_SIZE;
       const slice = items.slice(0, PAGE_SIZE);
       const last = slice[slice.length - 1];
-      const nextCursor =
-        hasMore && last ? `${last.createdAt.toISOString()}|${last.id}` : null;
+      const nextCursor = hasMore && last ? `${last.createdAt.toISOString()}|${last.id}` : null;
 
       // Precompute statusOptions as `[{value, active}]` so the .hbs template
       // can use `{{#if active}}active{{/if}}` without relying on a custom

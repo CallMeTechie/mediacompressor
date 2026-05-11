@@ -1,10 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { createPrismaClient } from '@mediacompressor/db';
-import {
-  createTestUser,
-  cleanupTestUsers,
-  testDatabaseUrl,
-} from '@mediacompressor/test-helpers';
+import { createTestUser, cleanupTestUsers, testDatabaseUrl } from '@mediacompressor/test-helpers';
 
 // Plan 9 Task 6: end-to-end smoke for the production-stack (Caddy + api + tusd).
 //
@@ -76,9 +72,7 @@ test.describe('Plan 9 production-stack smoke', () => {
     });
     expect(res.headers()['x-content-type-options']).toBe('nosniff');
     expect(res.headers()['x-frame-options']).toBe('DENY');
-    expect(res.headers()['referrer-policy']).toBe(
-      'strict-origin-when-cross-origin',
-    );
+    expect(res.headers()['referrer-policy']).toBe('strict-origin-when-cross-origin');
     expect(res.headers()['permissions-policy']).toMatch(/geolocation=\(\)/);
   });
 
@@ -103,10 +97,9 @@ test.describe('Plan 9 production-stack smoke', () => {
   });
 
   test('static asset i18n-bridge.js loadable via Caddy', async ({ request }) => {
-    const res = await request.get(
-      `${PROD_BASE_URL}/static/js/i18n-bridge.js`,
-      { ignoreHTTPSErrors: true },
-    );
+    const res = await request.get(`${PROD_BASE_URL}/static/js/i18n-bridge.js`, {
+      ignoreHTTPSErrors: true,
+    });
     expect(res.status()).toBe(200);
     expect(res.headers()['content-type']).toMatch(/javascript/);
     expect(res.headers()['cache-control']).toMatch(/max-age=3600/);
@@ -134,9 +127,7 @@ test.describe('Plan 9 production-stack smoke', () => {
     } catch {
       apiReachable = false;
     }
-    expect(apiReachable, 'api:3000 must NOT be exposed on the docker-host').toBe(
-      false,
-    );
+    expect(apiReachable, 'api:3000 must NOT be exposed on the docker-host').toBe(false);
 
     let tusdReachable = true;
     try {
@@ -149,9 +140,7 @@ test.describe('Plan 9 production-stack smoke', () => {
     } catch {
       tusdReachable = false;
     }
-    expect(tusdReachable, 'tusd:1080 must NOT be exposed on the docker-host').toBe(
-      false,
-    );
+    expect(tusdReachable, 'tusd:1080 must NOT be exposed on the docker-host').toBe(false);
   });
 
   // PFLICHT WC-prod-10/16: SSE-stream renders real-time (no Caddy-buffering).

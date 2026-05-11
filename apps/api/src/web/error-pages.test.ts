@@ -144,7 +144,9 @@ describe('web/error-pages', () => {
         headers: { accept: 'text/html' },
       });
       expect(res.statusCode).toBe(404);
-      expect(res.body).toMatch(/<a[^>]*class="brand"[^>]*href="\/"|<a[^>]*href="\/"[^>]*class="brand"/);
+      expect(res.body).toMatch(
+        /<a[^>]*class="brand"[^>]*href="\/"|<a[^>]*href="\/"[^>]*class="brand"/,
+      );
       expect(res.body).toMatch(/MediaCompressor/);
       // Authenticated nav-chrome MUST NOT render — no logout-form, no
       // /jobs / /profile / /admin links — when there is no session cookie.

@@ -66,14 +66,8 @@ const TEST_EMAILS_LIST = [
   'au-list-u1@test.invalid',
   'au-list-u2@test.invalid',
 ];
-const TEST_EMAILS_PATCH = [
-  'au-patch-admin@test.invalid',
-  'au-patch-target@test.invalid',
-];
-const TEST_EMAILS_CSRF = [
-  'au-csrf-admin@test.invalid',
-  'au-csrf-target@test.invalid',
-];
+const TEST_EMAILS_PATCH = ['au-patch-admin@test.invalid', 'au-patch-target@test.invalid'];
+const TEST_EMAILS_CSRF = ['au-csrf-admin@test.invalid', 'au-csrf-target@test.invalid'];
 
 describe('admin users routes — GET /api/v1/admin/users', () => {
   let prisma: PrismaClient;

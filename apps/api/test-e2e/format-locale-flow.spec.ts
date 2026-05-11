@@ -92,15 +92,10 @@ test('DE locale: dates rendered in DE numeric format on /profile session-row', a
   await page.goto('/login');
   await page.fill('input[name="email"]', TEST_EMAIL);
   await page.fill('input[name="password"]', PASSWORD);
-  await Promise.all([
-    page.waitForURL('**/'),
-    page.click('form.login-form button[type="submit"]'),
-  ]);
+  await Promise.all([page.waitForURL('**/'), page.click('form.login-form button[type="submit"]')]);
 
   // Switch locale to DE via cookie (allowlist-validated by detectLocale).
-  await context.addCookies([
-    { name: 'mc_locale', value: 'de', domain: 'localhost', path: '/' },
-  ]);
+  await context.addCookies([{ name: 'mc_locale', value: 'de', domain: 'localhost', path: '/' }]);
 
   await page.goto('/profile');
   const html = await page.content();
@@ -119,34 +114,25 @@ test('DE locale: dates rendered in DE numeric format on /profile session-row', a
   );
 });
 
-test('EN locale: dates rendered in EN format on /profile session-row', async ({
-  page,
-}) => {
+test('EN locale: dates rendered in EN format on /profile session-row', async ({ page }) => {
   // Login — no locale cookie set, so detectLocale falls back to DEFAULT_LOCALE
   // ('en') per the Accept-Language → DEFAULT_LOCALE chain.
   await page.goto('/login');
   await page.fill('input[name="email"]', TEST_EMAIL);
   await page.fill('input[name="password"]', PASSWORD);
-  await Promise.all([
-    page.waitForURL('**/'),
-    page.click('form.login-form button[type="submit"]'),
-  ]);
+  await Promise.all([page.waitForURL('**/'), page.click('form.login-form button[type="submit"]')]);
 
   await page.goto('/profile');
   const html = await page.content();
 
   // PFLICHT WC-i18n-f18 (FINAL): table-rows use formatDate default-medium →
   // EN renders as `Mon D, YYYY` (e.g. `May 9, 2026`).
-  expect(html).toMatch(
-    /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4}/,
-  );
+  expect(html).toMatch(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4}/);
 
   // PFLICHT WC-i18n-f21 (denial-assertion): EN-locale must NOT contain DE
   // month-names. "Mai" / "März" / "Juni" etc. would only appear if the
   // helper-locale-resolution leaked the request-locale into Intl.format.
-  expect(html).not.toMatch(
-    /\b(Januar|Februar|März|Juni|Juli|August|Oktober|Dezember)\b/,
-  );
+  expect(html).not.toMatch(/\b(Januar|Februar|März|Juni|Juli|August|Oktober|Dezember)\b/);
 });
 
 test('window.MC.t is populated from <meta name="mc-i18n"> on /upload (DE strings)', async ({
@@ -156,25 +142,18 @@ test('window.MC.t is populated from <meta name="mc-i18n"> on /upload (DE strings
   await page.goto('/login');
   await page.fill('input[name="email"]', TEST_EMAIL);
   await page.fill('input[name="password"]', PASSWORD);
-  await Promise.all([
-    page.waitForURL('**/'),
-    page.click('form.login-form button[type="submit"]'),
-  ]);
+  await Promise.all([page.waitForURL('**/'), page.click('form.login-form button[type="submit"]')]);
 
   // DE-locale via cookie so the bridge-script resolves DE upload-failure
   // strings on the /upload render.
-  await context.addCookies([
-    { name: 'mc_locale', value: 'de', domain: 'localhost', path: '/' },
-  ]);
+  await context.addCookies([{ name: 'mc_locale', value: 'de', domain: 'localhost', path: '/' }]);
 
   await page.goto('/upload');
 
   // i18n-bridge.js is `defer`-loaded; wait until it has populated window.MC.t.
   // Plan 8f Task 4 spec: the bridge reads `<meta name="mc-i18n">`, JSON.parses
   // the content-attribute, and assigns window.MC.t = (key, vars) => resolved.
-  await page.waitForFunction(() =>
-    Boolean((window as { MC?: { t?: unknown } }).MC?.t),
-  );
+  await page.waitForFunction(() => Boolean((window as { MC?: { t?: unknown } }).MC?.t));
 
   const t = await page.evaluate(() => {
     const w = window as unknown as { MC: { t: (k: string) => string } };

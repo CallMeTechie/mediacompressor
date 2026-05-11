@@ -56,10 +56,7 @@ export const apiKeyRevokeRoutePlugin: FastifyPluginAsync = async (app) => {
       });
 
       if (inner.statusCode === 204 || inner.statusCode === 200) {
-        return reply
-          .code(303)
-          .header('location', '/profile/api-keys?revokeflash=revoked')
-          .send();
+        return reply.code(303).header('location', '/profile/api-keys?revokeflash=revoked').send();
       }
       // Multi-tab logout race: inner session truly expired/revoked.
       if (inner.statusCode === 401) {

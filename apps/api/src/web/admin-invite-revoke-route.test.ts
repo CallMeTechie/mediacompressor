@@ -124,9 +124,11 @@ describe('web/admin-invite-revoke-route', () => {
   ): Promise<{ cookieHeader: string; csrf: string }> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf1 = extractCsrfToken(get.body as string);
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -139,9 +141,11 @@ describe('web/admin-invite-revoke-route', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf1)}`,
     });
-    const sessCookieHeader = (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    const sessCookieHeader = (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -151,11 +155,12 @@ describe('web/admin-invite-revoke-route', () => {
       headers: { cookie: sessCookieHeader, accept: 'text/html' },
     });
     const csrf2 = extractCsrfToken(get2.body as string);
-    const get2Cookies = (Array.isArray(get2.headers['set-cookie'])
-      ? get2.headers['set-cookie']
-      : get2.headers['set-cookie']
-      ? [get2.headers['set-cookie']]
-      : []
+    const get2Cookies = (
+      Array.isArray(get2.headers['set-cookie'])
+        ? get2.headers['set-cookie']
+        : get2.headers['set-cookie']
+          ? [get2.headers['set-cookie']]
+          : []
     )
       .map((c) => c?.split(';')[0])
       .filter(Boolean);
@@ -170,9 +175,11 @@ describe('web/admin-invite-revoke-route', () => {
   ): Promise<string> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf = extractCsrfToken(get.body as string);
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -185,9 +192,11 @@ describe('web/admin-invite-revoke-route', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf)}`,
     });
-    return (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    return (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -273,10 +282,7 @@ describe('web/admin-invite-revoke-route', () => {
         },
       });
 
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        TEST_EMAIL_ADMIN_OK,
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, TEST_EMAIL_ADMIN_OK);
       const res = await app.inject({
         method: 'POST',
         url: `/admin/invites/${created.id}/revoke`,
@@ -304,10 +310,7 @@ describe('web/admin-invite-revoke-route', () => {
   it('POST nonexistent invite -> 404 page', async () => {
     const app = await buildServer(config);
     try {
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        TEST_EMAIL_ADMIN_404,
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, TEST_EMAIL_ADMIN_404);
       const fakeId = '11111111-1111-4111-8111-111111111111';
       const res = await app.inject({
         method: 'POST',
@@ -330,10 +333,7 @@ describe('web/admin-invite-revoke-route', () => {
   it('inner DELETE 403 -> 303 /admin/invites?updateflash=csrf-stale', async () => {
     const app = await buildServer(config);
     try {
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        TEST_EMAIL_ADMIN_403,
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, TEST_EMAIL_ADMIN_403);
 
       const originalInject = app.inject.bind(app);
       const fakeInject = ((opts: unknown) => {
@@ -377,9 +377,7 @@ describe('web/admin-invite-revoke-route', () => {
       const setCookie = res.headers['set-cookie'];
       const cookies = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
       expect(
-        cookies.some(
-          (c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c),
-        ),
+        cookies.some((c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c)),
       ).toBe(false);
 
       injectSpy.mockRestore();
@@ -410,10 +408,7 @@ describe('web/admin-invite-revoke-route', () => {
         },
       });
 
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        TEST_EMAIL_ADMIN_AUDIT,
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, TEST_EMAIL_ADMIN_AUDIT);
       const res = await app.inject({
         method: 'POST',
         url: `/admin/invites/${created.id}/revoke`,

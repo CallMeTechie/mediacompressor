@@ -78,9 +78,11 @@ describe('web/profile-page', () => {
   ): Promise<string> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -93,9 +95,11 @@ describe('web/profile-page', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf)}`,
     });
-    return (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    return (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -164,10 +168,7 @@ describe('web/profile-page', () => {
         where: { email: 'profile-multi@test.invalid' },
       });
       const otherToken = 'other-device-token-xxxxxxxxxxxxxx';
-      const otherTokenHash = hashSessionToken(
-        otherToken,
-        Buffer.from(config.SESSION_SECRET),
-      );
+      const otherTokenHash = hashSessionToken(otherToken, Buffer.from(config.SESSION_SECRET));
       await prisma.session.create({
         data: {
           userId: user!.id,
@@ -271,10 +272,7 @@ describe('web/profile-page', () => {
       // Seed an extra non-current session (not matching our cookie token)
       // so the loop renders at least one revoke-form row.
       const otherToken = 'csrf-regression-token-yyyyyyyyyy';
-      const otherTokenHash = hashSessionToken(
-        otherToken,
-        Buffer.from(config.SESSION_SECRET),
-      );
+      const otherTokenHash = hashSessionToken(otherToken, Buffer.from(config.SESSION_SECRET));
       const created = await prisma.session.create({
         data: {
           userId: user!.id,
@@ -305,9 +303,7 @@ describe('web/profile-page', () => {
       expect(formOpen).toBeGreaterThanOrEqual(0);
       expect(formClose).toBeGreaterThan(formOpen);
       const formBody = body.slice(formOpen, formClose);
-      const csrfMatch = formBody.match(
-        /<input[^>]*name="_csrf"[^>]*value="([^"]+)"/,
-      );
+      const csrfMatch = formBody.match(/<input[^>]*name="_csrf"[^>]*value="([^"]+)"/);
       expect(csrfMatch).not.toBeNull();
       expect(csrfMatch![1]!.length).toBeGreaterThanOrEqual(16);
 
@@ -425,10 +421,7 @@ describe('web/profile-page', () => {
       // hardcodes timeZone:'UTC' (WC-i18n-f1) so noon-UTC is TZ-stable.
       const fixedExpires = new Date('2026-05-15T10:00:00Z');
       const seedToken = 'profile-de-format-token-zzzzzzzzz';
-      const seedHash = hashSessionToken(
-        seedToken,
-        Buffer.from(config.SESSION_SECRET),
-      );
+      const seedHash = hashSessionToken(seedToken, Buffer.from(config.SESSION_SECRET));
       const seeded = await prisma.session.create({
         data: {
           userId: user!.id,

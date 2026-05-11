@@ -29,107 +29,98 @@ export const downloadRoute: FastifyPluginAsync = async (app) => {
   // twice is a no-op in ioredis.
   registerCleanupScripts(redis);
 
-  app.get(
-    '/api/v1/jobs/:id/download',
-    { schema: { params: ParamSchema } },
-    async (req, reply) => {
-      const userId = await app.requireAuth(req, reply);
-      if (!userId) return;
-      const { id: jobId } = req.params as z.infer<typeof ParamSchema>;
+  app.get('/api/v1/jobs/:id/download', { schema: { params: ParamSchema } }, async (req, reply) => {
+    const userId = await app.requireAuth(req, reply);
+    if (!userId) return;
+    const { id: jobId } = req.params as z.infer<typeof ParamSchema>;
 
-      const job = await prisma.job.findFirst({ where: { id: jobId, userId } });
-      if (!job) return reply.code(404).send({ error: { code: 'NOT_FOUND' } });
-      if (job.status !== 'succeeded' || !job.outputStorageKey) {
-        return reply.code(409).send({
-          error: { code: 'JOB_NOT_READY', message: `job is in status=${job.status}` },
-        });
-      }
-      if (job.expiresAt && job.expiresAt < new Date()) {
-        return reply.code(410).send({ error: { code: 'EXPIRED' } });
-      }
-
-      let abortRequested = false;
-      const handle = await startDownloadHandler(redis, jobId, () => {
-        abortRequested = true;
-        app.log.error({ jobId }, 'download.aborted_redis_unavailable');
+    const job = await prisma.job.findFirst({ where: { id: jobId, userId } });
+    if (!job) return reply.code(404).send({ error: { code: 'NOT_FOUND' } });
+    if (job.status !== 'succeeded' || !job.outputStorageKey) {
+      return reply.code(409).send({
+        error: { code: 'JOB_NOT_READY', message: `job is in status=${job.status}` },
       });
-      if (!handle) {
-        return reply
-          .code(410)
-          .send({ error: { code: 'EXPIRED', message: 'cleanup in progress' } });
-      }
+    }
+    if (job.expiresAt && job.expiresAt < new Date()) {
+      return reply.code(410).send({ error: { code: 'EXPIRED' } });
+    }
 
-      // DC4-Fix: handle.release() is wired into the stream lifecycle
-      // (end / error / close), not a sync `finally` — otherwise the handler
-      // would be released *before* bytes are flushed.
-      let released = false;
-      const ensureReleased = (): void => {
-        if (released) return;
-        released = true;
-        void handle.release().catch(() => {});
-      };
+    let abortRequested = false;
+    const handle = await startDownloadHandler(redis, jobId, () => {
+      abortRequested = true;
+      app.log.error({ jobId }, 'download.aborted_redis_unavailable');
+    });
+    if (!handle) {
+      return reply.code(410).send({ error: { code: 'EXPIRED', message: 'cleanup in progress' } });
+    }
 
-      let absPath: string;
-      try {
-        absPath = join(config.MEDIA_MOUNT_PATH, job.outputStorageKey);
-        const fileStat = await stat(absPath).catch(() => null);
-        if (!fileStat) {
-          ensureReleased();
-          return reply.code(410).send({ error: { code: 'EXPIRED', message: 'file gone' } });
-        }
-        // Defense-in-depth: even though outputMime/outputFormat are written by
-        // the worker from a hardcoded allowlist (packages/compression/src/types.ts),
-        // sanitize before injecting into HTTP headers to neutralize any future
-        // upstream regression that could enable header-injection. `attachment`
-        // disposition also prevents browsers from interpreting the body inline,
-        // which is the primary XSS mitigation for this route.
-        const safeFormat = (job.outputFormat ?? 'bin').replace(/[^a-zA-Z0-9]/g, '');
-        const safeMime = /^[\w./+-]+$/.test(job.outputMime ?? '')
-          ? job.outputMime!
-          : 'application/octet-stream';
-        reply.header('Content-Length', String(fileStat.size));
-        // nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write
-        // Not an XSS surface: Content-Disposition: attachment forces download.
-        // outputMime/outputFormat are allowlisted (packages/compression/types.ts)
-        // AND defense-in-depth-sanitized above. Body is a binary file stream.
-        reply.header('Content-Type', safeMime);
-        // nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write
-        reply.header(
-          'Content-Disposition',
-          `attachment; filename="output.${safeFormat || 'bin'}"`,
-        );
-        reply.header('X-Accel-Buffering', 'no');
-      } catch (err) {
+    // DC4-Fix: handle.release() is wired into the stream lifecycle
+    // (end / error / close), not a sync `finally` — otherwise the handler
+    // would be released *before* bytes are flushed.
+    let released = false;
+    const ensureReleased = (): void => {
+      if (released) return;
+      released = true;
+      void handle.release().catch(() => {});
+    };
+
+    let absPath: string;
+    try {
+      absPath = join(config.MEDIA_MOUNT_PATH, job.outputStorageKey);
+      const fileStat = await stat(absPath).catch(() => null);
+      if (!fileStat) {
         ensureReleased();
-        throw err;
+        return reply.code(410).send({ error: { code: 'EXPIRED', message: 'file gone' } });
       }
+      // Defense-in-depth: even though outputMime/outputFormat are written by
+      // the worker from a hardcoded allowlist (packages/compression/src/types.ts),
+      // sanitize before injecting into HTTP headers to neutralize any future
+      // upstream regression that could enable header-injection. `attachment`
+      // disposition also prevents browsers from interpreting the body inline,
+      // which is the primary XSS mitigation for this route.
+      const safeFormat = (job.outputFormat ?? 'bin').replace(/[^a-zA-Z0-9]/g, '');
+      const safeMime = /^[\w./+-]+$/.test(job.outputMime ?? '')
+        ? job.outputMime!
+        : 'application/octet-stream';
+      reply.header('Content-Length', String(fileStat.size));
+      // nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write
+      // Not an XSS surface: Content-Disposition: attachment forces download.
+      // outputMime/outputFormat are allowlisted (packages/compression/types.ts)
+      // AND defense-in-depth-sanitized above. Body is a binary file stream.
+      reply.header('Content-Type', safeMime);
+      // nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write
+      reply.header('Content-Disposition', `attachment; filename="output.${safeFormat || 'bin'}"`);
+      reply.header('X-Accel-Buffering', 'no');
+    } catch (err) {
+      ensureReleased();
+      throw err;
+    }
 
-      const stream = createReadStream(absPath);
-      const checkInterval = setInterval(() => {
-        if (abortRequested) {
-          clearInterval(checkInterval);
-          stream.destroy();
-          // Only safe if headers are NOT yet sent; otherwise this is a TCP
-          // reset (no graceful close). Race-acceptable per plan.
-          reply.raw.destroy();
-        }
-      }, 1000);
-      checkInterval.unref();
-
-      stream.on('end', () => {
+    const stream = createReadStream(absPath);
+    const checkInterval = setInterval(() => {
+      if (abortRequested) {
         clearInterval(checkInterval);
-        ensureReleased();
-      });
-      stream.on('error', () => {
-        clearInterval(checkInterval);
-        ensureReleased();
-      });
-      stream.on('close', () => {
-        clearInterval(checkInterval);
-        ensureReleased();
-      });
+        stream.destroy();
+        // Only safe if headers are NOT yet sent; otherwise this is a TCP
+        // reset (no graceful close). Race-acceptable per plan.
+        reply.raw.destroy();
+      }
+    }, 1000);
+    checkInterval.unref();
 
-      return reply.send(stream);
-    },
-  );
+    stream.on('end', () => {
+      clearInterval(checkInterval);
+      ensureReleased();
+    });
+    stream.on('error', () => {
+      clearInterval(checkInterval);
+      ensureReleased();
+    });
+    stream.on('close', () => {
+      clearInterval(checkInterval);
+      ensureReleased();
+    });
+
+    return reply.send(stream);
+  });
 };

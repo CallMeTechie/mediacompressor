@@ -2,9 +2,7 @@
 // Defense-in-Depth: parseUploadPath rejects non-UUID-Patterns wie
 // 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' oder dash-Positionen-Mismatch.
 const UUID_RE_SRC = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const UPLOAD_PATH_RE = new RegExp(
-  `^uploads\\/(${UUID_RE_SRC})\\/(${UUID_RE_SRC})\\/source\\.bin$`,
-);
+const UPLOAD_PATH_RE = new RegExp(`^uploads\\/(${UUID_RE_SRC})\\/(${UUID_RE_SRC})\\/source\\.bin$`);
 
 export function uploadSourcePath(userId: string, jobId: string): string {
   return `uploads/${userId}/${jobId}/source.bin`;

@@ -18,10 +18,7 @@ declare module 'fastify' {
      *   const userId = await app.requireSession(req, reply);
      *   if (!userId) return; // already 303'd
      */
-    requireSession(
-      req: FastifyRequest,
-      reply: FastifyReply,
-    ): Promise<string | undefined>;
+    requireSession(req: FastifyRequest, reply: FastifyReply): Promise<string | undefined>;
   }
 }
 
@@ -44,11 +41,7 @@ const requireSessionImpl = async (app: FastifyInstance) => {
           user: { select: { id: true, role: true, status: true } },
         },
       });
-      if (
-        !session ||
-        session.expiresAt < new Date() ||
-        session.user.status !== 'active'
-      ) {
+      if (!session || session.expiresAt < new Date() || session.user.status !== 'active') {
         reply.clearCookie('mc_session', { path: '/' });
         reply.code(303).header('location', '/login').send();
         return undefined;

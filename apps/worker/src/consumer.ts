@@ -113,14 +113,15 @@ export async function processJob(deps: ProcessJobDeps, data: CompressJobData): P
         // den DB-Pool. Snapshot-on-Reconnect liefert dann mind. den letzten
         // 5-%-Schwellenwert.
         const now = Date.now();
-        if (p - lastDbProgress >= PROGRESS_DB_DELTA_PCT || now - lastDbAt >= PROGRESS_DB_INTERVAL_MS) {
+        if (
+          p - lastDbProgress >= PROGRESS_DB_DELTA_PCT ||
+          now - lastDbAt >= PROGRESS_DB_INTERVAL_MS
+        ) {
           lastDbProgress = p;
           lastDbAt = now;
-          void prisma.job
-            .update({ where: { id: jobId }, data: { progress: p } })
-            .catch(() => {
-              // Best-effort persistence — progress UI must never block compression.
-            });
+          void prisma.job.update({ where: { id: jobId }, data: { progress: p } }).catch(() => {
+            // Best-effort persistence — progress UI must never block compression.
+          });
         }
       },
     });

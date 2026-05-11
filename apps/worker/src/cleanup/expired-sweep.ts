@@ -8,11 +8,7 @@ export interface ExpiredSweepDeps {
   prisma: PrismaClient;
   redis: Redis;
   mediaMountPath: string;
-  log: (
-    level: 'info' | 'warn' | 'error',
-    msg: string,
-    ctx?: Record<string, unknown>,
-  ) => void;
+  log: (level: 'info' | 'warn' | 'error', msg: string, ctx?: Record<string, unknown>) => void;
 }
 
 export interface SweepResult {
@@ -37,9 +33,7 @@ const BATCH_SIZE = 100;
  * UC1: also catches `uploading` jobs whose `uploadExpiresAt` is past — orphan
  * recovery for tusd crashes between pre-create and post-finish hooks.
  */
-export async function sweepExpiredJobs(
-  deps: ExpiredSweepDeps,
-): Promise<SweepResult> {
+export async function sweepExpiredJobs(deps: ExpiredSweepDeps): Promise<SweepResult> {
   const expired = await deps.prisma.job.findMany({
     where: {
       OR: [
@@ -63,16 +57,12 @@ export async function sweepExpiredJobs(
   for (const job of expired) {
     try {
       let aborted = false;
-      const lockResult = await tryAcquireCleanupLock(
-        deps.redis,
-        job.id,
-        () => {
-          aborted = true;
-          deps.log('error', 'cleanup.aborted_redis_unavailable', {
-            jobId: job.id,
-          });
-        },
-      );
+      const lockResult = await tryAcquireCleanupLock(deps.redis, job.id, () => {
+        aborted = true;
+        deps.log('error', 'cleanup.aborted_redis_unavailable', {
+          jobId: job.id,
+        });
+      });
 
       if (!lockResult.acquired) {
         skipped++;

@@ -86,9 +86,11 @@ describe('web/admin-users-list-page', () => {
   ): Promise<string> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -101,9 +103,11 @@ describe('web/admin-users-list-page', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf)}`,
     });
-    return (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    return (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -202,7 +206,7 @@ describe('web/admin-users-list-page', () => {
   // 5. WC-AD4 PFLICHT -- XSS via email field. Citext allows a single quote.
   // Handlebars's escapeExpression turns it into &#x27; (Handlebars 4.x); the
   // raw apostrophe must NOT appear in the rendered HTML for this user.
-  it("WC-AD4 PFLICHT: email containing apostrophe is HTML-escaped (no stored-XSS)", async () => {
+  it('WC-AD4 PFLICHT: email containing apostrophe is HTML-escaped (no stored-XSS)', async () => {
     const app = await buildServer(config);
     try {
       const cookie = await loginAndCookies(app, TEST_EMAIL_ADMIN);
@@ -214,9 +218,7 @@ describe('web/admin-users-list-page', () => {
       expect(res.statusCode).toBe(200);
       const body = res.body as string;
       // The escaped form MUST appear (Handlebars's default escape).
-      expect(body).toMatch(
-        /o&#x27;brien-xss@test\.invalid|o&#39;brien-xss@test\.invalid/,
-      );
+      expect(body).toMatch(/o&#x27;brien-xss@test\.invalid|o&#39;brien-xss@test\.invalid/);
       // The literal raw apostrophe-form MUST NOT appear -- proves
       // auto-escape ran on this field.
       expect(body).not.toContain("o'brien-xss@test.invalid");

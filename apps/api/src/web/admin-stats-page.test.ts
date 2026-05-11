@@ -164,9 +164,11 @@ describe('web/admin-stats-page', () => {
   ): Promise<string> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf = extractCsrfToken(get.body as string);
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -179,9 +181,11 @@ describe('web/admin-stats-page', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf)}`,
     });
-    return (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    return (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -656,14 +660,8 @@ describe('web/admin-stats-page', () => {
     expect(enumValues.length).toBeGreaterThan(0);
     for (const status of enumValues) {
       const key = `stats_jobs_${status}`;
-      expect(
-        enKeys.get(key),
-        `EN locale missing key ${key} for JobStatus enum value`,
-      ).toBeTruthy();
-      expect(
-        deKeys.get(key),
-        `DE locale missing key ${key} for JobStatus enum value`,
-      ).toBeTruthy();
+      expect(enKeys.get(key), `EN locale missing key ${key} for JobStatus enum value`).toBeTruthy();
+      expect(deKeys.get(key), `DE locale missing key ${key} for JobStatus enum value`).toBeTruthy();
     }
   });
 });

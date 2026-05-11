@@ -28,8 +28,7 @@ const UPLOAD_WIZARD_JS = path.join(__dirname, '..', '..', 'public', 'js', 'uploa
 
 describe('PFLICHT WC-i18n-f17: renderUploadFailure (TypeScript canonical)', () => {
   beforeEach(() => {
-    document.body.innerHTML =
-      '<form id="upload-form"></form><div id="upload-progress"></div>';
+    document.body.innerHTML = '<form id="upload-form"></form><div id="upload-progress"></div>';
   });
 
   it('renders DE flash-banner using injected t-function', () => {
@@ -68,12 +67,7 @@ describe('PFLICHT WC-i18n-f17: renderUploadFailure (TypeScript canonical)', () =
     // shaped error, the rendered banner must NOT inject a runnable <script>.
     const progressBox = document.getElementById('upload-progress') as HTMLElement;
     const form = document.getElementById('upload-form') as HTMLElement;
-    renderUploadFailure(
-      progressBox,
-      form,
-      { message: '<script>alert(1)</script>' },
-      null,
-    );
+    renderUploadFailure(progressBox, form, { message: '<script>alert(1)</script>' }, null);
     const flash = progressBox.querySelector('.flash-error') as HTMLElement;
     expect(flash).toBeTruthy();
     // The literal `<script>` text is the textContent value — the browser

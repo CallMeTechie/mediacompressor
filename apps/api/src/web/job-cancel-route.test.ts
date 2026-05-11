@@ -87,9 +87,11 @@ describe('web/job-cancel-route', () => {
   ): Promise<{ cookieHeader: string; csrf: string }> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf1 = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -102,9 +104,11 @@ describe('web/job-cancel-route', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf1)}`,
     });
-    const sessCookieHeader = (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    const sessCookieHeader = (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -115,11 +119,12 @@ describe('web/job-cancel-route', () => {
       headers: { cookie: sessCookieHeader },
     });
     const csrf2 = ((get2.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const get2Cookies = (Array.isArray(get2.headers['set-cookie'])
-      ? get2.headers['set-cookie']
-      : get2.headers['set-cookie']
-      ? [get2.headers['set-cookie']]
-      : []
+    const get2Cookies = (
+      Array.isArray(get2.headers['set-cookie'])
+        ? get2.headers['set-cookie']
+        : get2.headers['set-cookie']
+          ? [get2.headers['set-cookie']]
+          : []
     )
       .map((c) => c?.split(';')[0])
       .filter(Boolean);
@@ -127,11 +132,7 @@ describe('web/job-cancel-route', () => {
     return { cookieHeader: merged, csrf: csrf2 };
   }
 
-  async function seedJob(opts: {
-    userId: string;
-    inputFilename: string;
-    status?: SeedStatus;
-  }) {
+  async function seedJob(opts: { userId: string; inputFilename: string; status?: SeedStatus }) {
     return prisma.job.create({
       data: {
         userId: opts.userId,
@@ -199,10 +200,7 @@ describe('web/job-cancel-route', () => {
         inputFilename: 'queued-cancel.png',
         status: 'queued',
       });
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        'job-cancel@test.invalid',
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, 'job-cancel@test.invalid');
       const res = await app.inject({
         method: 'POST',
         url: `/jobs/${job.id}/cancel`,
@@ -305,10 +303,7 @@ describe('web/job-cancel-route', () => {
         inputFilename: 'body-csrf.png',
         status: 'queued',
       });
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        'job-cancel-body@test.invalid',
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, 'job-cancel-body@test.invalid');
       const res = await app.inject({
         method: 'POST',
         url: `/jobs/${job.id}/cancel`,
@@ -398,9 +393,7 @@ describe('web/job-cancel-route', () => {
       const setCookie = res.headers['set-cookie'];
       const cookies = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
       expect(
-        cookies.some(
-          (c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c),
-        ),
+        cookies.some((c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c)),
       ).toBe(true);
 
       injectSpy.mockRestore();
@@ -469,9 +462,7 @@ describe('web/job-cancel-route', () => {
       const setCookie = res.headers['set-cookie'];
       const cookies = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
       expect(
-        cookies.some(
-          (c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c),
-        ),
+        cookies.some((c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c)),
       ).toBe(false);
 
       injectSpy.mockRestore();

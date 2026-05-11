@@ -45,4 +45,3 @@ export const errorPagesPlugin = fp(errorPagesPluginImpl, {
   name: 'error-pages-plugin',
   fastify: '5.x',
 });
-

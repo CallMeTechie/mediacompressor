@@ -30,9 +30,7 @@ describe('checkGlobalDiskFree (C5-Rev3)', () => {
       ffree: 0n,
     } as unknown as StatFsBigInt;
 
-    expect(() =>
-      checkGlobalDiskFree('/var/data', 1_000_000_000n, 5_000_000_000n),
-    ).not.toThrow();
+    expect(() => checkGlobalDiskFree('/var/data', 1_000_000_000n, 5_000_000_000n)).not.toThrow();
   });
 
   it('throws GlobalDiskLowError when free - claimed < reserve', () => {
@@ -48,8 +46,8 @@ describe('checkGlobalDiskFree (C5-Rev3)', () => {
       ffree: 0n,
     } as unknown as StatFsBigInt;
 
-    expect(() =>
-      checkGlobalDiskFree('/var/data', 2_000_000_000n, 5_000_000_000n),
-    ).toThrow(GlobalDiskLowError);
+    expect(() => checkGlobalDiskFree('/var/data', 2_000_000_000n, 5_000_000_000n)).toThrow(
+      GlobalDiskLowError,
+    );
   });
 });

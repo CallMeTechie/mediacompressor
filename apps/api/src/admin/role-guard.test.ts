@@ -1,9 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import IORedis from 'ioredis';
-import {
-  createPrismaClient,
-  type PrismaClient,
-} from '@mediacompressor/db';
+import { createPrismaClient, type PrismaClient } from '@mediacompressor/db';
 import {
   generateApiKey,
   generateSessionToken,
@@ -71,9 +68,7 @@ async function loginAndGetCreds(
   return { session, csrfCookie, csrfToken };
 }
 
-function registerAdminProbe(
-  app: Awaited<ReturnType<typeof buildServer>>,
-): void {
+function registerAdminProbe(app: Awaited<ReturnType<typeof buildServer>>): void {
   app.register(async (instance) => {
     instance.get('/__test__/admin-only', async (req, reply) => {
       const id = await instance.requireAdmin(req, reply);
@@ -83,9 +78,7 @@ function registerAdminProbe(
   });
 }
 
-function registerAdminCsrfProbe(
-  app: Awaited<ReturnType<typeof buildServer>>,
-): void {
+function registerAdminCsrfProbe(app: Awaited<ReturnType<typeof buildServer>>): void {
   app.register(async (instance) => {
     instance.post('/__test__/admin-state-change', async (req, reply) => {
       const id = await instance.requireAdminCsrf(req, reply);

@@ -55,9 +55,7 @@ type ProfileFlashMessageKey = `flash_${string}`;
 const CREATE_FLASH_MAP = new Map<
   string,
   { level: 'error' | 'info'; messageKey: ProfileFlashMessageKey }
->([
-  ['csrf-stale', { level: 'error', messageKey: 'flash_csrf_stale' }],
-]);
+>([['csrf-stale', { level: 'error', messageKey: 'flash_csrf_stale' }]]);
 
 export const apiKeyCreateRoutePlugin: FastifyPluginAsync = async (app) => {
   app.get(
@@ -66,9 +64,7 @@ export const apiKeyCreateRoutePlugin: FastifyPluginAsync = async (app) => {
     async (req, reply) => {
       reply.header('cache-control', 'no-store, max-age=0');
       const { createflash } = req.query as z.infer<typeof CreateQuery>;
-      const flashEntry = createflash
-        ? (CREATE_FLASH_MAP.get(createflash) ?? null)
-        : null;
+      const flashEntry = createflash ? (CREATE_FLASH_MAP.get(createflash) ?? null) : null;
       // Plan 8e Task 6: resolve flash messageKey via req.t at render-time.
       const flash = flashEntry
         ? {

@@ -99,9 +99,11 @@ describe('web/api-key-create-route', () => {
   ): Promise<{ cookieHeader: string; csrf: string }> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf1 = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -114,9 +116,11 @@ describe('web/api-key-create-route', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf1)}`,
     });
-    const sessCookieHeader = (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    const sessCookieHeader = (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -127,11 +131,12 @@ describe('web/api-key-create-route', () => {
       headers: { cookie: sessCookieHeader },
     });
     const csrf2 = ((get2.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const get2Cookies = (Array.isArray(get2.headers['set-cookie'])
-      ? get2.headers['set-cookie']
-      : get2.headers['set-cookie']
-      ? [get2.headers['set-cookie']]
-      : []
+    const get2Cookies = (
+      Array.isArray(get2.headers['set-cookie'])
+        ? get2.headers['set-cookie']
+        : get2.headers['set-cookie']
+          ? [get2.headers['set-cookie']]
+          : []
     )
       .map((c) => c?.split(';')[0])
       .filter(Boolean);
@@ -177,10 +182,7 @@ describe('web/api-key-create-route', () => {
   it('POST /profile/api-keys (valid) → 200 with api-key-created page containing the FULL key', async () => {
     const app = await buildServer(config);
     try {
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        'apikey-create@test.invalid',
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, 'apikey-create@test.invalid');
       const res = await app.inject({
         method: 'POST',
         url: '/profile/api-keys',
@@ -194,9 +196,7 @@ describe('web/api-key-create-route', () => {
       expect(res.statusCode).toBe(200);
       expect(res.body).toMatch(/API key created/);
       // Raw key rendered.
-      const match = (res.body as string).match(
-        /<code class="api-key-secret">([^<]+)<\/code>/,
-      );
+      const match = (res.body as string).match(/<code class="api-key-secret">([^<]+)<\/code>/);
       expect(match).not.toBeNull();
       expect(match![1]!.length).toBeGreaterThanOrEqual(30);
     } finally {
@@ -224,9 +224,7 @@ describe('web/api-key-create-route', () => {
         payload: `name=wcpr3-key&_csrf=${encodeURIComponent(csrf)}`,
       });
       expect(post.statusCode).toBe(200);
-      const match = (post.body as string).match(
-        /<code class="api-key-secret">([^<]+)<\/code>/,
-      );
+      const match = (post.body as string).match(/<code class="api-key-secret">([^<]+)<\/code>/);
       expect(match).not.toBeNull();
       const rawKey = match![1]!;
       // Plan-4 format: mc_<prefix-8>_<random-32>. Suffix is the random tail.
@@ -370,9 +368,7 @@ describe('web/api-key-create-route', () => {
       const setCookie = res.headers['set-cookie'];
       const cookies = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
       expect(
-        cookies.some(
-          (c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c),
-        ),
+        cookies.some((c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c)),
       ).toBe(false);
 
       injectSpy.mockRestore();
@@ -431,9 +427,7 @@ describe('web/api-key-create-route', () => {
       const setCookie = res.headers['set-cookie'];
       const cookies = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
       expect(
-        cookies.some(
-          (c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c),
-        ),
+        cookies.some((c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c)),
       ).toBe(true);
 
       injectSpy.mockRestore();
@@ -446,10 +440,7 @@ describe('web/api-key-create-route', () => {
   it('C1-PR: POST success → response cache-control matches /no-store/', async () => {
     const app = await buildServer(config);
     try {
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        'apikey-create@test.invalid',
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, 'apikey-create@test.invalid');
       const res = await app.inject({
         method: 'POST',
         url: '/profile/api-keys',
@@ -474,15 +465,13 @@ describe('web/api-key-create-route', () => {
   it('C2-PR: raw API key never appears in stdout (LOG_LEVEL=info, production-realistic)', async () => {
     const captured: string[] = [];
     const origWrite = process.stdout.write.bind(process.stdout);
-    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(
-      ((chunk: unknown, ...rest: unknown[]) => {
-        captured.push(typeof chunk === 'string' ? chunk : String(chunk));
-        return (origWrite as unknown as (...args: unknown[]) => boolean)(
-          chunk,
-          ...rest,
-        );
-      }) as typeof process.stdout.write,
-    );
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(((
+      chunk: unknown,
+      ...rest: unknown[]
+    ) => {
+      captured.push(typeof chunk === 'string' ? chunk : String(chunk));
+      return (origWrite as unknown as (...args: unknown[]) => boolean)(chunk, ...rest);
+    }) as typeof process.stdout.write);
     const app = await buildServer({ ...config, LOG_LEVEL: 'info' });
     try {
       const { cookieHeader, csrf } = await loginAndPrepareCsrf(
@@ -500,9 +489,7 @@ describe('web/api-key-create-route', () => {
         payload: `name=stdout-key&_csrf=${encodeURIComponent(csrf)}`,
       });
       expect(post.statusCode).toBe(200);
-      const match = (post.body as string).match(
-        /<code class="api-key-secret">([^<]+)<\/code>/,
-      );
+      const match = (post.body as string).match(/<code class="api-key-secret">([^<]+)<\/code>/);
       expect(match).not.toBeNull();
       const rawKey = match![1]!;
       const allStdout = captured.join('');
@@ -518,10 +505,7 @@ describe('web/api-key-create-route', () => {
   it('C3-PR: GET /profile/api-keys/new?createflash=evil-marker-create does NOT render the marker', async () => {
     const app = await buildServer(config);
     try {
-      const { cookieHeader } = await loginAndPrepareCsrf(
-        app,
-        'apikey-create-flash@test.invalid',
-      );
+      const { cookieHeader } = await loginAndPrepareCsrf(app, 'apikey-create-flash@test.invalid');
       const res = await app.inject({
         method: 'GET',
         url: '/profile/api-keys/new?createflash=evil-marker-create',
@@ -553,9 +537,7 @@ describe('web/api-key-create-route', () => {
         payload: `name=c5-key&_csrf=${encodeURIComponent(csrf)}`,
       });
       expect(res.statusCode).toBe(200);
-      expect(res.body).toMatch(
-        /<code class="api-key-secret">[A-Za-z0-9_-]{30,}<\/code>/,
-      );
+      expect(res.body).toMatch(/<code class="api-key-secret">[A-Za-z0-9_-]{30,}<\/code>/);
     } finally {
       await app.close();
     }

@@ -77,20 +77,10 @@ async function loginAndGetCreds(
 }
 
 // Per-describe scoped emails for parallel-test isolation.
-const TEST_EMAILS_AUTH = [
-  'stats-auth-admin@test.invalid',
-  'stats-auth-user@test.invalid',
-];
-const TEST_EMAILS_HAPPY = [
-  'stats-happy-admin@test.invalid',
-  'stats-happy-user@test.invalid',
-];
-const TEST_EMAILS_QUEUE = [
-  'stats-queue-admin@test.invalid',
-];
-const TEST_EMAILS_DISKFREE = [
-  'stats-disk-admin@test.invalid',
-];
+const TEST_EMAILS_AUTH = ['stats-auth-admin@test.invalid', 'stats-auth-user@test.invalid'];
+const TEST_EMAILS_HAPPY = ['stats-happy-admin@test.invalid', 'stats-happy-user@test.invalid'];
+const TEST_EMAILS_QUEUE = ['stats-queue-admin@test.invalid'];
+const TEST_EMAILS_DISKFREE = ['stats-disk-admin@test.invalid'];
 
 async function drainCompressionQueue(redis: IORedis): Promise<void> {
   const keys = await redis.keys('bull:compression:*');

@@ -24,10 +24,7 @@ test('user can sign in via /login and is redirected to /', async ({ page }) => {
 
   await page.fill('input[name="email"]', TEST_EMAIL);
   await page.fill('input[name="password"]', PASSWORD);
-  await Promise.all([
-    page.waitForURL('**/'),
-    page.click('button[type="submit"]'),
-  ]);
+  await Promise.all([page.waitForURL('**/'), page.click('button[type="submit"]')]);
 
   // Plan-8b Task 1 changed `/`'s h1 from "MediaCompressor" → "Dashboard".
   // Match either so the spec survives a future re-rename without churn.

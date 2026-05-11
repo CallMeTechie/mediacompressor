@@ -5,10 +5,7 @@ import type { Prisma, PrismaClient, Job } from '@mediacompressor/db';
 
 export class QuotaExceededError extends Error {
   constructor(
-    public code:
-      | 'QUOTA_STORAGE_EXCEEDED'
-      | 'QUOTA_PARALLEL_EXCEEDED'
-      | 'QUOTA_HOURLY_EXCEEDED',
+    public code: 'QUOTA_STORAGE_EXCEEDED' | 'QUOTA_PARALLEL_EXCEEDED' | 'QUOTA_HOURLY_EXCEEDED',
     message: string,
   ) {
     super(message);
@@ -50,10 +47,7 @@ const TUSD_UPLOAD_TTL_MS = 24 * 60 * 60_000; // 24h, Spec Sektion „tusd Inakti
  * UC12-Fix: idempotency-lookup BEFORE cleanup/reserve — repeated identical
  * pre-create hooks return the same Job.
  */
-export async function reserveQuota(
-  prisma: PrismaClient,
-  input: ReserveQuotaInput,
-): Promise<Job> {
+export async function reserveQuota(prisma: PrismaClient, input: ReserveQuotaInput): Promise<Job> {
   return prisma.$transaction(async (tx) => {
     // UC2: bigint variant of pg_advisory_xact_lock with namespaced 64-bit key.
     // $executeRaw because pg_advisory_xact_lock returns void and Prisma's

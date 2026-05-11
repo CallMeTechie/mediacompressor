@@ -145,9 +145,11 @@ describe('web/admin-invite-create-route', () => {
   ): Promise<{ cookieHeader: string; csrf: string }> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf1 = extractCsrfToken(get.body as string);
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -160,9 +162,11 @@ describe('web/admin-invite-create-route', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf1)}`,
     });
-    const sessCookieHeader = (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    const sessCookieHeader = (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -173,11 +177,12 @@ describe('web/admin-invite-create-route', () => {
       headers: { cookie: sessCookieHeader, accept: 'text/html' },
     });
     const csrf2 = extractCsrfToken(get2.body as string);
-    const get2Cookies = (Array.isArray(get2.headers['set-cookie'])
-      ? get2.headers['set-cookie']
-      : get2.headers['set-cookie']
-      ? [get2.headers['set-cookie']]
-      : []
+    const get2Cookies = (
+      Array.isArray(get2.headers['set-cookie'])
+        ? get2.headers['set-cookie']
+        : get2.headers['set-cookie']
+          ? [get2.headers['set-cookie']]
+          : []
     )
       .map((c) => c?.split(';')[0])
       .filter(Boolean);
@@ -192,9 +197,11 @@ describe('web/admin-invite-create-route', () => {
   ): Promise<string> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf = extractCsrfToken(get.body as string);
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -207,9 +214,11 @@ describe('web/admin-invite-create-route', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf)}`,
     });
-    return (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    return (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -279,10 +288,7 @@ describe('web/admin-invite-create-route', () => {
   it('POST valid (no email, default 24h) -> 200 with raw token rendered', async () => {
     const app = await buildServer(config);
     try {
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        TEST_EMAIL_ADMIN_NOEMAIL,
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, TEST_EMAIL_ADMIN_NOEMAIL);
       const res = await app.inject({
         method: 'POST',
         url: '/admin/invites',
@@ -297,9 +303,7 @@ describe('web/admin-invite-create-route', () => {
       const body = res.body as string;
       expect(body).toMatch(/Invite link|Einladungs-Link/);
       // Raw token rendered into <code class="invite-token-secret">.
-      const match = body.match(
-        /<code class="invite-token-secret">([^<]+)<\/code>/,
-      );
+      const match = body.match(/<code class="invite-token-secret">([^<]+)<\/code>/);
       expect(match).not.toBeNull();
       expect(match![1]!.length).toBeGreaterThanOrEqual(20);
     } finally {
@@ -311,10 +315,7 @@ describe('web/admin-invite-create-route', () => {
   it('POST valid with email -> 200 with email rendered on created-page', async () => {
     const app = await buildServer(config);
     try {
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        TEST_EMAIL_ADMIN_WITHEMAIL,
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, TEST_EMAIL_ADMIN_WITHEMAIL);
       const inviteEmail = 'invitee-1@test.invalid';
       const res = await app.inject({
         method: 'POST',
@@ -338,10 +339,7 @@ describe('web/admin-invite-create-route', () => {
   it('WC-AD6 PFLICHT: POST renders raw token; subsequent GET /admin/invites does NOT contain it', async () => {
     const app = await buildServer(config);
     try {
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        TEST_EMAIL_ADMIN_ONETIME,
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, TEST_EMAIL_ADMIN_ONETIME);
       const post = await app.inject({
         method: 'POST',
         url: '/admin/invites',
@@ -377,10 +375,7 @@ describe('web/admin-invite-create-route', () => {
   it('WC-AD7-eqv: POST success -> response cache-control matches /no-store/', async () => {
     const app = await buildServer(config);
     try {
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        TEST_EMAIL_ADMIN_NOSTORE,
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, TEST_EMAIL_ADMIN_NOSTORE);
       const res = await app.inject({
         method: 'POST',
         url: '/admin/invites',
@@ -402,21 +397,16 @@ describe('web/admin-invite-create-route', () => {
   it('WC-AD8-eqv PFLICHT: raw invite token never appears in stdout (LOG_LEVEL=info)', async () => {
     const captured: string[] = [];
     const origWrite = process.stdout.write.bind(process.stdout);
-    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(
-      ((chunk: unknown, ...rest: unknown[]) => {
-        captured.push(typeof chunk === 'string' ? chunk : String(chunk));
-        return (origWrite as unknown as (...args: unknown[]) => boolean)(
-          chunk,
-          ...rest,
-        );
-      }) as typeof process.stdout.write,
-    );
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(((
+      chunk: unknown,
+      ...rest: unknown[]
+    ) => {
+      captured.push(typeof chunk === 'string' ? chunk : String(chunk));
+      return (origWrite as unknown as (...args: unknown[]) => boolean)(chunk, ...rest);
+    }) as typeof process.stdout.write);
     const app = await buildServer({ ...config, LOG_LEVEL: 'info' });
     try {
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        TEST_EMAIL_ADMIN_STDOUT,
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, TEST_EMAIL_ADMIN_STDOUT);
       const post = await app.inject({
         method: 'POST',
         url: '/admin/invites',
@@ -471,10 +461,7 @@ describe('web/admin-invite-create-route', () => {
         },
       });
 
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        TEST_EMAIL_ADMIN_INVALIDMAIL,
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, TEST_EMAIL_ADMIN_INVALIDMAIL);
       const res = await app.inject({
         method: 'POST',
         url: '/admin/invites',
@@ -503,10 +490,7 @@ describe('web/admin-invite-create-route', () => {
   it('expiresInHours bounds match Plan-7 inner PostBody (drift detection)', async () => {
     const app = await buildServer(config);
     try {
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        TEST_EMAIL_ADMIN_BOUNDS,
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, TEST_EMAIL_ADMIN_BOUNDS);
       for (const bad of ['0', '169', '-1']) {
         const res = await app.inject({
           method: 'POST',
@@ -532,10 +516,7 @@ describe('web/admin-invite-create-route', () => {
   it('inner POST 201 with missing token -> 500 + error log (contract-drift detection)', async () => {
     const app = await buildServer(config);
     try {
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        TEST_EMAIL_ADMIN_SHAPE,
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, TEST_EMAIL_ADMIN_SHAPE);
 
       const errorLogSpy = vi.spyOn(app.log, 'error');
       const originalInject = app.inject.bind(app);
@@ -600,10 +581,7 @@ describe('web/admin-invite-create-route', () => {
   it('inner POST 401 -> 303 to /login + mc_session cleared', async () => {
     const app = await buildServer(config);
     try {
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        TEST_EMAIL_ADMIN_401,
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, TEST_EMAIL_ADMIN_401);
 
       const originalInject = app.inject.bind(app);
       const fakeInject = ((opts: unknown) => {
@@ -645,9 +623,7 @@ describe('web/admin-invite-create-route', () => {
       const setCookie = res.headers['set-cookie'];
       const cookies = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
       expect(
-        cookies.some(
-          (c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c),
-        ),
+        cookies.some((c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c)),
       ).toBe(true);
 
       injectSpy.mockRestore();
@@ -660,10 +636,7 @@ describe('web/admin-invite-create-route', () => {
   it('inner POST 403 -> 303 /admin/invites?updateflash=csrf-stale', async () => {
     const app = await buildServer(config);
     try {
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        TEST_EMAIL_ADMIN_403,
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, TEST_EMAIL_ADMIN_403);
 
       const originalInject = app.inject.bind(app);
       const fakeInject = ((opts: unknown) => {
@@ -706,9 +679,7 @@ describe('web/admin-invite-create-route', () => {
       const setCookie = res.headers['set-cookie'];
       const cookies = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
       expect(
-        cookies.some(
-          (c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c),
-        ),
+        cookies.some((c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c)),
       ).toBe(false);
 
       injectSpy.mockRestore();
@@ -729,10 +700,7 @@ describe('web/admin-invite-create-route', () => {
   it('PFLICHT WC-i18n-f-task2: POST /admin/invites with mc_locale=de renders expiresAt in DE long format on admin-invite-created (formatDateTime style="long")', async () => {
     const app = await buildServer(config);
     try {
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        TEST_EMAIL_ADMIN_NOEMAIL,
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, TEST_EMAIL_ADMIN_NOEMAIL);
       // Append mc_locale=de to the cookie-header for this request so the
       // detail-view rendering resolves DE locale through @root._locale.
       const cookieWithLocale = `${cookieHeader}; mc_locale=de`;
@@ -781,10 +749,7 @@ describe('web/admin-invite-create-route', () => {
         select: { id: true },
       });
       adminId = adminUser!.id;
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        TEST_EMAIL_ADMIN_AUDIT,
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, TEST_EMAIL_ADMIN_AUDIT);
       const post = await app.inject({
         method: 'POST',
         url: '/admin/invites',

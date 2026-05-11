@@ -94,9 +94,11 @@ describe('web/api-key-revoke-route', () => {
   ): Promise<{ cookieHeader: string; csrf: string }> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf1 = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -109,9 +111,11 @@ describe('web/api-key-revoke-route', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf1)}`,
     });
-    const sessCookieHeader = (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    const sessCookieHeader = (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -125,11 +129,12 @@ describe('web/api-key-revoke-route', () => {
       headers: { cookie: sessCookieHeader },
     });
     const csrf2 = ((get2.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const get2Cookies = (Array.isArray(get2.headers['set-cookie'])
-      ? get2.headers['set-cookie']
-      : get2.headers['set-cookie']
-      ? [get2.headers['set-cookie']]
-      : []
+    const get2Cookies = (
+      Array.isArray(get2.headers['set-cookie'])
+        ? get2.headers['set-cookie']
+        : get2.headers['set-cookie']
+          ? [get2.headers['set-cookie']]
+          : []
     )
       .map((c) => c?.split(';')[0])
       .filter(Boolean);
@@ -185,10 +190,7 @@ describe('web/api-key-revoke-route', () => {
         keyPrefix: 'aaaaaaaa',
         keyHash: 'a'.repeat(64),
       });
-      const { cookieHeader } = await loginAndPrepareCsrf(
-        app,
-        'apikey-revoke-no-csrf@test.invalid',
-      );
+      const { cookieHeader } = await loginAndPrepareCsrf(app, 'apikey-revoke-no-csrf@test.invalid');
       const res = await app.inject({
         method: 'POST',
         url: `/profile/api-keys/${seeded.id}/revoke`,
@@ -217,10 +219,7 @@ describe('web/api-key-revoke-route', () => {
         keyPrefix: 'bbbbbbbb',
         keyHash: 'b'.repeat(64),
       });
-      const { cookieHeader, csrf } = await loginAndPrepareCsrf(
-        app,
-        'apikey-revoke@test.invalid',
-      );
+      const { cookieHeader, csrf } = await loginAndPrepareCsrf(app, 'apikey-revoke@test.invalid');
       const res = await app.inject({
         method: 'POST',
         url: `/profile/api-keys/${seeded.id}/revoke`,
@@ -343,9 +342,7 @@ describe('web/api-key-revoke-route', () => {
       const setCookie = res.headers['set-cookie'];
       const cookies = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
       expect(
-        cookies.some(
-          (c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c),
-        ),
+        cookies.some((c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c)),
       ).toBe(false);
 
       injectSpy.mockRestore();

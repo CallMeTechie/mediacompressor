@@ -128,9 +128,7 @@ export const adminInviteRevokeRoutePlugin: FastifyPluginAsync = async (app) => {
           .send();
       }
       if (inner.statusCode === 404) {
-        return reply
-          .code(404)
-          .view('404', { title: 'Not found', path: req.url });
+        return reply.code(404).view('404', { title: 'Not found', path: req.url });
       }
       // Concern #5: unexpected inner status — coerce to literal 500 + warn
       // log. Avoids surfacing inner status codes (e.g. 502, 200) directly

@@ -88,9 +88,11 @@ describe('web/job-list-page', () => {
   ): Promise<string> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -103,9 +105,11 @@ describe('web/job-list-page', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf)}`,
     });
-    return (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    return (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -523,11 +527,9 @@ describe('web/job-list-page', () => {
         // The describe-level beforeEach normally handles job cleanup, but a
         // finally guarantee keeps reruns deterministic if a later test before
         // beforeEach throws mid-cleanup.
-        await prisma.job
-          .deleteMany({ where: { id: job.id } })
-          .catch((e: { code?: string }) => {
-            if (e?.code !== 'P2025') throw e;
-          });
+        await prisma.job.deleteMany({ where: { id: job.id } }).catch((e: { code?: string }) => {
+          if (e?.code !== 'P2025') throw e;
+        });
       }
     } finally {
       await app.close();

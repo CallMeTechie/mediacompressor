@@ -120,12 +120,8 @@ describe('locale untranslated-drift detection (DE !== EN)', () => {
 
   for (const ns of namespaces) {
     it(`${ns}: every DE-value differs from EN-value (unless allowlisted)`, () => {
-      const enJson = JSON.parse(
-        readFileSync(path.join(LOCALES_DIR, 'en', `${ns}.json`), 'utf-8'),
-      );
-      const deJson = JSON.parse(
-        readFileSync(path.join(LOCALES_DIR, 'de', `${ns}.json`), 'utf-8'),
-      );
+      const enJson = JSON.parse(readFileSync(path.join(LOCALES_DIR, 'en', `${ns}.json`), 'utf-8'));
+      const deJson = JSON.parse(readFileSync(path.join(LOCALES_DIR, 'de', `${ns}.json`), 'utf-8'));
       const enMap = new Map(flatEntries(enJson));
       const deMap = new Map(flatEntries(deJson));
 

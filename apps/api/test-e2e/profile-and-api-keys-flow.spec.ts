@@ -18,7 +18,9 @@ test.afterAll(async () => {
   await prisma.$disconnect();
 });
 
-test('user navigates Profile, creates an API key (sees one-time reveal), revokes it', async ({ page }) => {
+test('user navigates Profile, creates an API key (sees one-time reveal), revokes it', async ({
+  page,
+}) => {
   // 1. Login.
   await page.goto('/login');
   await page.fill('input[name="email"]', TEST_EMAIL);

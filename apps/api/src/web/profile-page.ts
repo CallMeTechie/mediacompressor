@@ -94,9 +94,7 @@ export const profilePagePlugin: FastifyPluginAsync = async (app) => {
       // Identify the current session by hashing the cookie token. Plain
       // string equality is fine here (render-only, no timing attack).
       const cookieToken = req.cookies.mc_session ?? '';
-      const currentTokenHash = cookieToken
-        ? hashSessionToken(cookieToken, sessionPepper)
-        : '';
+      const currentTokenHash = cookieToken ? hashSessionToken(cookieToken, sessionPepper) : '';
 
       const { revokeflash } = req.query as z.infer<typeof Query>;
       const flashEntry = revokeflash ? (REVOKE_FLASH_MAP.get(revokeflash) ?? null) : null;

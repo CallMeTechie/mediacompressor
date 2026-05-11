@@ -45,9 +45,7 @@ describe('verifyTusdSharedSecret', () => {
 
     expect(result).toBe(false);
     expect(reply._code).toBe(401);
-    expect((reply._body as { error: { code: string } }).error.code).toBe(
-      'AUTH_REQUIRED',
-    );
+    expect((reply._body as { error: { code: string } }).error.code).toBe('AUTH_REQUIRED');
   });
 
   it('returns false + 401 AUTH_INVALID when header is wrong (same length)', async () => {
@@ -61,9 +59,7 @@ describe('verifyTusdSharedSecret', () => {
 
     expect(result).toBe(false);
     expect(reply._code).toBe(401);
-    expect((reply._body as { error: { code: string } }).error.code).toBe(
-      'AUTH_INVALID',
-    );
+    expect((reply._body as { error: { code: string } }).error.code).toBe('AUTH_INVALID');
   });
 
   it('returns true when header matches exactly', async () => {
@@ -89,8 +85,6 @@ describe('verifyTusdSharedSecret', () => {
 
     expect(result).toBe(false);
     expect(reply._code).toBe(401);
-    expect((reply._body as { error: { code: string } }).error.code).toBe(
-      'AUTH_INVALID',
-    );
+    expect((reply._body as { error: { code: string } }).error.code).toBe('AUTH_INVALID');
   });
 });

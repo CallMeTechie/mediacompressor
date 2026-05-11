@@ -90,9 +90,11 @@ describe('Plan 8f Task 4: client-side i18n bridge (server-render PFLICHT)', () =
   ): Promise<string> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -105,9 +107,11 @@ describe('Plan 8f Task 4: client-side i18n bridge (server-render PFLICHT)', () =
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf)}`,
     });
-    return (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    return (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -138,9 +142,7 @@ describe('Plan 8f Task 4: client-side i18n bridge (server-render PFLICHT)', () =
       // Positive: meta-tag present.
       expect(res.body).toMatch(/<meta name="mc-i18n" content=/);
       // Positive: bridge-script loaded.
-      expect(res.body).toMatch(
-        /<script src="\/static\/js\/i18n-bridge\.js"[^>]*defer/,
-      );
+      expect(res.body).toMatch(/<script src="\/static\/js\/i18n-bridge\.js"[^>]*defer/);
       // Negative (CSP-regression-guard): NO inline-<script> with the legacy
       // `window.MC_I18N = ...` bootstrap-pattern. Production CSP would block
       // such a script (script-src 'self' without 'unsafe-inline'), causing

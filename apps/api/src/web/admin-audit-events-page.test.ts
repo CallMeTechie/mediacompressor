@@ -94,7 +94,10 @@ describe('web/admin-audit-events-page', () => {
     await cleanupTestUsers(prisma, TEST_EMAILS);
 
     await createTestUser(prisma, { email: TEST_EMAIL_USER, password: 'hunter22hunter22' });
-    const admin = await createTestUser(prisma, { email: TEST_EMAIL_ADMIN, password: 'hunter22hunter22' });
+    const admin = await createTestUser(prisma, {
+      email: TEST_EMAIL_ADMIN,
+      password: 'hunter22hunter22',
+    });
     await prisma.user.update({ where: { id: admin.id }, data: { role: 'admin' } });
     adminId = admin.id;
     const adminEmpty = await createTestUser(prisma, {
@@ -179,9 +182,11 @@ describe('web/admin-audit-events-page', () => {
   ): Promise<string> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -194,9 +199,11 @@ describe('web/admin-audit-events-page', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf)}`,
     });
-    return (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    return (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -304,9 +311,7 @@ describe('web/admin-audit-events-page', () => {
       // assistive-tech parsing per HTML <time> spec. `.toISOString()` always
       // emits exactly 3 millisecond digits, so the regex pins that shape
       // without an optional quantifier (which would trip detect-unsafe-regex).
-      expect(body).toMatch(
-        /<time datetime="\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z"/,
-      );
+      expect(body).toMatch(/<time datetime="\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z"/);
     } finally {
       await app.close();
     }
@@ -375,9 +380,7 @@ describe('web/admin-audit-events-page', () => {
       expect(res1.statusCode).toBe(200);
       const body1 = res1.body as string;
       // Next-page cursor link must be present (52 > 50).
-      const cursorMatch = body1.match(
-        /href="\/admin\/audit-events\?cursor=([^"&]+)[^"]*"/,
-      );
+      const cursorMatch = body1.match(/href="\/admin\/audit-events\?cursor=([^"&]+)[^"]*"/);
       expect(cursorMatch).not.toBeNull();
       const cursor = cursorMatch![1]!;
 

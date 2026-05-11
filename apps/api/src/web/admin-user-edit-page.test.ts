@@ -92,9 +92,11 @@ describe('web/admin-user-edit-page', () => {
   ): Promise<string> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -107,9 +109,11 @@ describe('web/admin-user-edit-page', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf)}`,
     });
-    return (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    return (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -161,9 +165,7 @@ describe('web/admin-user-edit-page', () => {
       expect(res.statusCode).toBe(200);
       const body = res.body as string;
       // Form posts back to /admin/users/<id>.
-      expect(body).toMatch(
-        new RegExp(`<form[^>]*action="/admin/users/${targetUserId}"`),
-      );
+      expect(body).toMatch(new RegExp(`<form[^>]*action="/admin/users/${targetUserId}"`));
       // CSRF hidden field.
       expect(body).toMatch(/<input[^>]+type="hidden"[^>]*name="_csrf"/);
       // Email visible in form.

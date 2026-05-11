@@ -29,9 +29,7 @@ export function registerAdminGuard(app: FastifyInstance): void {
         // gets 403, unauth gets 401 via requireAuth. Small existence-leak for admin
         // endpoints (a logged-in user can probe whether they have admin role) is
         // accepted per spec.
-        reply
-          .code(403)
-          .send({ error: { code: 'FORBIDDEN', message: 'admin role required' } });
+        reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'admin role required' } });
         return;
       }
       return userId;
@@ -48,9 +46,7 @@ export function registerAdminGuard(app: FastifyInstance): void {
       const outcome = await runCsrfHook(app, req, reply);
       if (outcome.ok) return userId;
       if (outcome.reason === 'missing-hook') {
-        app.log.error(
-          'csrfProtection hook missing — @fastify/csrf-protection not registered?',
-        );
+        app.log.error('csrfProtection hook missing — @fastify/csrf-protection not registered?');
         reply
           .code(500)
           .send({ error: { code: 'INTERNAL', message: 'CSRF subsystem unavailable' } });

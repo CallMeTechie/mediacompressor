@@ -62,9 +62,7 @@ test('user uploads a file, lands on /jobs/:id, sees status, cancels it', async (
   // "Failed", etc.). Match case-insensitively so the assertion works for
   // both the canonical lowercase enum-string (when the SSE event is
   // displayed raw as JSON) and the rendered localized label.
-  await expect(sseTarget).toContainText(
-    /uploading|queued|processing|succeeded|failed|canceled/i,
-  );
+  await expect(sseTarget).toContainText(/uploading|queued|processing|succeeded|failed|canceled/i);
 
   // 6. If a cancel button is rendered (server-side `canCancel` was true),
   //    submit it and assert the page lands back on /jobs/:id with a status
@@ -72,10 +70,7 @@ test('user uploads a file, lands on /jobs/:id, sees status, cancels it', async (
   //    finished the tiny fixture before we click).
   const cancelBtn = page.locator('form[action$="/cancel"] button[type="submit"]');
   if (await cancelBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await Promise.all([
-      page.waitForURL(/\/jobs\/[0-9a-f-]{36}/),
-      cancelBtn.click(),
-    ]);
+    await Promise.all([page.waitForURL(/\/jobs\/[0-9a-f-]{36}/), cancelBtn.click()]);
     await expect(page.locator('#job-detail-sse-target')).toContainText(
       /canceled|succeeded|failed/i,
     );

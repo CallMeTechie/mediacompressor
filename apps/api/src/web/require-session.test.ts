@@ -65,14 +65,14 @@ describe('web/require-session', () => {
   /**
    * Logs in via /login and returns the merged cookie header (mc_session + mc_csrf).
    */
-  async function loginAndCookies(
-    app: Awaited<ReturnType<typeof buildServer>>,
-  ): Promise<string> {
+  async function loginAndCookies(app: Awaited<ReturnType<typeof buildServer>>): Promise<string> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -85,9 +85,11 @@ describe('web/require-session', () => {
       },
       payload: `email=req-session%40test.invalid&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf)}`,
     });
-    return (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    return (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -100,11 +102,7 @@ describe('web/require-session', () => {
    */
   async function appWithProbe() {
     const app = await buildServer(config);
-    app.get(
-      '/__test_protected',
-      { preHandler: app.requireSession },
-      async () => ({ ok: true }),
-    );
+    app.get('/__test_protected', { preHandler: app.requireSession }, async () => ({ ok: true }));
     return app;
   }
 
@@ -162,9 +160,7 @@ describe('web/require-session', () => {
       const setCookie = res.headers['set-cookie'];
       const cookies = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
       expect(
-        cookies.some(
-          (c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c),
-        ),
+        cookies.some((c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c)),
       ).toBe(true);
     } finally {
       await app.close();
@@ -206,9 +202,7 @@ describe('web/require-session', () => {
         const setCookie = res.headers['set-cookie'];
         const cookies = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
         expect(
-          cookies.some(
-            (c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c),
-          ),
+          cookies.some((c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c)),
         ).toBe(true);
       } finally {
         // Restore so subsequent tests in this file pass.

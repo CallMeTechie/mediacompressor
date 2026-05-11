@@ -30,28 +30,24 @@ export const apiKeyRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // POST ist state-changing — CSRF-Pflicht (außer Bearer).
-  app.post(
-    '/api/v1/users/me/api-keys',
-    { schema: { body: CreateBody } },
-    async (req, reply) => {
-      const userId = await app.requireAuthCsrf(req, reply);
-      if (!userId) return;
-      const { name } = req.body as z.infer<typeof CreateBody>;
-      const { key, prefix } = generateApiKey();
-      const keyHash = hashApiKey(key, apiKeyPepper);
-      const row = await prisma.apiKey.create({
-        data: {
-          userId,
-          name,
-          keyHash,
-          keyPrefix: prefix,
-          scopes: ['jobs:write', 'jobs:read'],
-        },
-        select: { id: true, name: true, keyPrefix: true, createdAt: true },
-      });
-      return reply.code(201).send({ ...row, key });
-    },
-  );
+  app.post('/api/v1/users/me/api-keys', { schema: { body: CreateBody } }, async (req, reply) => {
+    const userId = await app.requireAuthCsrf(req, reply);
+    if (!userId) return;
+    const { name } = req.body as z.infer<typeof CreateBody>;
+    const { key, prefix } = generateApiKey();
+    const keyHash = hashApiKey(key, apiKeyPepper);
+    const row = await prisma.apiKey.create({
+      data: {
+        userId,
+        name,
+        keyHash,
+        keyPrefix: prefix,
+        scopes: ['jobs:write', 'jobs:read'],
+      },
+      select: { id: true, name: true, keyPrefix: true, createdAt: true },
+    });
+    return reply.code(201).send({ ...row, key });
+  });
 
   // DELETE ist state-changing — CSRF-Pflicht (außer Bearer).
   app.delete(

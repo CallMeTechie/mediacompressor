@@ -55,10 +55,7 @@ function loadJobsJson(locale: 'en' | 'de'): Map<string, unknown> {
   return new Map(Object.entries(parsed));
 }
 
-function assertNonEmptyString(
-  value: unknown,
-  ctx: string,
-): asserts value is string {
+function assertNonEmptyString(value: unknown, ctx: string): asserts value is string {
   expect(typeof value, `${ctx}: expected string`).toBe('string');
   expect((value as string).length, `${ctx}: expected non-empty`).toBeGreaterThan(0);
 }

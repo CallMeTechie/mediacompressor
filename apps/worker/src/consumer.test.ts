@@ -152,19 +152,14 @@ describe('worker consumer — processJob (Plan 4 Task 11)', () => {
       overrides: { targetFormat: 'webp' },
     };
 
-    const stubCompress = async (
-      _req: CompressionRequest,
-    ): Promise<CompressionResult> => {
+    const stubCompress = async (_req: CompressionRequest): Promise<CompressionResult> => {
       throw new Error('ENGINE_INPUT_CORRUPT: simulated decode failure');
     };
 
     const cap = await captureChannel(`job:status:${job.id}`);
     try {
       await expect(
-        processJob(
-          { redis, pub, prisma, compress: stubCompress as typeof compress },
-          data,
-        ),
+        processJob({ redis, pub, prisma, compress: stubCompress as typeof compress }, data),
       ).rejects.toThrow(/ENGINE_INPUT_CORRUPT/);
 
       const row = await prisma.job.findUnique({ where: { id: job.id } });
@@ -226,10 +221,7 @@ describe('worker consumer — processJob (Plan 4 Task 11)', () => {
     const cap = await captureChannel(`job:status:${job.id}`);
     try {
       await expect(
-        processJob(
-          { redis, pub, prisma, compress: stubCompress as typeof compress },
-          data,
-        ),
+        processJob({ redis, pub, prisma, compress: stubCompress as typeof compress }, data),
       ).rejects.toThrow(/CANCELED/);
 
       const row = await prisma.job.findUnique({ where: { id: job.id } });

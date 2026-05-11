@@ -45,10 +45,7 @@ const config: Config = {
 const apiKeyPepper = Buffer.from(config.API_KEY_PEPPER);
 
 // Helper that builds the JSON body tusd v2 sends to the pre-create-hook.
-function tusdHookBody(opts: {
-  uploadLength: number;
-  metadata?: Record<string, string>;
-}) {
+function tusdHookBody(opts: { uploadLength: number; metadata?: Record<string, string> }) {
   return {
     Type: 'pre-create',
     Event: {

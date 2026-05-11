@@ -1,8 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import {
-  createPrismaClient,
-  type PrismaClient,
-} from '@mediacompressor/db';
+import { createPrismaClient, type PrismaClient } from '@mediacompressor/db';
 import {
   generateApiKey,
   generateSessionToken,

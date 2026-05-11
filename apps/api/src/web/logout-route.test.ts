@@ -1,8 +1,13 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createPrismaClient, type PrismaClient } from '@mediacompressor/db';
 import {
-  TEST_API_KEY_PEPPER, TEST_SESSION_SECRET, TEST_CSRF_SECRET,
-  testDatabaseUrl, testRedisUrl, createTestUser, cleanupTestUsers,
+  TEST_API_KEY_PEPPER,
+  TEST_SESSION_SECRET,
+  TEST_CSRF_SECRET,
+  testDatabaseUrl,
+  testRedisUrl,
+  createTestUser,
+  cleanupTestUsers,
   resetLoginRateLimits,
 } from '@mediacompressor/test-helpers';
 import IORedis from 'ioredis';
@@ -17,10 +22,16 @@ const config: Config = {
   CSRF_SECRET: TEST_CSRF_SECRET,
   API_KEY_PEPPER: TEST_API_KEY_PEPPER,
   CORS_ALLOWED_ORIGINS: 'http://localhost:5173',
-  PORT: 0, NODE_ENV: 'test', LOG_LEVEL: 'error', ARGON2_MAX_CONCURRENCY: 8,
-  TUSD_SHARED_SECRET: 'a'.repeat(64), TUSD_REQUIRE_SHARED_SECRET: true,
-  TUSD_DATA_DIR: '/media/tusd-data', TUSD_FINAL_DIR: '/media/uploads',
-  MEDIA_MOUNT_PATH: '/media', MIN_FREE_BYTES_RESERVE: 1n,
+  PORT: 0,
+  NODE_ENV: 'test',
+  LOG_LEVEL: 'error',
+  ARGON2_MAX_CONCURRENCY: 8,
+  TUSD_SHARED_SECRET: 'a'.repeat(64),
+  TUSD_REQUIRE_SHARED_SECRET: true,
+  TUSD_DATA_DIR: '/media/tusd-data',
+  TUSD_FINAL_DIR: '/media/uploads',
+  MEDIA_MOUNT_PATH: '/media',
+  MIN_FREE_BYTES_RESERVE: 1n,
   TRUSTED_PROXY_CIDR: 'loopback',
   ENABLE_LEGACY_JOB_STUB: false,
 };
@@ -83,9 +94,11 @@ describe('web/logout-route', () => {
       ...(Array.isArray(get2.headers['set-cookie'])
         ? get2.headers['set-cookie']
         : get2.headers['set-cookie']
-        ? [get2.headers['set-cookie']!]
-        : []
-      ).map((c) => c?.split(';')[0]).filter(Boolean),
+          ? [get2.headers['set-cookie']!]
+          : []
+      )
+        .map((c) => c?.split(';')[0])
+        .filter(Boolean),
     ].join('; ');
     return { cookieHeader: merged, csrf: csrf2 };
   }
@@ -108,7 +121,9 @@ describe('web/logout-route', () => {
       const setCookie = res.headers['set-cookie'];
       const cookies = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
       // mc_session cleared (Max-Age=0 or Expires in the past).
-      expect(cookies.some((c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c))).toBe(true);
+      expect(
+        cookies.some((c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c)),
+      ).toBe(true);
     } finally {
       await app.close();
     }

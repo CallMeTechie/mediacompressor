@@ -1,10 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { createPrismaClient } from '@mediacompressor/db';
-import {
-  createTestUser,
-  cleanupTestUsers,
-  testDatabaseUrl,
-} from '@mediacompressor/test-helpers';
+import { createTestUser, cleanupTestUsers, testDatabaseUrl } from '@mediacompressor/test-helpers';
 
 /**
  * Plan 10 Task 5: end-to-end happy-path for the AuditEvent persistent
@@ -65,17 +61,12 @@ test.afterAll(async () => {
   }
 });
 
-test('admin updates user -> AuditEvent row visible at /admin/audit-events', async ({
-  page,
-}) => {
+test('admin updates user -> AuditEvent row visible at /admin/audit-events', async ({ page }) => {
   // 1. Login as admin.
   await page.goto('/login');
   await page.fill('input[name="email"]', ADMIN_EMAIL);
   await page.fill('input[name="password"]', PASSWORD);
-  await Promise.all([
-    page.waitForURL('**/'),
-    page.click('button[type="submit"]'),
-  ]);
+  await Promise.all([page.waitForURL('**/'), page.click('button[type="submit"]')]);
 
   // 2. /admin/users -> open TARGET edit form -> set status=disabled -> save.
   // Mirrors the existing admin-and-i18n-flow.spec.ts pattern.

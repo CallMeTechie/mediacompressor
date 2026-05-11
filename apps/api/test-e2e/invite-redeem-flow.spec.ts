@@ -25,10 +25,7 @@ async function cleanupInvitesAndUsers(emails: string[]): Promise<void> {
     const userIds = users.map((u) => u.id);
     await prisma.invite.deleteMany({
       where: {
-        OR: [
-          { createdById: { in: userIds } },
-          { consumedById: { in: userIds } },
-        ],
+        OR: [{ createdById: { in: userIds } }, { consumedById: { in: userIds } }],
       },
     });
   }
@@ -71,10 +68,7 @@ test('user can redeem an invite and reach the home placeholder', async ({ page }
   await expect(page.locator('h1')).toContainText(/Complete your account/);
   await page.fill('input[name="email"]', NEW_EMAIL);
   await page.fill('input[name="password"]', PASSWORD);
-  await Promise.all([
-    page.waitForURL('**/'),
-    page.click('button[type="submit"]'),
-  ]);
+  await Promise.all([page.waitForURL('**/'), page.click('button[type="submit"]')]);
   // Plan-8b Task 1 changed `/`'s h1 from "MediaCompressor" → "Dashboard"
   // (invite-redeem 303s to `/` on success, which is now the Dashboard view).
   await expect(page.locator('h1')).toContainText(/MediaCompressor|Dashboard/);

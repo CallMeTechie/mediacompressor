@@ -57,19 +57,14 @@ export const sessionRevokeRoutePlugin: FastifyPluginAsync = async (app) => {
 
       // WC-PR6: constant-time compare for the current-session guard.
       const cookieToken = req.cookies.mc_session ?? '';
-      const currentTokenHash = cookieToken
-        ? hashSessionToken(cookieToken, sessionPepper)
-        : '';
+      const currentTokenHash = cookieToken ? hashSessionToken(cookieToken, sessionPepper) : '';
       if (currentTokenHash) {
         const a = Buffer.from(target.tokenHash, 'hex');
         const b = Buffer.from(currentTokenHash, 'hex');
         // Defensive length-check: timingSafeEqual throws on mismatched lengths.
         // tokenHash is always 64-char hex (SHA-256), so equal in practice.
         if (a.length === b.length && timingSafeEqual(a, b)) {
-          return reply
-            .code(303)
-            .header('location', '/profile?revokeflash=current-session')
-            .send();
+          return reply.code(303).header('location', '/profile?revokeflash=current-session').send();
         }
       }
 

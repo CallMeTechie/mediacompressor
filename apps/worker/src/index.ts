@@ -30,14 +30,9 @@ async function main(): Promise<void> {
     logger: log,
   });
 
-  cleanupCron.worker.on('error', (err) =>
-    log.error({ err }, 'cleanup-cron worker error'),
-  );
+  cleanupCron.worker.on('error', (err) => log.error({ err }, 'cleanup-cron worker error'));
   cleanupCron.worker.on('failed', (job, err) =>
-    log.warn(
-      { jobName: job?.name, err: err.message },
-      'cleanup-cron job failed',
-    ),
+    log.warn({ jobName: job?.name, err: err.message }, 'cleanup-cron job failed'),
   );
 
   const shutdown = async (signal: string): Promise<void> => {

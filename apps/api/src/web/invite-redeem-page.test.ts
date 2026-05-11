@@ -362,9 +362,7 @@ describe('web/invite-redeem-page', () => {
     const app = await buildServer(config);
     try {
       const { token } = await seedInvite();
-      const forms = await Promise.all(
-        Array.from({ length: 20 }, () => getInviteForm(app, token)),
-      );
+      const forms = await Promise.all(Array.from({ length: 20 }, () => getInviteForm(app, token)));
       const results = await Promise.all(
         forms.map((f, i) =>
           app.inject({

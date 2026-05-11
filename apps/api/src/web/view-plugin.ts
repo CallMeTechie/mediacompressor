@@ -1,12 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type {
-  FastifyInstance,
-  FastifyPluginAsync,
-  FastifyReply,
-  FastifyRequest,
-} from 'fastify';
+import type { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
 import view from '@fastify/view';
 import staticPlugin from '@fastify/static';
@@ -54,10 +49,7 @@ function safeCurrentUser(auth: FastifyRequest['auth']): CurrentUserView {
  * locale-string content (apostrophe, ampersand, double-quote) survives
  * `<meta content='...'>` round-tripping.
  */
-function buildClientI18n(
-  req: FastifyRequest,
-  app: FastifyInstance,
-): Record<string, string> {
+function buildClientI18n(req: FastifyRequest, app: FastifyInstance): Record<string, string> {
   const lng = req.locale ?? DEFAULT_LOCALE;
   const out: Record<string, string> = {};
   for (const { ns, key } of CLIENT_I18N_KEYS) {

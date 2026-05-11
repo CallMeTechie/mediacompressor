@@ -38,10 +38,7 @@ export function verifyTusdSharedSecret(
     }
     const providedBuf = Buffer.from(provided, 'utf8');
     // Length check first — timingSafeEqual throws on mismatched lengths.
-    if (
-      providedBuf.length !== expectedBuf.length ||
-      !timingSafeEqual(providedBuf, expectedBuf)
-    ) {
+    if (providedBuf.length !== expectedBuf.length || !timingSafeEqual(providedBuf, expectedBuf)) {
       // A header WAS supplied — reject forgery regardless of `require`.
       reply.code(401).send({
         error: { code: 'AUTH_INVALID', message: 'tusd shared-secret invalid' },

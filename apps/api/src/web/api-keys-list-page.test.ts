@@ -98,9 +98,11 @@ describe('web/api-keys-list-page', () => {
   ): Promise<string> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -113,9 +115,11 @@ describe('web/api-keys-list-page', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf)}`,
     });
-    return (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    return (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -209,7 +213,8 @@ describe('web/api-keys-list-page', () => {
       // Revoked key NOT shown.
       expect(res.body).not.toContain('key-revoked');
       // Each row has a revoke form.
-      const revokeFormMatches = res.body.match(/action="\/profile\/api-keys\/[^"]+\/revoke"/g) ?? [];
+      const revokeFormMatches =
+        res.body.match(/action="\/profile\/api-keys\/[^"]+\/revoke"/g) ?? [];
       expect(revokeFormMatches.length).toBe(3);
     } finally {
       await app.close();
@@ -322,9 +327,7 @@ describe('web/api-keys-list-page', () => {
       expect(formOpen).toBeGreaterThanOrEqual(0);
       expect(formClose).toBeGreaterThan(formOpen);
       const formBody = body.slice(formOpen, formClose);
-      const csrfMatch = formBody.match(
-        /<input[^>]*name="_csrf"[^>]*value="([^"]+)"/,
-      );
+      const csrfMatch = formBody.match(/<input[^>]*name="_csrf"[^>]*value="([^"]+)"/);
       expect(csrfMatch).not.toBeNull();
       expect(csrfMatch![1]!.length).toBeGreaterThanOrEqual(16);
     } finally {

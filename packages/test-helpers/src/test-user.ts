@@ -23,10 +23,7 @@ export async function createTestUser(
   prisma: PrismaClient,
   opts: TestUserOptions,
 ): Promise<{ id: string; email: string }> {
-  const passwordHash = await argon2.hash(
-    opts.password ?? 'hunter22hunter22',
-    TEST_HASH_OPTIONS,
-  );
+  const passwordHash = await argon2.hash(opts.password ?? 'hunter22hunter22', TEST_HASH_OPTIONS);
   const user = await prisma.user.upsert({
     where: { email: opts.email },
     update: { passwordHash, status: opts.status ?? 'active' },
@@ -48,10 +45,7 @@ export async function createTestUser(
  * the AuditEvent table yet — Prisma raises P2021 ("table does not exist").
  * Skip that error gracefully so cleanup keeps working across migration-states.
  */
-export async function cleanupTestUsers(
-  prisma: PrismaClient,
-  emails: string[],
-): Promise<void> {
+export async function cleanupTestUsers(prisma: PrismaClient, emails: string[]): Promise<void> {
   const users = await prisma.user.findMany({
     where: { email: { in: emails } },
     select: { id: true },

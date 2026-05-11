@@ -9,9 +9,7 @@ describe('web/error-redact', () => {
 
   it('known code "INPUT_CORRUPT: …" → friendly message (path stripped)', () => {
     expect(
-      redactErrorMessage(
-        'INPUT_CORRUPT: details that contain /media/uploads/abc/source.bin',
-      ),
+      redactErrorMessage('INPUT_CORRUPT: details that contain /media/uploads/abc/source.bin'),
     ).toBe('The input file appears to be corrupted.');
   });
 
@@ -24,9 +22,9 @@ describe('web/error-redact', () => {
   });
 
   it('free-form ffmpeg stderr (with server path) → generic "Job failed."', () => {
-    expect(
-      redactErrorMessage('ffmpeg: Cannot open /media/uploads/abc/source.bin'),
-    ).toBe('Job failed.');
+    expect(redactErrorMessage('ffmpeg: Cannot open /media/uploads/abc/source.bin')).toBe(
+      'Job failed.',
+    );
   });
 
   // C9-LI PFLICHT — Allowlist comes from packages/shared, not a local const.

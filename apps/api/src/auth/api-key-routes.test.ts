@@ -45,9 +45,7 @@ interface LoginCreds {
   csrfToken: string;
 }
 
-async function loginAndGetCreds(
-  app: Awaited<ReturnType<typeof buildServer>>,
-): Promise<LoginCreds> {
+async function loginAndGetCreds(app: Awaited<ReturnType<typeof buildServer>>): Promise<LoginCreds> {
   const login = await app.inject({
     method: 'POST',
     url: '/api/v1/auth/login',

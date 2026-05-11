@@ -1,10 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import {
-  dummyCompare,
-  hashApiKey,
-  hashSessionToken,
-  parseApiKey,
-} from '@mediacompressor/auth';
+import { dummyCompare, hashApiKey, hashSessionToken, parseApiKey } from '@mediacompressor/auth';
 import { runCsrfHook } from './csrf-stub-reply.js';
 
 declare module 'fastify' {
@@ -54,9 +49,7 @@ export function registerAuthMiddleware(app: FastifyInstance): void {
    * Does NOT call `dummyCompare` — callers add it only where constant-time
    * miss handling is required (i.e. `requireAuth` with Bearer-present-but-invalid).
    */
-  async function resolveAuth(
-    req: FastifyRequest,
-  ): Promise<{
+  async function resolveAuth(req: FastifyRequest): Promise<{
     userId: string;
     method: 'session' | 'api-key';
     role: 'user' | 'admin';
@@ -135,16 +128,13 @@ export function registerAuthMiddleware(app: FastifyInstance): void {
     },
   );
 
-  app.decorate(
-    'tryAuth',
-    async (req: FastifyRequest): Promise<string | null> => {
-      const result = await resolveAuth(req);
-      if (!result) return null;
-      req.auth = result;
-      if (result.method === 'api-key') req.skipCsrf = true;
-      return result.userId;
-    },
-  );
+  app.decorate('tryAuth', async (req: FastifyRequest): Promise<string | null> => {
+    const result = await resolveAuth(req);
+    if (!result) return null;
+    req.auth = result;
+    if (result.method === 'api-key') req.skipCsrf = true;
+    return result.userId;
+  });
 
   // C1-Rev1 + C9-Rev2: Wrapper für state-changing Routes — erst Auth, dann CSRF (außer Bearer).
   // Stub-Reply-Proxy ist nach `csrf-stub-reply.ts` extrahiert (siehe runCsrfHook),

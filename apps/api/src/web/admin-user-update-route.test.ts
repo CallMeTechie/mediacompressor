@@ -146,9 +146,11 @@ describe('web/admin-user-update-route', () => {
   ): Promise<{ cookieHeader: string; csrf: string }> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf1 = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -161,9 +163,11 @@ describe('web/admin-user-update-route', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf1)}`,
     });
-    const sessCookieHeader = (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    const sessCookieHeader = (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -174,11 +178,12 @@ describe('web/admin-user-update-route', () => {
       headers: { cookie: sessCookieHeader, accept: 'text/html' },
     });
     const csrf2 = ((get2.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const get2Cookies = (Array.isArray(get2.headers['set-cookie'])
-      ? get2.headers['set-cookie']
-      : get2.headers['set-cookie']
-      ? [get2.headers['set-cookie']]
-      : []
+    const get2Cookies = (
+      Array.isArray(get2.headers['set-cookie'])
+        ? get2.headers['set-cookie']
+        : get2.headers['set-cookie']
+          ? [get2.headers['set-cookie']]
+          : []
     )
       .map((c) => c?.split(';')[0])
       .filter(Boolean);
@@ -193,9 +198,11 @@ describe('web/admin-user-update-route', () => {
   ): Promise<string> {
     const get = await app.inject({ method: 'GET', url: '/login' });
     const csrf = ((get.body as string).match(/value="([A-Za-z0-9._\-]{16,})"/) ?? [])[1]!;
-    const initialCookies = (Array.isArray(get.headers['set-cookie'])
-      ? get.headers['set-cookie']
-      : [get.headers['set-cookie'] ?? ''])
+    const initialCookies = (
+      Array.isArray(get.headers['set-cookie'])
+        ? get.headers['set-cookie']
+        : [get.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -208,9 +215,11 @@ describe('web/admin-user-update-route', () => {
       },
       payload: `email=${encodeURIComponent(email)}&password=hunter22hunter22&_csrf=${encodeURIComponent(csrf)}`,
     });
-    return (Array.isArray(post.headers['set-cookie'])
-      ? post.headers['set-cookie']
-      : [post.headers['set-cookie'] ?? ''])
+    return (
+      Array.isArray(post.headers['set-cookie'])
+        ? post.headers['set-cookie']
+        : [post.headers['set-cookie'] ?? '']
+    )
       .map((c) => c?.split(';')[0])
       .filter(Boolean)
       .join('; ');
@@ -320,15 +329,13 @@ describe('web/admin-user-update-route', () => {
   it('C5-AD-PR + C6-AD-PR PFLICHT: audit-log BigInt-safe + carries adminId/action/targetUserId', async () => {
     const captured: string[] = [];
     const origWrite = process.stdout.write.bind(process.stdout);
-    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(
-      ((chunk: unknown, ...rest: unknown[]) => {
-        captured.push(typeof chunk === 'string' ? chunk : String(chunk));
-        return (origWrite as unknown as (...args: unknown[]) => boolean)(
-          chunk,
-          ...rest,
-        );
-      }) as typeof process.stdout.write,
-    );
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(((
+      chunk: unknown,
+      ...rest: unknown[]
+    ) => {
+      captured.push(typeof chunk === 'string' ? chunk : String(chunk));
+      return (origWrite as unknown as (...args: unknown[]) => boolean)(chunk, ...rest);
+    }) as typeof process.stdout.write);
     const app = await buildServer(config);
     try {
       const { cookieHeader, csrf } = await loginAndPrepareCsrf(
@@ -419,9 +426,7 @@ describe('web/admin-user-update-route', () => {
         const setCookie = res.headers['set-cookie'];
         const cookies = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
         expect(
-          cookies.some(
-            (c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c),
-          ),
+          cookies.some((c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c)),
         ).toBe(true);
 
         injectSpy.mockRestore();
@@ -477,16 +482,12 @@ describe('web/admin-user-update-route', () => {
         });
         expect([302, 303]).toContain(res.statusCode);
         // Concern #2: redirect goes to the EDIT-form for retry, not the list.
-        expect(res.headers.location).toBe(
-          `/admin/users/${targetUserId}?updateflash=csrf-stale`,
-        );
+        expect(res.headers.location).toBe(`/admin/users/${targetUserId}?updateflash=csrf-stale`);
         // mc_session NOT cleared (CSRF rotation race, session valid).
         const setCookie = res.headers['set-cookie'];
         const cookies = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
         expect(
-          cookies.some(
-            (c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c),
-          ),
+          cookies.some((c) => c?.startsWith('mc_session=') && /Max-Age=0|Expires=/.test(c)),
         ).toBe(false);
 
         injectSpy.mockRestore();

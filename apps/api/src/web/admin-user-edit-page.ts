@@ -1,9 +1,6 @@
 import { z } from 'zod';
 import type { FastifyPluginAsync } from 'fastify';
-import {
-  ADMIN_USER_FLASH_MAP,
-  type AdminUserFlashKey,
-} from './admin-user-flash-keys.js';
+import { ADMIN_USER_FLASH_MAP, type AdminUserFlashKey } from './admin-user-flash-keys.js';
 
 /**
  * Plan 8d Task 4: GET /admin/users/:id -- edit-form for a single user.

@@ -1,9 +1,6 @@
 import { z } from 'zod';
 import type { FastifyPluginAsync } from 'fastify';
-import {
-  ADMIN_INVITE_FLASH_KEYS,
-  ADMIN_INVITE_FLASH_MAP,
-} from './admin-invite-flash-keys.js';
+import { ADMIN_INVITE_FLASH_KEYS, ADMIN_INVITE_FLASH_MAP } from './admin-invite-flash-keys.js';
 
 /**
  * Plan 8d Task 5: GET /admin/invites -- paginated invite list (BFF).
@@ -43,10 +40,7 @@ export type InviteRowApi = {
 };
 
 export type InviteRowView = InviteRowApi & {
-  statusKey:
-    | 'invites_status_consumed'
-    | 'invites_status_expired'
-    | 'invites_status_active';
+  statusKey: 'invites_status_consumed' | 'invites_status_expired' | 'invites_status_active';
   canRevoke: boolean;
 };
 
@@ -58,10 +52,7 @@ export type InviteRowView = InviteRowApi & {
  * @param items raw items from inner GET /api/v1/admin/invites
  * @param now `Date.now()` snapshot — pass-in for deterministic tests
  */
-export function buildInvitesViewModel(
-  items: InviteRowApi[],
-  now: number,
-): InviteRowView[] {
+export function buildInvitesViewModel(items: InviteRowApi[], now: number): InviteRowView[] {
   return items.map((inv) => {
     const expiresAtMs = new Date(inv.expiresAt).getTime();
     const consumed = inv.consumedAt !== null;
@@ -100,16 +91,12 @@ export const adminInvitesListPagePlugin: FastifyPluginAsync = async (app) => {
       });
 
       if (inner.statusCode !== 200) {
-        return reply
-          .code(inner.statusCode)
-          .view('500', { title: 'Could not load invites' });
+        return reply.code(inner.statusCode).view('500', { title: 'Could not load invites' });
       }
 
       const data = inner.json() as { items: InviteRowApi[] };
 
-      const flashEntry = q.updateflash
-        ? ADMIN_INVITE_FLASH_MAP.get(q.updateflash)
-        : undefined;
+      const flashEntry = q.updateflash ? ADMIN_INVITE_FLASH_MAP.get(q.updateflash) : undefined;
       const flash = flashEntry
         ? {
             level: flashEntry.level,

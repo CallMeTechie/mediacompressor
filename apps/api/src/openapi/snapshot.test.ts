@@ -66,9 +66,7 @@ describe('OpenAPI snapshot', () => {
       writeFileSync(SNAPSHOT_PATH, expected, 'utf-8');
     }
     if (!existsSync(SNAPSHOT_PATH)) {
-      throw new Error(
-        `OpenAPI snapshot not found at ${SNAPSHOT_PATH} — run UPDATE_SNAPSHOT=1`,
-      );
+      throw new Error(`OpenAPI snapshot not found at ${SNAPSHOT_PATH} — run UPDATE_SNAPSHOT=1`);
     }
     const committed = readFileSync(SNAPSHOT_PATH, 'utf-8');
     expect(expected).toBe(committed);

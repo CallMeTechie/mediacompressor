@@ -131,8 +131,7 @@ describe('download route — GET /api/v1/jobs/:id/download (Plan 6 Task 4)', () 
         inputFilename: 'in.bin',
         uploadId: `task6-dl-${Math.random().toString(36).slice(2)}-${Date.now()}`,
         outputStorageKey: placeholderKey,
-        outputMime:
-          opts.outputMime === undefined ? 'application/octet-stream' : opts.outputMime,
+        outputMime: opts.outputMime === undefined ? 'application/octet-stream' : opts.outputMime,
         outputFormat: opts.outputFormat === undefined ? 'bin' : opts.outputFormat,
         ...(opts.outputBytes !== undefined && opts.outputBytes !== null
           ? { outputBytes: opts.outputBytes }

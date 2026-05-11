@@ -1,9 +1,6 @@
 import { z } from 'zod';
 import type { FastifyPluginAsync } from 'fastify';
-import {
-  ADMIN_USER_FLASH_MAP,
-  type AdminUserFlashKey,
-} from './admin-user-flash-keys.js';
+import { ADMIN_USER_FLASH_MAP, type AdminUserFlashKey } from './admin-user-flash-keys.js';
 
 /**
  * Plan 8d Task 4: GET /admin/users -- paginated user list (BFF).
@@ -59,9 +56,7 @@ export const adminUsersListPagePlugin: FastifyPluginAsync = async (app) => {
       });
 
       if (inner.statusCode !== 200) {
-        return reply
-          .code(inner.statusCode)
-          .view('500', { title: 'Could not load users' });
+        return reply.code(inner.statusCode).view('500', { title: 'Could not load users' });
       }
 
       const data = inner.json() as {
