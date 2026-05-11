@@ -1,2 +1,6 @@
 pnpm-lock.yaml
 *.md
+
+# Handlebars templates use partials ({{> csrf @root}}) that Prettier's
+# .hbs parser doesn't support. Templates are reviewed manually instead.
+**/*.hbs
