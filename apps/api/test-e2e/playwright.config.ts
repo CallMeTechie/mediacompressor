@@ -18,6 +18,15 @@ try {
 
 export default defineConfig({
   testDir: '.',
+  // Restrict to *.spec.ts in this directory only. Without these, Playwright's
+  // default testMatch `**/*.@(spec|test).?(c|m)[jt]s?(x)` walks up to the
+  // package root and collects `apps/api/dist/**/*.test.js` (vitest-style tests
+  // built by `tsc -b`). Those files `import { ... } from 'vitest'`, which loads
+  // `@vitest/expect` and clashes with Playwright's bundled `expect` on the
+  // `Symbol($$jest-matchers-object)` global → "Cannot redefine property" crash
+  // before any spec runs.
+  testMatch: /.*\.spec\.ts$/,
+  testIgnore: ['**/dist/**', '**/node_modules/**'],
   timeout: 30_000,
   fullyParallel: false, // share singleton DB rows
   forbidOnly: !!process.env.CI,
