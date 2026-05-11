@@ -56,7 +56,10 @@
                     "minLength": 1
                   }
                 },
-                "required": ["email", "password"],
+                "required": [
+                  "email",
+                  "password"
+                ],
                 "additionalProperties": false
               }
             }
@@ -191,7 +194,10 @@
                 "properties": {
                   "status": {
                     "type": "string",
-                    "enum": ["active", "disabled"]
+                    "enum": [
+                      "active",
+                      "disabled"
+                    ]
                   },
                   "storageQuota": {
                     "type": "integer",
@@ -322,7 +328,9 @@
                     "maxLength": 64
                   }
                 },
-                "required": ["name"],
+                "required": [
+                  "name"
+                ],
                 "additionalProperties": false
               }
             }
@@ -370,7 +378,14 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["queued", "processing", "succeeded", "failed", "canceled", "expired"]
+              "enum": [
+                "queued",
+                "processing",
+                "succeeded",
+                "failed",
+                "canceled",
+                "expired"
+              ]
             },
             "in": "query",
             "name": "status",
@@ -379,7 +394,10 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["image", "video"]
+              "enum": [
+                "image",
+                "video"
+              ]
             },
             "in": "query",
             "name": "kind",
@@ -523,15 +541,21 @@
                             "default": {}
                           }
                         },
-                        "required": ["Size"],
+                        "required": [
+                          "Size"
+                        ],
                         "additionalProperties": false
                       }
                     },
-                    "required": ["Upload"],
+                    "required": [
+                      "Upload"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["Event"],
+                "required": [
+                  "Event"
+                ],
                 "additionalProperties": false
               }
             }
@@ -590,15 +614,22 @@
                             "default": {}
                           }
                         },
-                        "required": ["ID", "Size"],
+                        "required": [
+                          "ID",
+                          "Size"
+                        ],
                         "additionalProperties": false
                       }
                     },
-                    "required": ["Upload"],
+                    "required": [
+                      "Upload"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["Event"],
+                "required": [
+                  "Event"
+                ],
                 "additionalProperties": false
               }
             }
@@ -961,7 +992,11 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["created", "revoked", "csrf-stale"]
+              "enum": [
+                "created",
+                "revoked",
+                "csrf-stale"
+              ]
             },
             "in": "query",
             "name": "updateflash",
@@ -1034,7 +1069,11 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["invite_create", "invite_revoke", "user_update"]
+              "enum": [
+                "invite_create",
+                "invite_revoke",
+                "user_update"
+              ]
             },
             "in": "query",
             "name": "action",

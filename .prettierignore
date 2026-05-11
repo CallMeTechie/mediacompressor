@@ -4,3 +4,9 @@ pnpm-lock.yaml
 # Handlebars templates use partials ({{> csrf @root}}) that Prettier's
 # .hbs parser doesn't support. Templates are reviewed manually instead.
 **/*.hbs
+
+# OpenAPI snapshot is regenerated via JSON.stringify(spec, null, 2) by the
+# snapshot test (UPDATE_SNAPSHOT=1). Prettier would reformat it on a parallel
+# track, causing CI drift between the test-writer format and the formatter
+# format. Test-format wins; Prettier stays out.
+apps/api/openapi-snapshot.json
