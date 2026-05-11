@@ -108,6 +108,9 @@ test('admin updates user -> AuditEvent row visible at /admin/audit-events', asyn
   // 3. Navigate to /admin/audit-events. The row from step 2 must be visible
   // with action=user_update, target=user/<targetUserId>, actor=ADMIN_EMAIL.
   await page.goto('/admin/audit-events');
+  // Locale-agnostic substring: matches both EN "Audit Events" and DE
+  // "Audit-Ereignisse". Intentional — the E2E sets no `mc_locale` cookie,
+  // so it should pass regardless of the test-env's default-locale config.
   await expect(page.locator('h1')).toContainText(/Audit/);
 
   // Default locale is `en` so the action label renders as "User updated"

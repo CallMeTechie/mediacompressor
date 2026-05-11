@@ -297,6 +297,16 @@ describe('web/admin-audit-events-page', () => {
       expect(body).toContain('User updated');
       // The actor email column shows the admin's email.
       expect(body).toContain(TEST_EMAIL_ADMIN);
+      // `<time datetime="...">` attribute MUST be HTML-spec-compliant
+      // ISO-8601 (YYYY-MM-DDTHH:MM:SS.sssZ), not a JS-Date.toString().
+      // Guards against view-model regression where createdAt is serialized
+      // via default `toString()` (e.g. "Mon May 11 2026 ..."), which breaks
+      // assistive-tech parsing per HTML <time> spec. `.toISOString()` always
+      // emits exactly 3 millisecond digits, so the regex pins that shape
+      // without an optional quantifier (which would trip detect-unsafe-regex).
+      expect(body).toMatch(
+        /<time datetime="\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z"/,
+      );
     } finally {
       await app.close();
     }
@@ -549,6 +559,26 @@ describe('web/admin-audit-events-page', () => {
       // Suffix must appear AFTER the prefix, with the (non-empty) cursor in between.
       const suffixIdx = body.indexOf(paginationSuffix, prefixIdx + paginationPrefix.length);
       expect(suffixIdx).toBeGreaterThan(prefixIdx + paginationPrefix.length);
+    } finally {
+      await app.close();
+    }
+  });
+
+  // 11. Pins Zod-coercion behaviour for the `limit` querystring: non-numeric
+  // values (e.g. `?limit=abc`) MUST 400-fail at the validation boundary,
+  // NOT silently fall back to the default 50. Guards against a future
+  // schema-change accidentally weakening the validator (e.g. dropping
+  // `.int()` or adding `.catch(50)`).
+  it('GET /admin/audit-events?limit=abc -> 400 (zod rejects non-numeric)', async () => {
+    const app = await buildServer(config);
+    try {
+      const cookie = await loginAndCookies(app, TEST_EMAIL_ADMIN_EMPTY);
+      const res = await app.inject({
+        method: 'GET',
+        url: '/admin/audit-events?limit=abc',
+        headers: { accept: 'text/html', cookie },
+      });
+      expect(res.statusCode).toBe(400);
     } finally {
       await app.close();
     }

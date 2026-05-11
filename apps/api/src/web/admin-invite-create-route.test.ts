@@ -796,31 +796,35 @@ describe('web/admin-invite-create-route', () => {
         payload: `_csrf=${encodeURIComponent(csrf)}`,
       });
       expect(post.statusCode).toBe(200);
-      // Extract the created invite-id from the rendered created-page; the
-      // route renders `data-invite-id` or the token alongside id. Easier:
-      // query the DB for the newest invite under this admin.
-      // Invite has no createdAt column; find any invite under this admin.
-      // beforeEach deletes prior invites so this should be the single new row.
-      const newest = await prisma.invite.findFirst({
+      // Invite has no createdAt column; find via createdById. beforeEach
+      // deletes prior invites so we explicitly assert exactly ONE row exists
+      // for this admin — guards against future drift where the cleanup
+      // invariant weakens and `findFirst` would silently pick an arbitrary
+      // row.
+      const inviteCount = await prisma.invite.count({
+        where: { createdById: adminId },
+      });
+      expect(inviteCount).toBe(1);
+      const newest = await prisma.invite.findFirstOrThrow({
         where: { createdById: adminId },
         select: { id: true },
       });
-      expect(newest).not.toBeNull();
 
+      // No `take: 1` here — `toHaveLength(1)` surfaces accidental duplicate
+      // audit-writes loudly instead of silently masking them via a limit.
       const events = await prisma.auditEvent.findMany({
         where: {
           actorUserId: adminId,
           action: 'invite_create',
-          targetId: newest!.id,
+          targetId: newest.id,
         },
         orderBy: { createdAt: 'desc' },
-        take: 1,
       });
       expect(events).toHaveLength(1);
       expect(events[0]).toMatchObject({
         action: 'invite_create',
         targetType: 'invite',
-        targetId: newest!.id,
+        targetId: newest.id,
       });
       // Whitelist enforcement: payload has `expiresAt`, NO `token`.
       expect(events[0]!.payload).not.toHaveProperty('token');

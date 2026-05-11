@@ -165,7 +165,12 @@ export const adminAuditEventsPagePlugin: FastifyPluginAsync = async (app) => {
         }
         return {
           id: e.id,
-          createdAt: e.createdAt,
+          // ISO-8601 so the template's `<time datetime="{{createdAt}}">`
+          // attribute is HTML-spec-compliant (assistive-tech parses it as a
+          // machine-readable timestamp). `formatDateTime` accepts strings
+          // too (`new Date(String(value))`), so the human-readable label
+          // continues to render correctly.
+          createdAt: e.createdAt.toISOString(),
           actorUserId: e.actorUserId,
           actorEmail,
           action: e.action,

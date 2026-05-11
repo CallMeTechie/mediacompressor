@@ -602,6 +602,8 @@ describe('web/admin-user-update-route', () => {
       expect([302, 303]).toContain(res.statusCode);
       expect(res.headers.location).toBe('/admin/users?updateflash=updated');
 
+      // No `take: 1` — `toHaveLength(1)` surfaces accidental duplicate
+      // audit-writes loudly instead of silently masking them via a limit.
       const events = await prisma.auditEvent.findMany({
         where: {
           actorUserId: adminId,
@@ -609,7 +611,6 @@ describe('web/admin-user-update-route', () => {
           targetId: targetUserId,
         },
         orderBy: { createdAt: 'desc' },
-        take: 1,
       });
       expect(events).toHaveLength(1);
       expect(events[0]).toMatchObject({

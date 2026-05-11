@@ -427,6 +427,8 @@ describe('web/admin-invite-revoke-route', () => {
       expect([302, 303]).toContain(res.statusCode);
       expect(res.headers.location).toBe('/admin/invites?updateflash=revoked');
 
+      // No `take: 1` — `toHaveLength(1)` surfaces accidental duplicate
+      // audit-writes loudly instead of silently masking them via a limit.
       const events = await prisma.auditEvent.findMany({
         where: {
           actorUserId: adminId,
@@ -434,7 +436,6 @@ describe('web/admin-invite-revoke-route', () => {
           targetId: created.id,
         },
         orderBy: { createdAt: 'desc' },
-        take: 1,
       });
       expect(events).toHaveLength(1);
       expect(events[0]).toMatchObject({
