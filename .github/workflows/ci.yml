@@ -150,10 +150,14 @@ jobs:
         run: |
           : "${CI_API_KEY_PEPPER:?CI_API_KEY_PEPPER MUSS in Repo-Settings > Secrets > Actions gesetzt sein (64-char hex, separat von Production!)}"
           : "${CI_SESSION_SECRET:?CI_SESSION_SECRET MUSS in Repo-Settings > Secrets > Actions gesetzt sein (32-char base64, separat von Production!)}"
+          : "${CI_CSRF_SECRET:?CI_CSRF_SECRET MUSS in Repo-Settings > Secrets > Actions gesetzt sein (64-char hex)}"
+          : "${CI_TUSD_SHARED_SECRET:?CI_TUSD_SHARED_SECRET MUSS in Repo-Settings > Secrets > Actions gesetzt sein (64-char hex)}"
           echo "OK: CI-Secrets sind gesetzt."
         env:
           CI_API_KEY_PEPPER: ${{ secrets.CI_API_KEY_PEPPER }}
           CI_SESSION_SECRET: ${{ secrets.CI_SESSION_SECRET }}
+          CI_CSRF_SECRET: ${{ secrets.CI_CSRF_SECRET }}
+          CI_TUSD_SHARED_SECRET: ${{ secrets.CI_TUSD_SHARED_SECRET }}
 
       - name: Install Playwright browsers
         run: pnpm --filter @mediacompressor/api exec playwright install --with-deps chromium
@@ -178,6 +182,12 @@ jobs:
           PORT: '3000'
           API_KEY_PEPPER: ${{ secrets.CI_API_KEY_PEPPER }}
           SESSION_SECRET: ${{ secrets.CI_SESSION_SECRET }}
+          CSRF_SECRET: ${{ secrets.CI_CSRF_SECRET }}
+          TUSD_SHARED_SECRET: ${{ secrets.CI_TUSD_SHARED_SECRET }}
+          TUSD_REQUIRE_SHARED_SECRET: 'true'
+          TUSD_DATA_DIR: /tmp/tusd-data
+          TUSD_FINAL_DIR: /tmp/uploads
+          MEDIA_MOUNT_PATH: /tmp
           TRUSTED_PROXY_CIDR: '127.0.0.1/32'
           NODE_ENV: production
 
