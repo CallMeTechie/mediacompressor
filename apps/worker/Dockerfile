@@ -1,24 +1,8 @@
-# Worker-Container für die Compression-Engine.
-# Plan 4 ergänzt CMD, COPY und das Workspace-Setup.
-# Plan 2 hinterlegt System-Deps (Runtime + Build) für HEIC/HEVC-Encoding via
-# sharp build-from-source (Plan 2 Task 4-bis). Ohne diese Build-Toolchain
-# liefert sharp's prebuilt-libvips kein HEVC-Encoder und tiny.heic-Generation
-# scheitert.
+# syntax=docker/dockerfile:1.7
 #
-# Plan 4 Task 12 follow-up: Switch von bookworm-slim → trixie-slim. bookworm
-# shippt libvips 8.14.1, aber sharp 0.33.5 mit SHARP_FORCE_GLOBAL_LIBVIPS=true
-# verlangt mindestens libvips 8.15.3 (Plan-2-Latenz: Plan 2's Worker-Dockerfile
-# führte nie ein echtes pnpm install aus, daher unentdeckt). Trixie shippt
-# libvips 8.16.x. Alle apt-Paket-Namen bleiben identisch (verifiziert in trixie/main).
-# Codec-Suffix `libx265-199` → `libx265-215` (Trixie ships x265 4.x mit ABI 215).
-
-FROM node:22-trixie-slim AS base
-
-# Runtime + Build deps für ffmpeg + libvips + libheif (mit x265, aom, dav1d, de265 codecs)
-# + sharp build-from-source toolchain (build-essential, python3, node-gyp deps).
-# Trixie shippt libheif 1.17+ mit Plugin-Architektur, aber wir behalten die
-# monolithischen Codec-SOs (libde265, libx265, libaom, libdav1d) — sie sind
-# weiterhin als shared libs verfügbar und decken HEIC/HEVC + AVIF ab.
+# Stage 1: builder — full toolchain (libvips-dev, libheif-dev, build-essential,
+# python3) for sharp build-from-source against system-libvips.
+FROM node:22-trixie-slim AS builder
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       ffmpeg \
@@ -35,32 +19,40 @@ RUN apt-get update \
       python3 \
       ca-certificates \
  && rm -rf /var/lib/apt/lists/*
-
-# sharp baut from-source gegen system-libvips, damit HEIC-Encoder verfügbar ist.
-# Ohne diese ENV nutzt sharp prebuilt-libvips ohne HEVC-Encoder.
 ENV SHARP_FORCE_GLOBAL_LIBVIPS=true
-
-# Smoke: Versionen melden, sodass `docker build` einen sichtbaren Beweis hinterlässt.
-# Trixie: libvips 8.16.x, libheif 1.17+. Codec-SOs werden weiterhin gelistet.
-RUN ffmpeg -version | head -n 1 \
- && vips --version 2>/dev/null \
- && ls /usr/lib/x86_64-linux-gnu/libheif.so* \
-       /usr/lib/x86_64-linux-gnu/libx265.so* \
-       /usr/lib/x86_64-linux-gnu/libaom.so* \
-       /usr/lib/x86_64-linux-gnu/libdav1d.so* \
-       /usr/lib/x86_64-linux-gnu/libde265.so* \
- && echo "Worker base image ready"
-
-# Plan 4 ergänzt von hier ab: WORKDIR, COPY, pnpm install, CMD
 WORKDIR /app
-COPY --chown=node:node package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
-COPY --chown=node:node tsconfig.base.json tsconfig.json ./
-COPY --chown=node:node packages ./packages
-COPY --chown=node:node apps/worker ./apps/worker
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY tsconfig.base.json tsconfig.json ./
+COPY packages ./packages
+COPY apps/worker ./apps/worker
 RUN corepack enable && corepack prepare pnpm@9 --activate \
- && chown -R node:node /app \
- && su node -c "pnpm install --frozen-lockfile \
-    && pnpm --filter @mediacompressor/db prisma:generate \
-    && pnpm --filter @mediacompressor/worker build"
+ && pnpm install --frozen-lockfile \
+ && pnpm --filter @mediacompressor/db prisma:generate \
+ && pnpm --filter @mediacompressor/worker build
+
+# Stage 2: runtime — runtime libs only (NO -dev, NO build-essential, NO python3).
+# WC-cicd-17: node_modules wird DIREKT vom builder kopiert — KEIN --prod
+# re-install, der sharp's gebauten sharp-linux-x64.node aus dem ersten
+# pnpm install gefährden würde.
+FROM node:22-trixie-slim AS runtime
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      ffmpeg \
+      libvips42t64 \
+      libheif1 \
+      libde265-0 \
+      libx265-215 \
+      libaom3 \
+      libdav1d7 \
+      ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+ENV SHARP_FORCE_GLOBAL_LIBVIPS=true
+WORKDIR /app
+COPY --from=builder --chown=node:node /app/package.json /app/pnpm-workspace.yaml ./
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/packages ./packages
+COPY --from=builder --chown=node:node /app/apps/worker/dist ./apps/worker/dist
+COPY --from=builder --chown=node:node /app/apps/worker/package.json ./apps/worker/package.json
+COPY --from=builder --chown=node:node /app/apps/worker/node_modules ./apps/worker/node_modules
 USER node
 CMD ["node", "apps/worker/dist/index.js"]
