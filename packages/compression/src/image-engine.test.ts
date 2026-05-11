@@ -13,10 +13,12 @@ let outDir: string;
 // fails with "No decoding plugin installed" / "bad seek". Locally (Plan 2
 // Task 4-bis env) the probe succeeds and both HEIC/AVIF tests run.
 // Must run synchronously at registration time because `it.skipIf` evaluates
-// its condition before `beforeAll` hooks fire.
+// its condition before `beforeAll` hooks fire. `.metadata()` only reads
+// container headers (succeeds even without a decoder plugin), so we force
+// real pixel decoding via `.toBuffer()` on a downscaled output.
 const heifDecoderAvailable = await (async () => {
   try {
-    await sharp(join(FIXTURES, 'tiny.heic')).metadata();
+    await sharp(join(FIXTURES, 'tiny.heic')).resize(2, 2).png().toBuffer();
     return true;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
