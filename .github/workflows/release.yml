@@ -4,8 +4,8 @@ on:
   push:
     branches: [main]
     tags:
-      - 'v*'           # echte Release-Tags (z.B. v1.0.0)
-      - '*-v[0-9]*'    # Plan-Tags im bestehenden Pattern (z.B. audit-event-v0.1.0)
+      - 'v*' # echte Release-Tags (z.B. v1.0.0)
+      - '*-v[0-9]*' # Plan-Tags im bestehenden Pattern (z.B. audit-event-v0.1.0)
   workflow_dispatch:
 
 permissions:
