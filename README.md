@@ -1,48 +1,58 @@
 # MediaCompressor
 
-Self-hosted Service zur Kompression von Bild- und Videodateien (Web-UI + REST-API).
+Self-hosted media-compression service. Drag-and-drop upload (TUS resumable),
+asynchronous compression pipeline (ffmpeg + libvips/libheif), browser-based
+admin UI with i18n (DE/EN), and persistent audit trail.
 
-## Status
+## Quick Start (Development)
 
-**Foundation-Phase abgeschlossen.** Repository ist auf alle nachfolgenden Pläne (Compression Engine, Auth, Job-Lifecycle, …) vorbereitet.
-
-Siehe [`docs/superpowers/specs/2026-05-03-mediacompressor-design.md`](./docs/superpowers/specs/2026-05-03-mediacompressor-design.md) für die vollständige Spezifikation und [`docs/superpowers/plans/`](./docs/superpowers/plans/) für die Implementierungspläne.
-
-## Voraussetzungen
-
-- Node 22 LTS (`.nvmrc`)
-- pnpm 9 (`corepack enable && corepack prepare pnpm@9 --activate`)
-- Docker + Compose v2
-
-## Erste Schritte
+Requirements: Docker + Docker Compose v2.24+, Node.js 22+, pnpm 9+.
 
 ```bash
-pnpm install
 cp .env.example .env
-docker compose up -d postgres redis
-docker compose run --rm migrate
-pnpm test
-pnpm lint
-pnpm typecheck
+docker compose up -d
+pnpm install
+pnpm --filter @mediacompressor/db prisma:migrate:deploy
+pnpm dev
 ```
+
+Service is reachable on `http://localhost:3000`.
 
 ## Production Deployment
 
-For production deployment with Caddy reverse-proxy + automatic Let's Encrypt TLS:
+See the production overlay:
 
-- **[Deploy-Runbook](docs/operations/deploy.md)** — first-deploy + secret-rotation procedures
-- **[Incident-Runbook](docs/operations/runbook.md)** — common-issue resolution + backup/restore
+```bash
+cp .env.production.example .env.production
+# Edit .env.production with real secrets (Postgres password, API_KEY_PEPPER, etc.)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
 
-## Repository-Struktur
+Caddy auto-issues TLS via Let's Encrypt. See the production `.env.example`
+file for required secrets and rotation guidance.
 
-| Pfad | Inhalt |
-|---|---|
-| `packages/shared` | Geteilte Typen, Zod-Schemas, Error-Codes |
-| `packages/storage` | StorageAdapter-Interface (Plan 2: LocalFsAdapter) |
-| `packages/compression` | CompressionRequest/Result + Profile-Allowlist (Plan 2: sharp/ffmpeg-Engines) |
-| `packages/db` | Prisma-Schema und Client-Factory |
-| `packages/eslint-plugin-mediacompressor` | Custom-Rule `no-direct-ffmpeg-spawn` (Spec C2) |
-| `apps/api` | Plan 4 — Fastify-Server |
-| `apps/worker` | Plan 4 — BullMQ-Job-Consumer |
-| `apps/web` | Plan 8 — React-Frontend |
-| `docs/` | Spezifikationen, Pläne, Prompts |
+## Container Images
+
+Pre-built images on GitHub Container Registry:
+
+- `ghcr.io/callmetechie/mediacompressor-api:latest`
+- `ghcr.io/callmetechie/mediacompressor-worker:latest`
+
+## Tech Stack
+
+- **API**: Fastify 5 + HTMX + Handlebars + Prisma 5 + Postgres 16
+- **Worker**: BullMQ + Redis + ffmpeg + sharp (libvips/libheif)
+- **Upload**: tusd (TUS protocol, resumable uploads)
+- **Reverse-Proxy**: Caddy 2 (auto-TLS, security headers)
+- **i18n**: i18next + fs-backend (DE/EN, full RTL-ready)
+
+## Contributions
+
+This repository accepts no external contributions at this time. Issues are
+welcome at https://github.com/CallMeTechie/mediacompressor/issues. Pull
+requests from forks will not be merged — please open an issue describing
+what you'd build, and the maintainer will scope it.
+
+## License
+
+MIT — see `LICENSE`.
