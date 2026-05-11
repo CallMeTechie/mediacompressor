@@ -57,4 +57,3 @@ what you'd build, and the maintainer will scope it.
 
 MIT — see `LICENSE`.
 
-<!-- pipeline test 2026-05-11T13:54:48Z -->
