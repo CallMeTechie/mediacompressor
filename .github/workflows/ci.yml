@@ -192,7 +192,7 @@ jobs:
           NODE_ENV: production
 
       - name: Run Playwright E2E specs
-        run: pnpm --filter @mediacompressor/api exec playwright test
+        run: pnpm --filter @mediacompressor/api exec playwright test --config=test-e2e/playwright.config.ts
         env:
           BASE_URL: http://localhost:3000
           DATABASE_URL: postgresql://mediacompressor:ci@localhost:5432/mediacompressor?schema=public
